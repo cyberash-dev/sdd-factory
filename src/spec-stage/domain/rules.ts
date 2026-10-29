@@ -88,17 +88,13 @@ export function specStageRules(caps: Caps): readonly TransitionRule[] {
       }),
     },
     {
-      name: "spec.blocked -> failed",
+      name: "spec.blocked -> run.failed",
       eventType: "spec.blocked",
       acceptsRunStatus: ["spec_drafting", "spec_review"],
       apply: ({ state, event }) => {
         const reason = stringField(event.payload, "reason");
         const detail = stringField(event.payload, "detail");
-        return {
-          state: { ...state, status: "failed", failure: { stage: "spec", reason, detail } },
-          emits: [{ type: "run.failed", producer: "foreman", payload: { stage: "spec", reason, detail } }],
-          effects: [],
-        };
+        return { state, emits: [{ type: "run.failed", producer: "foreman", payload: { stage: "spec", reason, detail } }], effects: [] };
       },
     },
   ];

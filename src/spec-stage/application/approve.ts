@@ -2,28 +2,15 @@ import { join } from "node:path";
 import type { Effect } from "../../bus/domain/transition.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
+import { parseFinalizeEnvelope } from "../../shared/sdd/envelope.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { specIntegrityProblems } from "../domain/spec-records.js";
-import type { CommandResult } from "../ports/command-runner.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
 
 const APPROVAL_MODE = "pre-authorized-at-launch";
 
 function approveArgv(slice: SliceContext, id: string): readonly string[] {
   return ["approve", "--id", id, "--approver", slice.operator, "--owner-role", "product-owner", "--change-request", `${slice.runId}: pre-authorised at launch`, "--scope", "first-time-approval", "--format=json"];
-}
-
-function finalizedCount(result: CommandResult): number | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.stdout);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null || !("finalized_ids" in parsed) || !Array.isArray(parsed.finalized_ids)) {
-    return null;
-  }
-  return parsed.finalized_ids.length;
 }
 
 export async function runApprove(_effect: Effect, context: EffectContext, slice: SliceContext, deps: StageDeps): Promise<void> {
@@ -50,11 +37,16 @@ export async function runApprove(_effect: Effect, context: EffectContext, slice:
     return;
   }
   const finalize = await deps.commands.run(["finalize", "--format=json"], productDir);
-  const approvedIds = finalize.exitCode === 0 ? finalizedCount(finalize) : null;
-  if (approvedIds === null) {
+  if (finalize.exitCode !== 0) {
     blocked(`finalize_failed: ${outputTail(finalize)}`);
     return;
   }
+  const finalized = parseFinalizeEnvelope(finalize.stdout);
+  if (!finalized.ok) {
+    blocked(`finalize_failed: ${finalized.kind ?? outputTail(finalize)}`);
+    return;
+  }
+  const approvedIds = finalized.flipped.length;
   const lintAfter = await deps.commands.run(["lint", "--format=json"], productDir);
   if (lintAfter.exitCode !== 0) {
     blocked(`lint_failed_after_finalize: ${outputTail(lintAfter)}`);

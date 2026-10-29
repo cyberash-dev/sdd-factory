@@ -4,7 +4,7 @@ import { createStageClock } from "../../src/spec-stage/application/stage-clock.j
 import type { CommandResult } from "../../src/spec-stage/ports/command-runner.js";
 import { CLI_SPEC, effectContext, exitZero, OPERATOR, RUN_ID, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace } from "./harness.js";
 
-const FINALIZED: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"plan_id":"p","finalized_ids":["todo-cli:SUR-001","todo-cli:CTR-001","todo-cli:OQ-001","todo-cli:ASM-001"],"files_changed":["spec/spec.md"],"archived_path":"x"}\n', stderr: "" };
+const FINALIZED: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"plan_id":"p","flipped":["todo-cli:SUR-001","todo-cli:CTR-001","todo-cli:OQ-001","todo-cli:ASM-001"],"files_changed":["spec/spec.md"],"archived_path":"x"}\n', stderr: "" };
 
 const APPROVE_FLAGS = ["--approver", OPERATOR, "--owner-role", "product-owner", "--change-request", `${RUN_ID}: pre-authorised at launch`, "--scope", "first-time-approval", "--format=json"];
 
@@ -45,12 +45,12 @@ describe("spec.approve effect", () => {
 
   it("blocks with finalize_failed and the CLI output when finalize refuses proposed references", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
-    const commands = scriptedCommands(sddReplies({ finalize: { exitCode: 1, stdout: '{"ok":false,"reason":"proposed-references"}', stderr: "" } }));
+    const commands = scriptedCommands(sddReplies({ finalize: { exitCode: 1, stdout: '{"format_version":1,"ok":false,"reason":"proposed-references"}', stderr: "" } }));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
 
-    expect([commands.calls.length, published]).toEqual([4, [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: 'finalize_failed: {"ok":false,"reason":"proposed-references"}' } }]]);
+    expect([commands.calls.length, published]).toEqual([4, [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: 'finalize_failed: {"format_version":1,"ok":false,"reason":"proposed-references"}' } }]]);
   });
 
   it("blocks with lint_failed before approving anything when lint is red", async () => {

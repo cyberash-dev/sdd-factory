@@ -84,12 +84,12 @@ describe("spec-stage rules", () => {
     expect([result.state.status, result.effects]).toEqual(["spec_approved", [{ kind: "design.architect", attempt: 1 }, { kind: "design.verification", attempt: 1 }]]);
   });
 
-  it("fails the run at stage spec with the blocked reason and detail", () => {
+  it("emits run.failed at stage spec with the blocked reason and leaves the terminal status to the factory rule", () => {
     const result = applied(stateAt("spec_drafting"), "spec.blocked", { reason: "lint_cap", detail: "lint_cap sdd:weasel" });
 
     expect([result.state.status, result.state.failure, result.emits]).toEqual([
-      "failed",
-      { stage: "spec", reason: "lint_cap", detail: "lint_cap sdd:weasel" },
+      "spec_drafting",
+      null,
       [{ type: "run.failed", producer: "foreman", payload: { stage: "spec", reason: "lint_cap", detail: "lint_cap sdd:weasel" } }],
     ]);
   });

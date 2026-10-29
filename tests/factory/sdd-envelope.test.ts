@@ -35,6 +35,12 @@ describe("agent-sdd 2.1.1 JSON envelopes", () => {
     expect(parseFinalizeEnvelope(await fixture("finalize-no-plan"))).toEqual({ ok: false, kind: "no-active-plan", flipped: [] });
   });
 
+  it("reads the finalized record ids from a successful finalize envelope", () => {
+    const envelope = parseFinalizeEnvelope(JSON.stringify({ format_version: 1, ok: true, finalized_ids: ["todo:BEH-001", "todo:CTR-001"] }));
+
+    expect(envelope).toEqual({ ok: true, kind: null, flipped: ["todo:BEH-001", "todo:CTR-001"] });
+  });
+
   it("rejects an envelope with an unsupported format_version", () => {
     expect(codeOf(() => parseLintEnvelope(JSON.stringify({ format_version: 2, ok: true, diagnostics: [] })))).toBe("sdd_envelope_unsupported");
   });

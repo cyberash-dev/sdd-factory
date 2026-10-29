@@ -134,6 +134,6 @@ export function parseFinalizeEnvelope(text: string): FinalizeEnvelope {
   if (typeof envelope["ok"] !== "boolean") {
     throw new SddEnvelopeError("sdd_envelope_malformed", "finalize envelope lacks ok");
   }
-  const flipped = Array.isArray(envelope["flipped"]) ? envelope["flipped"].filter((item): item is string => typeof item === "string") : [];
-  return { ok: envelope["ok"], kind: stringOrNull(envelope["kind"]), flipped };
+  const ids = Array.isArray(envelope["finalized_ids"]) ? envelope["finalized_ids"] : Array.isArray(envelope["flipped"]) ? envelope["flipped"] : [];
+  return { ok: envelope["ok"], kind: stringOrNull(envelope["kind"]), flipped: ids.filter((item): item is string => typeof item === "string") };
 }

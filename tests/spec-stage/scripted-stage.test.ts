@@ -8,7 +8,7 @@ import { composeEffectRunner, composeRules, type Slice } from "../../src/shared/
 import { createSpecStageSlice } from "../../src/spec-stage/index.js";
 import { analystHandoff, CLI_SPEC, criticHandoff, gaReview, RUN_ID, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type RoleScript, type StageWorkspace } from "./harness.js";
 
-const FINALIZED = { exitCode: 0, stdout: '{"ok":true,"finalized_ids":["todo-cli:SUR-001","todo-cli:CTR-001"]}', stderr: "" };
+const FINALIZED = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"plan_id":"p","flipped":["todo-cli:SUR-001","todo-cli:CTR-001"]}', stderr: "" };
 
 const DECIDE_FINDING = "- id: GA-001\n  kind: gap\n  target_ids: [todo-cli:CTR-001]\n  resolution: decide\n  required_change: add error_taxonomy";
 
@@ -44,7 +44,7 @@ async function scriptedStage(ws: StageWorkspace, scripts: readonly RoleScript[])
   runtime.join(createReactor("tracer", Object.fromEntries(EVENT_TYPES.map((type) => [type, (event: DeliveredEvent<EventType>) => trace.push(event)]))));
 
   runtime.publisher.publish({ type: "workspace.ready", producer: "foreman", payload: { productDir: ws.productDir, slug: "todo-cli", baselineId: "todo-cli:BL-001" } });
-  for (let round = 0; round < 40 && engine.state.status !== "spec_approved" && engine.state.status !== "failed"; round += 1) {
+  for (let round = 0; round < 40 && engine.state.status !== "spec_approved" && !trace.some((event) => event.type === "run.failed"); round += 1) {
     await Promise.all(settled.splice(0));
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
@@ -78,9 +78,9 @@ describe("spec stage through the run engine", () => {
   it("ends with spec.blocked{critic_cap} and run.failed after two rework answers, without a third draft", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
 
-    const { trace, engine } = await scriptedStage(ws, [analystWrites(ws, 1), criticAnswers(ws, 1, "rework"), analystWrites(ws, 2), criticAnswers(ws, 2, "rework")]);
+    const { trace } = await scriptedStage(ws, [analystWrites(ws, 1), criticAnswers(ws, 1, "rework"), analystWrites(ws, 2), criticAnswers(ws, 2, "rework")]);
 
-    expect([trace.map((event) => event.type), trace.at(-2)?.payload["reason"], engine.state.failure]).toEqual([
+    expect([trace.map((event) => event.type), trace.at(-2)?.payload["reason"], trace.at(-1)?.payload]).toEqual([
       ["workspace.ready", "spec.drafted", "spec.reviewed", "spec.rework", "spec.drafted", "spec.reviewed", "spec.blocked", "run.failed"],
       "critic_cap",
       { stage: "spec", reason: "critic_cap", detail: "critic answered rework in round 2 of 2; findings at spec/review/ga.md" },
