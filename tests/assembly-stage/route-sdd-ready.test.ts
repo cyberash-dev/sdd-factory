@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { copyFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { routeSddReadyEffect } from "../../src/assembly-stage/application/route-sdd-ready.js";
@@ -15,10 +15,15 @@ function tasks() {
   };
 }
 
-async function route(violations: readonly { readonly kind: string; readonly id?: string; readonly file?: string }[]) {
+async function route(violations: readonly { readonly kind: string; readonly id?: string; readonly file?: string }[] | "recorded") {
   const root = await tempDir("assembly-route");
   const evidencePath = join(root, "run/handoffs/assembly/round-1/sdd_ready.json");
-  await writeTextAtomic(evidencePath, sddReadyReport(violations));
+  if (violations === "recorded") {
+    await writeTextAtomic(evidencePath, "");
+    await copyFile(join(process.cwd(), "tests/fixtures/sdd-envelopes/ready-violations.json"), evidencePath);
+  } else {
+    await writeTextAtomic(evidencePath, sddReadyReport(violations));
+  }
   const triaged: Effect[] = [];
   const triage: EffectHandler = async (effect) => {
     triaged.push(effect);
@@ -57,6 +62,13 @@ describe("assembly.route-sdd-ready", () => {
     const { context } = await route([{ kind: "unapproved", id: "todo:DLT-001", file: "spec/spec.md" }, { kind: "uncovered", id: "todo:BEH-001", file: "spec/spec.md" }]);
 
     expect(context.published).toEqual([{ type: "run.failed", producer: "assembler", payload: { stage: "assembly", reason: "runtime_error", detail: "spec_gate: unapproved todo:DLT-001" } }]);
+  });
+
+  // @covers assembly-stage:BEH-006
+  it("fails the run on the recorded agent-sdd envelope whose first violation is unapproved", async () => {
+    const { context } = await route("recorded");
+
+    expect(context.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])).toEqual([["run.failed", "runtime_error", "spec_gate: unapproved factory:DLT-001"]]);
   });
 
   // @covers assembly-stage:BEH-006

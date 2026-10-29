@@ -7,7 +7,10 @@ import type { AssemblyLedger, MergeEntry, MergeResult, RoundFailingTest, StepRes
 import { integerField, stringArrayField } from "../domain/payload.js";
 import { redactSecrets, secretValuesOf } from "../domain/redaction.js";
 import { WRITE_SET_CONFLICT } from "../domain/rework-reasons.js";
-import { failingCoversOf, parseSddReadyReport } from "../domain/sdd-ready-report.js";
+import { parseReadyEnvelope, SddEnvelopeError, type ReadyEnvelope } from "../../shared/sdd/envelope.js";
+import { refreshBaselineBlock } from "../domain/baseline-block.js";
+import { failingCoversOf } from "../domain/sdd-ready-routing.js";
+import { parseTokenEnvelope } from "../domain/sdd-token.js";
 import { INSTALL_ARGV, NETWORK_FAILURE, OFFLINE_INSTALL_ARGV, VERIFICATION_SEQUENCE, VITEST_REPORT_FILE, stepArgv, type AssemblyStep } from "../domain/verification-steps.js";
 import { parseVitestReport } from "../domain/vitest-report.js";
 import type { Argv, CommandResult, CommandRunner } from "../ports/outbound/command-runner.js";
@@ -17,6 +20,8 @@ import { REPORT_FILE, updateLedger, writeProductReport, type LedgerIdentity } fr
 
 const INTEGRATION_BRANCH = "integration";
 const SDD_READY_REPORT_FILE = "sdd_ready.json";
+const SPEC_FILE = join("spec", "spec.md");
+const TOKEN_ARGV: Argv = ["npx", "sdd", "token", "--format=json"];
 
 interface VerifyRun {
   readonly slice: SliceContext;
@@ -116,13 +121,46 @@ async function runTest(run: VerifyRun): Promise<StepOutcome> {
   };
 }
 
+async function refreshBaseline(run: VerifyRun): Promise<void> {
+  const token = await execute(run, TOKEN_ARGV);
+  await captureCommand(run.evidenceDir, "sdd_token", token, run.secrets);
+  const envelope = parseTokenEnvelope(token.stdout);
+  if (token.exitCode !== 0 || !envelope.ok) {
+    throw new Error(`baseline_refresh_failed: ${envelope.ok ? `exit ${String(token.exitCode)}` : envelope.reason}`);
+  }
+  const specPath = join(run.slice.paths.productDir, SPEC_FILE);
+  const spec = await readTextOrNull(specPath);
+  if (spec === null) {
+    throw new Error(`baseline_refresh_failed: ${SPEC_FILE} is missing`);
+  }
+  const refreshed = refreshBaselineBlock(spec, { token: envelope.token, commitSha: envelope.commitSha });
+  if (refreshed === spec) {
+    return;
+  }
+  await writeTextAtomic(specPath, refreshed);
+  await run.git.output(["add", "--", SPEC_FILE]);
+  await run.git.output(["commit", "-m", "spec: baseline refresh"]);
+}
+
+function readyEnvelopeOf(text: string): ReadyEnvelope | null {
+  try {
+    return parseReadyEnvelope(text);
+  } catch (error) {
+    if (error instanceof SddEnvelopeError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function runSddReady(run: VerifyRun): Promise<StepOutcome> {
+  await refreshBaseline(run);
   const argv = stepArgv("sdd_ready", run.evidenceDir);
   const result = await execute(run, argv);
   await captureCommand(run.evidenceDir, "sdd_ready", result, run.secrets);
   const evidencePath = join(run.evidenceDir, SDD_READY_REPORT_FILE);
   await writeTextAtomic(evidencePath, redactSecrets(result.stdout, run.secrets));
-  const summary = parseSddReadyReport(result.stdout);
+  const summary = readyEnvelopeOf(result.stdout);
   const verdict: StepResult = result.exitCode === 0 && summary !== null && summary.ok ? "green" : "red";
   return {
     entry: entryOf(run, "sdd_ready", argv, result, verdict, evidencePath),

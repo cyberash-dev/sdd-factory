@@ -4,12 +4,16 @@ import { describe, expect, it } from "vitest";
 import { verifyEffect } from "../../src/assembly-stage/application/verify.js";
 import type { CommandInvocation } from "../../src/assembly-stage/ports/outbound/command-runner.js";
 import { writeTextAtomic } from "../../src/shared/fs/text.js";
-import { collectingContext, commandLine, coversMarker, commitFiles, failed, fakeCommandRunner, git, initRepo, ok, runState, sddReadyReport, sliceContext, taskState, tempDir, vitestReport, type CommandScript, type FakeCommandRunner } from "./support.js";
+import { baselineSpec, collectingContext, commandLine, coversMarker, commitFiles, failed, fakeCommandRunner, git, initRepo, ok, runState, sddReadyReport, sliceContext, SLUG, taskState, tempDir, tokenEnvelope, vitestReport, type CommandScript, type FakeCommandRunner } from "./support.js";
 
+const STALE_SHA = "0".repeat(40);
+const STALE_TOKEN = "0".repeat(64);
+const FRESH_SHA = "a".repeat(40);
+const FRESH_TOKEN = "b".repeat(64);
 const PRODUCT_FILES = {
   "package.json": '{"name":"todo-cli","version":"0.0.0","private":true,"scripts":{"test":"node --test tests/"}}\n',
   "tsconfig.json": "{}\n",
-  "spec/spec.md": "# spec\n",
+  "spec/spec.md": baselineSpec(SLUG, STALE_SHA, STALE_TOKEN),
   "design/tasks.json": "[]\n",
 };
 
@@ -43,6 +47,9 @@ function allGreen(vitestJson: string, sddJson = sddReadyReport([])): CommandScri
     if (line.startsWith("npx vitest")) {
       await writeTextAtomic(outputFileOf(invocation), vitestJson);
       return vitestJson.includes('"success":true') ? ok() : failed(1, "", "tests failed");
+    }
+    if (line.startsWith("npx sdd token")) {
+      return ok(tokenEnvelope(FRESH_TOKEN, FRESH_SHA));
     }
     if (line.startsWith("npx sdd ready")) {
       return sddJson.includes('"ok":true') ? ok(sddJson) : failed(1, "", sddJson);
@@ -161,7 +168,7 @@ describe("assembly.verify verification sequence", () => {
     const head = await git(fixture.productDir, "log", "-1", "--format=%s");
     expect([stepsOf(context), runner.calls.filter((call) => call.argv[0] !== "git").map(commandLine), head, await git(fixture.productDir, "show", "--stat", "--format=", "HEAD")]).toEqual([
       ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified test green", "assembly.verified sdd_ready green"],
-      ["npm ci --prefer-offline --no-audit --no-fund", "npx tsc --noEmit", `npx vitest run --reporter=json --outputFile=${join(fixture.root, "run/handoffs/assembly/round-1/vitest.json")}`, "npx sdd ready --format=json"],
+      ["npm ci --prefer-offline --no-audit --no-fund", "npx tsc --noEmit", `npx vitest run --reporter=json --outputFile=${join(fixture.root, "run/handoffs/assembly/round-1/vitest.json")}`, "npx sdd token --format=json", "npx sdd ready --format=json"],
       "assembly report round 1",
       expect.stringContaining("assembly/report.md"),
     ]);
@@ -247,10 +254,47 @@ describe("assembly.verify verification sequence", () => {
 
     const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
 
-    expect([context.published.at(-1)?.payload, await git(fixture.productDir, "rev-parse", "HEAD")]).toEqual([
+    expect([context.published.at(-1)?.payload, await git(fixture.productDir, "log", "-1", "--format=%s")]).toEqual([
       { result: "red", step: "sdd_ready", evidencePath: join(fixture.root, "run/handoffs/assembly/round-1/sdd_ready.json"), failingCovers: ["todo:BEH-002"] },
-      fixture.baseSha,
+      "spec: baseline refresh",
     ]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("refreshes the baseline block and commits spec/spec.md before running sdd ready", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(allGreen(vitestReport({ passing: ["x"] })));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    const spec = await readFile(join(fixture.productDir, "spec/spec.md"), "utf8");
+    const commands = runner.calls.map(commandLine).filter((line) => line.startsWith("npx sdd") || line.startsWith("git add") || line.startsWith("git commit"));
+    expect([spec.includes(`    reference: ${FRESH_SHA}`), spec.includes(`freshness_token: ${FRESH_TOKEN}`), spec.includes(`baseline_commit_sha: ${FRESH_SHA}`), spec.includes(STALE_TOKEN), commands.slice(0, 4), await git(fixture.productDir, "log", "-2", "--format=%s")]).toEqual([
+      true,
+      true,
+      true,
+      false,
+      ["npx sdd token --format=json", "git add -- spec/spec.md", "git commit -m spec: baseline refresh", "npx sdd ready --format=json"],
+      "assembly report round 1\nspec: baseline refresh",
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("commits nothing when the baseline block is already fresh", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npx sdd token") ? ok(tokenEnvelope(STALE_TOKEN, STALE_SHA)) : allGreen(vitestReport({ passing: ["x"] }), sddReadyReport([{ kind: "uncovered", id: "todo:BEH-001" }]))(invocation)));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([runner.calls.map(commandLine).filter((line) => line.startsWith("git commit")), await git(fixture.productDir, "rev-parse", "HEAD")]).toEqual([[], fixture.baseSha]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("fails fast when the discovery scope is dirty at token time", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npx sdd token") ? failed(1, "", JSON.stringify({ format_version: 1, ok: false, reason: "baseline-dirty", dirty_paths: ["src/"] })) : allGreen(vitestReport({ passing: ["x"] }))(invocation)));
+
+    await expect(runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"])).rejects.toThrow("baseline_refresh_failed: baseline-dirty");
   });
 
   // @covers assembly-stage:EXT-001

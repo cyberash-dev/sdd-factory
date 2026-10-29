@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { publishEffect } from "../../src/assembly-stage/application/publish.js";
 import { updateLedger } from "../../src/assembly-stage/application/ledger-store.js";
-import { collectingContext, commandLine, commitFiles, fakeCommandRunner, git, initRepo, RUN_ID, runState, SLUG, sliceContext, taskState, tempDir, writeFiles, type FakeCommandRunner } from "./support.js";
+import { collectingContext, commandLine, commitFiles, fakeCommandRunner, git, initRepo, registerTracer, RUN_ID, runState, SLUG, sliceContext, taskState, tempDir, writeFiles, type FakeCommandRunner } from "./support.js";
 
 const PRODUCT_FILES = {
   "package.json": '{"name":"todo-cli","version":"0.0.0","private":true,"scripts":{"test":"node --test tests/"}}\n',
@@ -45,7 +45,8 @@ async function fixture(options: { readonly origin?: "accepting" | "rejecting" | 
     }
     await git(teamDir, "remote", "add", "origin", bare);
   }
-  await writeFiles(join(root, "run", "trace"), { "trace.jsonl": '{"seq":1}\n', "trace.md": "# trace\n", "interventions.md": "# interventions\n" });
+  await writeFiles(join(root, "run", "trace"), { "trace.jsonl": "", "trace.md": "# trace\n", "interventions.md": "# interventions\n" });
+  registerTracer(sliceContext({ root }));
   await updateLedger({ runDir: join(root, "run"), runId: RUN_ID, slug: SLUG }, (ledger) => ({ ...ledger, rounds: 1, task_order: ["T-001"], verified_head: head }));
   return { root, productDir, teamDir, head };
 }
@@ -86,6 +87,7 @@ describe("assembly.publish", () => {
         "src/cli/index.js",
         "src/deep/nested/dir/leaf.js",
         "tests/cli/run.test.mjs",
+        "trace/costs.json",
         "trace/interventions.md",
         "trace/trace.jsonl",
         "trace/trace.md",

@@ -15,7 +15,7 @@ export function recordEffect(entries: { readonly triage?: readonly TriageEntry[]
 
 export function failedRun(state: RunState, reason: AssemblyFailureReason, detail: string, triage: readonly TriageEntry[] = []): TransitionResult {
   return {
-    state: { ...state, status: "failed", failure: { stage: "assembly", reason, detail } },
+    state,
     emits: [{ type: "run.failed", producer: "assembler", payload: { stage: "assembly", reason, detail } }],
     effects: [recordEffect({ triage, failed: `${reason}: ${detail}` })],
   };

@@ -1,6 +1,7 @@
-import { copyFile, cp, mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import type { EffectHandler, SliceContext } from "../../shared/slice.js";
+import { copyTraceTo } from "../../trace/index.js";
 import type { PublishedEntry } from "../domain/ledger.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { errorText } from "./evidence.js";
@@ -53,7 +54,7 @@ async function publishTree(slice: SliceContext, runner: CommandRunner, identity:
     throw new Error("integration working tree has uncommitted changes");
   }
   await copyIntegrationTree(productGit, slice.paths.productDir, slice.paths.outputDir);
-  await cp(slice.paths.traceDir, join(slice.paths.outputDir, "trace"), { recursive: true });
+  await copyTraceTo(slice.paths.traceDir, join(slice.paths.outputDir, "trace"));
   const outputRelative = relative(slice.paths.repoRoot, slice.paths.outputDir);
   await teamGit.output(["add", "-A", "--", outputRelative]);
   await teamGit.output(["commit", "-m", `factory: ${slice.slug} ${slice.runId}`]);

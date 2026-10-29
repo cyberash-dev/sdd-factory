@@ -15,6 +15,7 @@ import { DEFAULT_CONFIG, type FactoryConfig } from "../../src/shared/config.js";
 import type { ApiRoleRequest, ApiRoleRunner, ApiRoleUsage } from "../../src/shared/llm/api-role-runner.js";
 import { createPromptLibrary } from "../../src/shared/prompts.js";
 import type { SliceContext } from "../../src/shared/slice.js";
+import { createTraceSlice } from "../../src/trace/index.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,6 +24,18 @@ export const SLUG = "todo-cli";
 
 export function coversMarker(id: string): string {
   return `// @${"covers"} ${id}\n`;
+}
+
+export function baselineSpec(slug: string, commitSha: string, token: string): string {
+  return [
+    "# spec", "", "## 4. Brownfield baseline", "", "```yaml", "---", `id: ${slug}:BL-001`, "type: BrownfieldBaseline", "lifecycle:", "  status: approved", `partition_id: ${slug}`,
+    "discovery_scope:", "  - src", "  - tests", "coverage_evidence:", "  - kind: git_tree_hash_v1", `    reference: ${commitSha}`, "    note: |", "      scaffold",
+    `freshness_token: ${token}`, `baseline_commit_sha: ${commitSha}`, "mechanism: git_tree_hash_v1", "---", "```", "",
+  ].join("\n");
+}
+
+export function tokenEnvelope(token: string, commitSha: string): string {
+  return JSON.stringify({ format_version: 1, ok: true, token, commit_sha: commitSha, mechanism: "git_tree_hash_v1", scope: ["src", "tests"] });
 }
 
 export function ok(stdout = ""): CommandResult {
@@ -196,6 +209,13 @@ export function sliceContext(input: TestSliceInput): SliceContext {
     log: (line) => log.push(line),
     now: () => new Date("2026-10-29T12:00:00.000Z"),
   };
+}
+
+export function registerTracer(context: SliceContext): void {
+  for (const participant of createTraceSlice()(context).participants(context)) {
+    context.runtime.join(participant);
+  }
+  context.runtime.publisher.publish({ type: "run.started", producer: "foreman", payload: { specPath: context.paths.specSourcePath, slug: context.slug, operator: context.operator, mode: "autonomous" } });
 }
 
 export function vitestReport(input: { readonly failing?: readonly { readonly file: string; readonly name: string; readonly message: string }[]; readonly passing?: readonly string[] }): string {

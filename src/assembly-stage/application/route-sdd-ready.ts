@@ -6,10 +6,22 @@ import { ASSEMBLY_EFFECT } from "../domain/effects.js";
 import { integerField, stringField } from "../domain/payload.js";
 import { sddReadyReason } from "../domain/rework-reasons.js";
 import { reworkEvents } from "../domain/rules/emit.js";
-import { parseSddReadyReport, ROUTED_BY_FILE_KINDS, ROUTED_BY_ID_KINDS, SPEC_GATE_KINDS, type SddReadyViolation } from "../domain/sdd-ready-report.js";
+import { parseReadyEnvelope, SddEnvelopeError, type ReadyEnvelope, type ReadyViolation } from "../../shared/sdd/envelope.js";
+import { ROUTED_BY_FILE_KINDS, ROUTED_BY_ID_KINDS, SPEC_GATE_KINDS } from "../domain/sdd-ready-routing.js";
 import { updateLedger, writeFailedReport } from "./ledger-store.js";
 
-function ownersOf(tasks: Readonly<Record<string, TaskState>>, violation: SddReadyViolation): readonly string[] {
+function envelopeOf(text: string): ReadyEnvelope | null {
+  try {
+    return parseReadyEnvelope(text);
+  } catch (error) {
+    if (error instanceof SddEnvelopeError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function ownersOf(tasks: Readonly<Record<string, TaskState>>, violation: ReadyViolation): readonly string[] {
   if (ROUTED_BY_ID_KINDS.includes(violation.kind)) {
     return violation.id === null ? [] : tasksCovering(tasks, violation.id);
   }
@@ -24,7 +36,7 @@ export function routeSddReadyEffect(triage: EffectHandler): EffectHandler {
     const round = integerField(effect, "round");
     const evidencePath = stringField(effect, "evidencePath");
     const identity = { runDir: slice.paths.runDir, runId: slice.runId, slug: slice.slug };
-    const summary = parseSddReadyReport((await readTextOrNull(evidencePath)) ?? "");
+    const summary = envelopeOf((await readTextOrNull(evidencePath)) ?? "");
     const tasks = context.state.tasks;
     const reasonsByTask = new Map<string, string[]>();
     let needsTriage = summary === null;

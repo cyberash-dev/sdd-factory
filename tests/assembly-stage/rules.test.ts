@@ -119,8 +119,8 @@ describe("assembly.verified rule", () => {
     const result = assemblyVerifiedRule(DEPS).apply({ state: assembling(2), event: verified("red", "test", ["todo:BEH-001"]) });
 
     expect([result.state.status, result.state.failure, result.emits, result.effects]).toEqual([
-      "failed",
-      { stage: "assembly", reason: "cap_exhausted", detail: "round 2" },
+      "assembling",
+      null,
       [{ type: "run.failed", producer: "assembler", payload: { stage: "assembly", reason: "cap_exhausted", detail: "round 2" } }],
       [{ kind: "assembly.record", triage: [], failed: "cap_exhausted: round 2" }],
     ]);
@@ -183,7 +183,7 @@ describe("assembly.triaged rule", () => {
     const result = assemblyTriagedRule(DEPS).apply({ state: assembling(1), event: delivered("assembly.triaged", { taskId: null, target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts" }) });
 
     expect([result.state.status, result.emits]).toEqual([
-      "failed",
+      "assembling",
       [{ type: "run.failed", producer: "assembler", payload: { stage: "assembly", reason: "design_blocked", detail: "conflict between T-001 and T-002 in src/types.ts" } }],
     ]);
   });

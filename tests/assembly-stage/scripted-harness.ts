@@ -10,13 +10,13 @@ import type { TransitionRule } from "../../src/bus/domain/transition.js";
 import type { ApiRoleRunner } from "../../src/shared/llm/api-role-runner.js";
 import { composeEffectRunner, composeRules, type Slice } from "../../src/shared/slice.js";
 import { writeTextAtomic } from "../../src/shared/fs/text.js";
-import { commandLine, commitFiles, coversMarker, fakeCommandRunner, git, initRepo, ok, failed, runState, sddReadyReport, sliceContext, taskState, tempDir, writeFiles } from "./support.js";
+import { baselineSpec, commandLine, commitFiles, coversMarker, fakeCommandRunner, git, initRepo, ok, failed, registerTracer, runState, sddReadyReport, sliceContext, SLUG, taskState, tempDir, tokenEnvelope, writeFiles } from "./support.js";
 
 export const PRODUCT_FILES = {
   "package.json": '{"name":"todo-cli","version":"0.0.0","private":true,"type":"module","scripts":{"test":"node --test tests/"}}\n',
   "package-lock.json": '{"name":"todo-cli","version":"0.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"todo-cli","version":"0.0.0"}}}\n',
   "tsconfig.json": '{"compilerOptions":{"allowJs":true,"noEmit":true}}\n',
-  "spec/spec.md": "# todo-cli spec\n",
+  "spec/spec.md": baselineSpec(SLUG, "0".repeat(40), "0".repeat(64)),
   "design/tasks.json": '[{"id":"T-001","covers":["todo:CTR-001"],"writes":["src/cli/**","tests/cli/**"],"dependsOn":[]},{"id":"T-002","covers":["todo:BEH-002"],"writes":["src/store/**","tests/store/**"],"dependsOn":["T-001"]},{"id":"T-003","covers":["todo:BEH-003"],"writes":["src/api/**","tests/api/**"],"dependsOn":["T-001"]}]\n',
 };
 
@@ -105,6 +105,7 @@ export async function scriptedAssembly(options: ScriptedOptions): Promise<Script
   }
   await initRepo(teamDir, "main", { "README.md": "team\n" });
   await writeFiles(join(root, "run", "trace"), { "trace.jsonl": "", "trace.md": "# trace\n", "interventions.md": "# interventions\n" });
+  registerTracer(sliceContext({ root }));
   let vitestRuns = 0;
   let tscRuns = 0;
   const runner = fakeCommandRunner(async (invocation) => {
@@ -122,6 +123,9 @@ export async function scriptedAssembly(options: ScriptedOptions): Promise<Script
       const outputFile = invocation.argv.find((argument) => argument.startsWith("--outputFile="))?.slice("--outputFile=".length) ?? "";
       await writeTextAtomic(outputFile, report);
       return report.includes('"success":true') ? ok() : failed(1, "", "failed");
+    }
+    if (line.startsWith("npx sdd token")) {
+      return ok(tokenEnvelope("c".repeat(64), await git(productDir, "rev-parse", "HEAD")));
     }
     if (line.startsWith("npx sdd ready")) {
       return ok(sddReadyReport([]));
