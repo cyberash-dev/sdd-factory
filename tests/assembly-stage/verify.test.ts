@@ -1,0 +1,298 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { verifyEffect } from "../../src/assembly-stage/application/verify.js";
+import type { CommandInvocation } from "../../src/assembly-stage/ports/outbound/command-runner.js";
+import { writeTextAtomic } from "../../src/shared/fs/text.js";
+import { collectingContext, commandLine, coversMarker, commitFiles, failed, fakeCommandRunner, git, initRepo, ok, runState, sddReadyReport, sliceContext, taskState, tempDir, vitestReport, type CommandScript, type FakeCommandRunner } from "./support.js";
+
+const PRODUCT_FILES = {
+  "package.json": '{"name":"todo-cli","version":"0.0.0","private":true,"scripts":{"test":"node --test tests/"}}\n',
+  "tsconfig.json": "{}\n",
+  "spec/spec.md": "# spec\n",
+  "design/tasks.json": "[]\n",
+};
+
+interface Fixture {
+  readonly root: string;
+  readonly productDir: string;
+  readonly baseSha: string;
+}
+
+async function productRepo(): Promise<Fixture> {
+  const root = await tempDir("assembly-verify");
+  const productDir = join(root, "product");
+  const baseSha = await initRepo(productDir, "integration", PRODUCT_FILES);
+  return { root, productDir, baseSha };
+}
+
+function outputFileOf(invocation: CommandInvocation): string {
+  const flag = invocation.argv.find((argument) => argument.startsWith("--outputFile="));
+  return flag === undefined ? "" : flag.slice("--outputFile=".length);
+}
+
+function allGreen(vitestJson: string, sddJson = sddReadyReport([])): CommandScript {
+  return async (invocation) => {
+    const line = commandLine(invocation);
+    if (line.startsWith("npm ci")) {
+      return ok("added 0 packages");
+    }
+    if (line.startsWith("npx tsc")) {
+      return ok();
+    }
+    if (line.startsWith("npx vitest")) {
+      await writeTextAtomic(outputFileOf(invocation), vitestJson);
+      return vitestJson.includes('"success":true') ? ok() : failed(1, "", "tests failed");
+    }
+    if (line.startsWith("npx sdd ready")) {
+      return sddJson.includes('"ok":true') ? ok(sddJson) : failed(1, "", sddJson);
+    }
+    return undefined;
+  };
+}
+
+async function runVerify(fixture: Fixture, runner: FakeCommandRunner, tasks: Parameters<typeof runState>[0]["tasks"], taskOrder: readonly string[]) {
+  const state = runState({ status: "assembling", assemblyRounds: 1, tasks });
+  const context = collectingContext(state);
+  const log: string[] = [];
+  await verifyEffect(runner)({ kind: "assembly.verify", round: 1, taskOrder }, context, sliceContext({ root: fixture.root, log }));
+  return { context, log };
+}
+
+function stepsOf(context: { readonly published: readonly { readonly type: string; readonly payload: Readonly<Record<string, unknown>> }[] }): readonly string[] {
+  return context.published.map((event) => `${event.type} ${String(event.payload["step"] ?? event.payload["target"])} ${String(event.payload["result"] ?? event.payload["reason"])}`);
+}
+
+describe("assembly.verify straggler merge", () => {
+  // @covers assembly-stage:BEH-002
+  // @covers assembly-stage:INV-001
+  it("skips every task already reachable from the integration head and creates no merge commit", async () => {
+    const fixture = await productRepo();
+    const first = await commitFiles(fixture.productDir, { "src/a.js": "export const a = 1;\n" }, "T-001");
+    const second = await commitFiles(fixture.productDir, { "src/b.js": "export const b = 2;\n" }, "T-002");
+    const third = await commitFiles(fixture.productDir, { "src/c.js": "export const c = 3;\n" }, "T-003");
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npm ci") ? failed(1, "EACCES") : undefined));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: first }), "T-002": taskState({ implSha: second }), "T-003": taskState({ implSha: third }) }, ["T-001", "T-002", "T-003"]);
+
+    const ledger = JSON.parse(await readFile(join(fixture.root, "run", "assembly", "ledger.json"), "utf8"));
+    expect([ledger.merges.map((entry: { result: string }) => entry.result), await git(fixture.productDir, "rev-parse", "HEAD"), await git(fixture.productDir, "rev-list", "--count", "HEAD")]).toEqual([
+      ["skipped_ancestor", "skipped_ancestor", "skipped_ancestor"],
+      third,
+      "4",
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-002
+  it("fast-forwards a straggler whose commit descends from the integration head", async () => {
+    const fixture = await productRepo();
+    const first = await commitFiles(fixture.productDir, { "src/a.js": "export const a = 1;\n" }, "T-001");
+    await git(fixture.productDir, "checkout", "-q", "-b", "task/T-002");
+    const straggler = await commitFiles(fixture.productDir, { "src/b.js": "export const b = 2;\n" }, "T-002");
+    await git(fixture.productDir, "checkout", "-q", "integration");
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npm ci") ? failed(1, "EACCES") : undefined));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: first }), "T-002": taskState({ implSha: straggler }) }, ["T-001", "T-002"]);
+
+    const ledger = JSON.parse(await readFile(join(fixture.root, "run", "assembly", "ledger.json"), "utf8"));
+    expect([ledger.merges.map((entry: { result: string }) => entry.result), await git(fixture.productDir, "rev-parse", "HEAD")]).toEqual([["skipped_ancestor", "fast_forward"], straggler]);
+  });
+
+  // @covers assembly-stage:BEH-002
+  // @covers assembly-stage:INV-001
+  it("creates a merge commit for a diverged straggler whose tree equals the clean merge of both parents", async () => {
+    const fixture = await productRepo();
+    await git(fixture.productDir, "checkout", "-q", "-b", "task/T-002");
+    const straggler = await commitFiles(fixture.productDir, { "src/b.js": "export const b = 2;\n" }, "T-002");
+    await git(fixture.productDir, "checkout", "-q", "integration");
+    const first = await commitFiles(fixture.productDir, { "src/a.js": "export const a = 1;\n" }, "T-001");
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npm ci") ? failed(1, "EACCES") : undefined));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: first }), "T-002": taskState({ implSha: straggler }) }, ["T-001", "T-002"]);
+
+    const ledger = JSON.parse(await readFile(join(fixture.root, "run", "assembly", "ledger.json"), "utf8"));
+    const expectedTree = await git(fixture.productDir, "merge-tree", "--write-tree", first, straggler);
+    expect([ledger.merges.map((entry: { result: string }) => entry.result), await git(fixture.productDir, "rev-parse", "HEAD^{tree}"), await git(fixture.productDir, "rev-list", "--merges", "--count", "HEAD")]).toEqual([
+      ["skipped_ancestor", "merged"],
+      expectedTree,
+      "1",
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-002
+  // @covers assembly-stage:CST-002
+  it("aborts a conflicting straggler merge, leaves a clean tree and routes the task to the planner", async () => {
+    const fixture = await productRepo();
+    await git(fixture.productDir, "checkout", "-q", "-b", "task/T-002");
+    const straggler = await commitFiles(fixture.productDir, { "src/shared.js": "export const shared = 'from T-002';\n" }, "T-002");
+    await git(fixture.productDir, "checkout", "-q", "integration");
+    const first = await commitFiles(fixture.productDir, { "src/shared.js": "export const shared = 'from T-001';\n" }, "T-001");
+    const runner = fakeCommandRunner(() => undefined);
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: first }), "T-002": taskState({ implSha: straggler }) }, ["T-001", "T-002"]);
+
+    expect([context.published, await git(fixture.productDir, "status", "--porcelain"), await readFile(join(fixture.productDir, "src/shared.js"), "utf8"), await git(fixture.productDir, "rev-parse", "HEAD")]).toEqual([
+      [{ type: "assembly.triaged", producer: "assembler", payload: { taskId: "T-002", target: "planner", reason: "write_set_conflict" } }],
+      "",
+      "export const shared = 'from T-001';\n",
+      first,
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-002
+  it("fails fast on a task whose implSha is missing from the repository", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(() => undefined);
+
+    await expect(runVerify(fixture, runner, { "T-001": taskState({ implSha: "0123456789abcdef0123456789abcdef01234567" }) }, ["T-001"])).rejects.toThrow("missing_commit: T-001");
+  });
+});
+
+describe("assembly.verify verification sequence", () => {
+  // @covers assembly-stage:BEH-003
+  // @covers assembly-stage:CST-003
+  it("runs install, typecheck, test and sdd ready in order and commits the report on integration when all are green", async () => {
+    const fixture = await productRepo();
+    const first = await commitFiles(fixture.productDir, { "tests/a.test.mjs": coversMarker("todo:BEH-001") }, "T-001");
+    const runner = fakeCommandRunner(allGreen(vitestReport({ passing: [join(fixture.productDir, "tests/a.test.mjs")] })));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: first }) }, ["T-001"]);
+
+    const head = await git(fixture.productDir, "log", "-1", "--format=%s");
+    expect([stepsOf(context), runner.calls.filter((call) => call.argv[0] !== "git").map(commandLine), head, await git(fixture.productDir, "show", "--stat", "--format=", "HEAD")]).toEqual([
+      ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified test green", "assembly.verified sdd_ready green"],
+      ["npm ci --prefer-offline --no-audit --no-fund", "npx tsc --noEmit", `npx vitest run --reporter=json --outputFile=${join(fixture.root, "run/handoffs/assembly/round-1/vitest.json")}`, "npx sdd ready --format=json"],
+      "assembly report round 1",
+      expect.stringContaining("assembly/report.md"),
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("stops after a red install and emits one red event", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npm ci") ? failed(1, "npm ERR! missing: left-pad") : undefined));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([stepsOf(context), runner.calls.filter((call) => call.argv[0] !== "git").map(commandLine)]).toEqual([["assembly.verified install red"], ["npm ci --prefer-offline --no-audit --no-fund"]]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("stops after a red typecheck without running the tests", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(async (invocation) => {
+      const line = commandLine(invocation);
+      return line.startsWith("npm ci") ? ok() : line.startsWith("npx tsc") ? failed(2, "", "src/a.ts(1,1): error TS2304") : undefined;
+    });
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    const evidence = await readFile(join(fixture.root, "run/handoffs/assembly/round-1/typecheck.log"), "utf8");
+    expect([stepsOf(context), runner.calls.filter((call) => call.argv[0] === "npx").length, evidence]).toEqual([
+      ["assembly.verified install green", "assembly.verified typecheck red"],
+      1,
+      "--- stdout ---\nsrc/a.ts(1,1): error TS2304\n--- stderr ---\n\n",
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("reports the covers markers of both failing test files and skips sdd ready", async () => {
+    const fixture = await productRepo();
+    const first = await commitFiles(fixture.productDir, { "tests/cli/parse.test.mjs": coversMarker("todo:CTR-001") + coversMarker("todo:BEH-001"), "tests/store/save.test.mjs": coversMarker("todo:BEH-002"), "tests/ok.test.mjs": coversMarker("todo:BEH-003") }, "T-001");
+    const report = vitestReport({
+      failing: [
+        { file: join(fixture.productDir, "tests/cli/parse.test.mjs"), name: "parses flags", message: "expected 1 to be 2" },
+        { file: join(fixture.productDir, "tests/store/save.test.mjs"), name: "saves", message: "ENOENT" },
+      ],
+      passing: [join(fixture.productDir, "tests/ok.test.mjs")],
+    });
+    const runner = fakeCommandRunner(allGreen(report));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: first }) }, ["T-001"]);
+
+    const ledger = JSON.parse(await readFile(join(fixture.root, "run", "assembly", "ledger.json"), "utf8"));
+    expect([context.published.at(-1)?.payload, runner.calls.some((call) => commandLine(call).startsWith("npx sdd")), ledger.failing_tests]).toEqual([
+      { result: "red", step: "test", evidencePath: join(fixture.root, "run/handoffs/assembly/round-1/vitest.json"), failingCovers: ["todo:CTR-001", "todo:BEH-001", "todo:BEH-002"] },
+      false,
+      [
+        { round: 1, file: "tests/cli/parse.test.mjs", name: "parses flags", message: "expected 1 to be 2" },
+        { round: 1, file: "tests/store/save.test.mjs", name: "saves", message: "ENOENT" },
+      ],
+    ]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("treats a vitest exit 0 whose report shows a failed suite as red", async () => {
+    const fixture = await productRepo();
+    const report = vitestReport({ failing: [{ file: join(fixture.productDir, "tests/broken.test.mjs"), name: "(suite)", message: "Cannot find module" }] });
+    const runner = fakeCommandRunner(async (invocation) => {
+      const line = commandLine(invocation);
+      if (line.startsWith("npx vitest")) {
+        await writeTextAtomic(outputFileOf(invocation), report);
+        return ok();
+      }
+      return line.startsWith("npm ci") || line.startsWith("npx tsc") ? ok() : undefined;
+    });
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect(stepsOf(context).at(-1)).toBe("assembly.verified test red");
+  });
+
+  // @covers assembly-stage:BEH-003
+  // @covers assembly-stage:CST-003
+  it("reports the uncovered id on a red sdd ready and commits no report", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(allGreen(vitestReport({ passing: ["x"] }), sddReadyReport([{ kind: "uncovered", id: "todo:BEH-002", file: "spec/spec.md" }])));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([context.published.at(-1)?.payload, await git(fixture.productDir, "rev-parse", "HEAD")]).toEqual([
+      { result: "red", step: "sdd_ready", evidencePath: join(fixture.root, "run/handoffs/assembly/round-1/sdd_ready.json"), failingCovers: ["todo:BEH-002"] },
+      fixture.baseSha,
+    ]);
+  });
+
+  // @covers assembly-stage:EXT-001
+  it("retries npm ci offline once after a network failure and reports install green when the retry succeeds", async () => {
+    const fixture = await productRepo();
+    let installs = 0;
+    const runner = fakeCommandRunner(async (invocation) => {
+      const line = commandLine(invocation);
+      if (line.startsWith("npm ci")) {
+        installs += 1;
+        return installs === 1 ? failed(1, "npm ERR! code ENOTFOUND registry.npmjs.org") : ok();
+      }
+      return line.startsWith("npx tsc") ? failed(1, "", "error") : undefined;
+    });
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([runner.calls.filter((call) => call.argv[0] === "npm").map(commandLine), stepsOf(context)[0]]).toEqual([
+      ["npm ci --prefer-offline --no-audit --no-fund", "npm ci --offline --no-audit --no-fund"],
+      "assembly.verified install green",
+    ]);
+  });
+
+  // @covers assembly-stage:EXT-001
+  it("emits exactly one red install event when the online and the offline install both fail", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npm ci") ? failed(1, "npm ERR! code ECONNRESET") : undefined));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([runner.calls.filter((call) => call.argv[0] === "npm").length, stepsOf(context)]).toEqual([2, ["assembly.verified install red"]]);
+  });
+
+  // @covers assembly-stage:BEH-003
+  it("redacts secret environment values from the captured command output", async () => {
+    const fixture = await productRepo();
+    process.env["ASSEMBLY_TEST_TOKEN"] = "hunter2hunter2";
+    const runner = fakeCommandRunner(async (invocation) => (commandLine(invocation).startsWith("npm ci") ? failed(1, "auth failed with hunter2hunter2") : undefined));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    delete process.env["ASSEMBLY_TEST_TOKEN"];
+    expect(await readFile(join(fixture.root, "run/handoffs/assembly/round-1/install.log"), "utf8")).toBe("--- stdout ---\n\n--- stderr ---\nauth failed with [REDACTED]\n");
+  });
+});
