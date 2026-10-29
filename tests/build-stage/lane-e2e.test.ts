@@ -150,7 +150,7 @@ describe("build lane end to end", () => {
         if (invocation.role === "test-writer") {
           if (invocation.attempt === 2) {
             restart.head = await git(invocation.worktree, ["rev-parse", "HEAD"]);
-            restart.status = await git(invocation.worktree, ["status", "--porcelain"]);
+            restart.status = await git(invocation.worktree, ["status", "--porcelain", "--", ".", ":(exclude)node_modules"]);
           }
           await writeTests(invocation, invocation.attempt === 1 ? RED_TEST.replace('"Hello, Ada!"', '"Hi Ada"') : RED_TEST);
           return;

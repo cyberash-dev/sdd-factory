@@ -42,6 +42,15 @@ describe("lane start", () => {
     expect([await readFile(join(lane.worktree, "src/greet.ts"), "utf8"), await git(lane.worktree, ["log", "-1", "--format=%s"])]).toEqual(["export function greet(name: string): string {\n  return name;\n}\n", "scaffold product"]);
   });
 
+  it("replaces a scaffold placeholder that exports nothing with the throwing stub", async () => {
+    const productDir = await aProductRepo({ "src/greet.ts": "export {};\n" });
+    const harness = await aLaneHarness({ productDir, design: greeterDesign() });
+
+    const lane = await provisionLane(harness);
+
+    expect([await readFile(join(lane.worktree, "src/greet.ts"), "utf8"), await git(lane.worktree, ["log", "-1", "--format=%s"])]).toEqual(['export function greet(name: string): string {\n  throw new Error("not implemented: greet");\n}\n', "scaffold T-001"]);
+  });
+
   it("writes the stub at the module entry when owns is a glob, never at a path named after the glob", async () => {
     const module = aModule({ owns: ["src/cli/**"], entry: "src/cli/index.ts" });
     const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign([aTaskSpec({ writes: ["src/cli/**", "tests/cli/**"] })], [module]) });

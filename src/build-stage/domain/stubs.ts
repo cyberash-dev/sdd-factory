@@ -80,6 +80,12 @@ export function stubForExport(item: TechExport): string {
   }
 }
 
+/* A scaffold placeholder exporting nothing is not an implementation: the stub replaces it. */
+export function isPlaceholderModule(source: string): boolean {
+  const body = source.trim();
+  return body.length === 0 || body === "export {};" || body === "export {}";
+}
+
 export function stubSource(module: TechModule): string {
   if (module.exports.length === 0) {
     return "export {};\n";

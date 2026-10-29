@@ -1,9 +1,10 @@
 import { access, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
+import { readTextOrNull } from "../../../shared/fs/text.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { taskBranch } from "../../domain/handoff-paths.js";
-import { modulesOfTask, stubSource } from "../../domain/stubs.js";
+import { isPlaceholderModule, modulesOfTask, stubSource } from "../../domain/stubs.js";
 import { startableTasks } from "../../domain/task-scheduling.js";
 import type { DesignBundle } from "../../ports/outbound/design-source.js";
 import { taskEntryOf } from "../design-cache.js";
@@ -19,6 +20,11 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+async function needsStub(path: string): Promise<boolean> {
+  const existing = await readTextOrNull(path);
+  return existing === null || isPlaceholderModule(existing);
+}
+
 export async function linkNodeModules(productDir: string, worktree: string): Promise<void> {
   const target = join(worktree, "node_modules");
   await rm(target, { force: true });
@@ -30,7 +36,7 @@ async function writeStubs(design: DesignBundle, worktree: string, taskId: string
   const entry = taskEntryOf(design, taskId);
   for (const module of modulesOfTask(design.tech.modules, entry)) {
     const absolute = join(worktree, module.entry);
-    if (!(await exists(absolute))) {
+    if (await needsStub(absolute)) {
       await mkdir(dirname(absolute), { recursive: true });
       await writeFile(absolute, stubSource(module), "utf8");
     }

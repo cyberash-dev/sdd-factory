@@ -66,6 +66,9 @@ Write both files with exactly this frontmatter, then stop:
 ---
 role: reviewer
 attempt: {{attempt}}
+task_id: {{task_id}}
+impl_sha: <the 40-hex "Reviewed commit" from the first message; null in arbitration mode>
+mode: review | arbitration
 decision: approve | request_changes | advisory_only
 target: implementer | test-writer | architect | contract | none
 findings:
@@ -77,4 +80,4 @@ findings:
 ---
 ```
 
-`target` is `none` with `approve` and `advisory_only`; `findings` is `[]` with `approve`. A missing or malformed frontmatter is treated as failure.
+`target` is `none` with `approve` and `advisory_only`; `findings` is `[]` with `approve`; `task_id`, `mode` and `impl_sha` repeat the values given in the first message. The body carries exactly these headings in this order: `## Scope checked`, `## Spec conformance` (one line per covered id), `## Findings`, `## Verdict rationale`. A missing or malformed frontmatter is treated as failure.

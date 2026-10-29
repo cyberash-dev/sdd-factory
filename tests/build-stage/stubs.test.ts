@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modulesOfTask, stubForExport, stubSource } from "../../src/build-stage/domain/stubs.js";
+import { isPlaceholderModule, modulesOfTask, stubForExport, stubSource } from "../../src/build-stage/domain/stubs.js";
 import { aModule, aTaskSpec } from "./support/design.js";
 
 describe("stub generation from the tech.md module table", () => {
@@ -21,6 +21,15 @@ describe("stub generation from the tech.md module table", () => {
     const stub = stubForExport({ name: "Greeter", kind: "class", signature: "class Greeter {\n  constructor(locale: string);\n  greet(name: string): string;\n  static create(): Greeter;\n}" });
 
     expect(stub).toBe('export class Greeter {\n  constructor(..._args: unknown[]) {\n    throw new Error("not implemented: Greeter");\n  }\n}\nexport interface Greeter {\n  greet(name: string): string;\n}');
+  });
+
+  it.each([
+    ["export {};\n", true],
+    ["\n", true],
+    ["export const x = 1;\n", false],
+    ["export {};\nexport function f(): void {}\n", false],
+  ])("recognises %j as placeholder: %s", (source, expected) => {
+    expect(isPlaceholderModule(source)).toBe(expected);
   });
 
   it("renders an empty module for a module without exports", () => {

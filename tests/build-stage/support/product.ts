@@ -34,9 +34,9 @@ export async function aProductRepo(files: Readonly<Record<string, string>> = {})
   for (const [path, content] of Object.entries(files)) {
     await writeProductFile(productDir, path, content);
   }
-  await symlink(join(REPO_ROOT, "node_modules"), join(productDir, "node_modules"), "dir");
   await git(productDir, ["init", "-q", "-b", "integration"]);
   await git(productDir, ["add", "-A"]);
   await git(productDir, ["commit", "-q", "-m", "scaffold product"]);
+  await symlink(join(REPO_ROOT, "node_modules"), join(productDir, "node_modules"), "dir");
   return productDir;
 }
