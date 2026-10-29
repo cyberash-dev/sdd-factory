@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modulesOfTask, stubForExport, stubForPath, stubSource } from "../../src/build-stage/domain/stubs.js";
+import { modulesOfTask, stubForExport, stubSource } from "../../src/build-stage/domain/stubs.js";
 import { aModule, aTaskSpec } from "./support/design.js";
 
 describe("stub generation from the tech.md module table", () => {
@@ -23,10 +23,8 @@ describe("stub generation from the tech.md module table", () => {
     expect(stub).toBe('export class Greeter {\n  constructor(..._args: unknown[]) {\n    throw new Error("not implemented: Greeter");\n  }\n}\nexport interface Greeter {\n  greet(name: string): string;\n}');
   });
 
-  it("writes an empty module for an owned path that is not the entry", () => {
-    const module = aModule({ owns: ["src/greet.ts", "src/greet/types.ts"] });
-
-    expect([stubForPath(module, "src/greet/types.ts"), stubSource(aModule({ exports: [] }))]).toEqual(["export {};\n", "export {};\n"]);
+  it("renders an empty module for a module without exports", () => {
+    expect(stubSource(aModule({ exports: [] }))).toBe("export {};\n");
   });
 
   it("selects the modules referenced by designRefs or sharing a covered id", () => {

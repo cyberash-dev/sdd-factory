@@ -39,7 +39,7 @@ export function taskFindingRule(deps: RuleDeps): TransitionRule {
         case "TASK-OVERFLOW":
           return { state: stamped, emits: [plannerRework(state, taskId, deps.caps, "task_overflow", findingPath)], effects: [] };
         case "VD-INFEASIBLE":
-          return { state: stamped, emits: [architectRework(state, taskId, deps.caps, "design_repair", findingPath)], effects: [] };
+          return { state: stamped, emits: [architectRework(state, taskId, deps.caps, "design_repair", findingPath, stringsField(event.payload, "specIds"))], effects: [] };
         case "TOOLING-BROKEN": {
           const origin = typeof event.payload["origin"] === "string" ? event.payload["origin"] : "implementer";
           return toolingRoute(stamped, taskId, attempt, origin, detail);

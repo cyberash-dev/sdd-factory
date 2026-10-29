@@ -45,7 +45,7 @@ export async function laneInputs(slice: SliceContext, deps: LaneDeps, state: Run
     specRecords.push({ id, text: await recordText(deps, slice.paths.productDir, id) });
   }
   const verificationBlocks = design.verification.blocks.filter((block) => entry.covers.includes(block.id)).map((block) => ({ id: block.id, text: block.yamlSource }));
-  return { entry, task, modules, stubPaths: modules.flatMap((module) => module.owns), specRecords, verificationBlocks, tooling: design.tech.tooling };
+  return { entry, task, modules, stubPaths: modules.map((module) => module.entry), specRecords, verificationBlocks, tooling: design.tech.tooling };
 }
 
 export async function reworkFindingText(finding: ReworkFinding | null): Promise<string | null> {

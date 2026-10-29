@@ -1,6 +1,7 @@
 import type { RunState, TaskState, TaskStatus } from "../../bus/domain/run-state.js";
 
 const IDLE_STATUSES: readonly TaskStatus[] = ["ready", "approved", "failed"];
+export const REGISTERED_EVENT = "design.tasks.ready";
 
 export function isLaneActive(task: TaskState): boolean {
   return !IDLE_STATUSES.includes(task.status);
@@ -14,7 +15,7 @@ export function startableTasks(state: RunState, maxParallelLanes: number): reado
   const active = Object.values(state.tasks).filter(isLaneActive).length;
   const slots = Math.max(0, maxParallelLanes - active);
   return Object.entries(state.tasks)
-    .filter(([, task]) => task.status === "ready" && dependenciesApproved(state, task))
+    .filter(([, task]) => task.status === "ready" && task.lastEvent === REGISTERED_EVENT && dependenciesApproved(state, task))
     .map(([id]) => id)
     .sort()
     .slice(0, slots);

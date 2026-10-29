@@ -11,7 +11,9 @@ export interface DesignRuleDeps {
   readonly worktreesDir: string;
 }
 
-export const DESIGN_STATUSES = ["designing", "planning", "building"] as const;
+export const DESIGN_STATUSES = ["spec_approved", "designing", "planning", "building"] as const;
+
+const PRE_PLANNING_STATUSES: readonly RunState["status"][] = ["spec_approved", "designing"];
 
 function designBlocked(reason: string): PendingEvent {
   return { type: "design.blocked", producer: "foreman", payload: { reason } };
@@ -44,7 +46,7 @@ function readyRule(eventType: "design.tech.ready" | "design.verification.ready")
   return {
     name: `${eventType} -> barrier`,
     eventType,
-    acceptsRunStatus: role === "architect" ? ["designing", "building"] : ["designing"],
+    acceptsRunStatus: role === "architect" ? [...PRE_PLANNING_STATUSES, "building"] : PRE_PLANNING_STATUSES,
     apply({ state, event }) {
       const base = withRoleAccounting(state, event, role);
       if (state.status === "building") {
@@ -56,7 +58,7 @@ function readyRule(eventType: "design.tech.ready" | "design.verification.ready")
       }
       const design = { ...state.design, [flag]: true };
       if (!(design.techReady && design.verificationReady)) {
-        return unchanged({ ...base, design });
+        return unchanged({ ...base, design, status: "designing" });
       }
       return { state: { ...base, design, status: "planning" }, emits: [], effects: [planEffect(1, "")] };
     },
@@ -121,7 +123,7 @@ function architectRework(deps: DesignRuleDeps, state: RunState, reason: string, 
     const detail = `architect repairs cap ${deps.caps.architectRepairs} exceeded: ${reason}`;
     return { state, emits: [runFailed("cap_exhausted", detail)], effects: [] };
   }
-  const design = state.status === "designing" ? { ...state.design, techReady: false } : state.design;
+  const design = PRE_PLANNING_STATUSES.includes(state.status) ? { ...state.design, techReady: false } : state.design;
   const next: RunState = { ...state, design, stageAttempts: { ...state.stageAttempts, architectRepairs: repairs } };
   return { state: next, emits: [], effects: [{ kind: "design.architect", attempt: repairs + 1, reworkFinding: reason, specIds }] };
 }

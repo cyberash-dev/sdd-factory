@@ -1,10 +1,10 @@
-import { readFile, readlink } from "node:fs/promises";
+import { readdir, readFile, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { aModule, aTaskSpec, greeterDesign } from "./support/design.js";
 import { aLaneHarness } from "./support/harness.js";
 import { provisionLane, runLaneEffect } from "./support/lanes.js";
-import { aProductRepo, git } from "./support/product.js";
+import { aProductRepo, git, writeProductFile } from "./support/product.js";
 import { aTask, buildingState } from "./support/state.js";
 
 describe("lane start", () => {
@@ -42,13 +42,17 @@ describe("lane start", () => {
     expect([await readFile(join(lane.worktree, "src/greet.ts"), "utf8"), await git(lane.worktree, ["log", "-1", "--format=%s"])]).toEqual(["export function greet(name: string): string {\n  return name;\n}\n", "scaffold product"]);
   });
 
-  it("writes an empty module for owned non-entry paths and the stub only for the entry", async () => {
-    const module = aModule({ owns: ["src/greet.ts", "src/greet/format.ts"] });
-    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign([aTaskSpec()], [module]) });
+  it("writes the stub at the module entry when owns is a glob, never at a path named after the glob", async () => {
+    const module = aModule({ owns: ["src/cli/**"], entry: "src/cli/index.ts" });
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign([aTaskSpec({ writes: ["src/cli/**", "tests/cli/**"] })], [module]) });
 
     const lane = await provisionLane(harness);
 
-    expect(await readFile(join(lane.worktree, "src/greet/format.ts"), "utf8")).toBe("export {};\n");
+    expect([await readFile(join(lane.worktree, "src/cli/index.ts"), "utf8"), await readdir(join(lane.worktree, "src")), await git(lane.worktree, ["ls-files"])]).toEqual([
+      'export function greet(name: string): string {\n  throw new Error("not implemented: greet");\n}\n',
+      ["cli"],
+      ".gitignore\npackage.json\nsrc/cli/index.ts\ntsconfig.json",
+    ]);
   });
 
   it("schedules only the tasks without pending dependencies, up to maxParallelLanes", async () => {
@@ -76,6 +80,24 @@ describe("lane start", () => {
 
     const baseSha = String(published[0]?.payload["baseSha"]);
     expect([published.map((event) => event.payload["taskId"]), await git(productDir, ["merge-base", "--is-ancestor", mergedSha, baseSha]).then(() => "ancestor")]).toEqual([["T-002"], "ancestor"]);
+  });
+
+  it("commits the product working tree on integration before the first worktree so lanes see spec/ and design/", async () => {
+    const productDir = await aProductRepo();
+    const harness = await aLaneHarness({ productDir, design: greeterDesign() });
+    await writeProductFile(productDir, "design/tasks.json", "{}\n");
+
+    await runLaneEffect(harness, "build.schedule", {}, buildingState({ "T-001": aTask() }));
+
+    expect([await git(productDir, ["log", "--format=%s", "-2", "integration"]), await readFile(join(harness.worktreeOf("T-001"), "design/tasks.json"), "utf8")]).toEqual(["spec and design artefacts\nscaffold product", "{}\n"]);
+  });
+
+  it("skips a ready task whose last event is not design.tasks.ready", async () => {
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign() });
+
+    const published = await runLaneEffect(harness, "build.schedule", {}, buildingState({ "T-001": aTask({ lastEvent: "task.rework" }) }));
+
+    expect(published).toEqual([]);
   });
 
   it("never starts a task whose dependency failed", async () => {

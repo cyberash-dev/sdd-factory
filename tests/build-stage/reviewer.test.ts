@@ -52,6 +52,7 @@ describe("reviewer invocation", () => {
     const request = apiRoles.requests[0];
     expect([
       request?.role,
+      request?.taskId,
       request?.model,
       request?.tools.map((tool) => tool.name),
       ["mode review", `Reviewed commit: ${implSha}`, "+  return `Hello, ${name}!`;", "- `tests/greet.test.ts`", '"verdict":"pass"', "export function greet(name: string): string;", "### greeter:BEH-001"].map((item) => (request?.message ?? "").includes(item)),
@@ -60,12 +61,13 @@ describe("reviewer invocation", () => {
       published,
     ]).toEqual([
       "reviewer",
+      "T-001",
       "claude-sonnet-5-5",
       ["read_file", "list_dir", "write_file"],
       [true, true, true, true, true, true, true],
       true,
       ["reviewer-1.md"],
-      [{ type: "task.reviewed", producer: "reviewer", payload: { taskId: "T-001", decision: "approve", target: "none", reportPath: "reviews/T-001.md", specIds: [], costUsd: 0.02, inputTokens: 800, outputTokens: 150, durationMs: 2500, model: "claude-sonnet-5-5" } }],
+      [{ type: "task.reviewed", producer: "reviewer", payload: { taskId: "T-001", decision: "approve", target: "none", reportPath: "reviews/T-001.md", specIds: [], findingText: "", costUsd: 0.02, inputTokens: 800, outputTokens: 150, durationMs: 2500, model: "claude-sonnet-5-5" } }],
     ]);
   });
 
@@ -94,6 +96,17 @@ describe("reviewer invocation", () => {
     const published = await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
 
     expect(published.map((event) => [event.payload["decision"], event.payload["target"], event.payload["specIds"]])).toEqual([expected]);
+  });
+
+  it("carries the blocking findings as readable text for the critic route", async () => {
+    const apiRoles = scriptedApiRoles(async (request) => {
+      await writeReview(request, reviewFrontmatter({ decision: "request_changes", target: "contract", findings: [{ id: "RV-001", severity: "blocking", target: "contract", spec_ids: ["greeter:BEH-001"], evidence: "greeter:BEH-001.then: Hello; greeter:CTR-002.schema: Hi" }, { id: "RV-002", severity: "advisory", target: "implementer", spec_ids: [], evidence: "style" }], impl_sha: (request.message.match(/Reviewed commit: ([0-9a-f]{40})/) ?? [])[1] ?? null }));
+    });
+    const { harness, state } = await verifiedLane(apiRoles);
+
+    const published = await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
+
+    expect(published.map((event) => event.payload["findingText"])).toEqual(["RV-001 [contract] greeter:BEH-001.then: Hello; greeter:CTR-002.schema: Hi"]);
   });
 
   // @covers build-stage:BEH-013

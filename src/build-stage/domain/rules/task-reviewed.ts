@@ -4,7 +4,7 @@ import type { PendingEvent, TransitionRule } from "../../../bus/domain/transitio
 import type { RunState } from "../../../bus/domain/run-state.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { PayloadFieldError, stringField } from "../payload.js";
-import { architectRework, costEntryOf, criticRework, foreman, hasCostFields, implementerRework, laneEffect, specIdsOf, taskOf, testWriterRework, withTask, type RuleDeps } from "./support.js";
+import { architectRework, costEntryOf, criticRework, findingTextOf, foreman, hasCostFields, implementerRework, laneEffect, specIdsOf, taskOf, testWriterRework, withTask, type RuleDeps } from "./support.js";
 
 interface Decision {
   readonly state: RunState;
@@ -14,6 +14,7 @@ interface Decision {
   readonly target: string;
   readonly reportPath: string;
   readonly specIds: readonly string[];
+  readonly findingText: string;
 }
 
 function malformedTarget(taskId: string): PendingEvent {
@@ -21,16 +22,16 @@ function malformedTarget(taskId: string): PendingEvent {
 }
 
 function routeTarget(input: Decision, caps: RuleDeps["caps"], implementerReason: string, testWriterReason: string): PendingEvent {
-  const { state, task, taskId, target, reportPath, specIds } = input;
+  const { state, task, taskId, target, reportPath, specIds, findingText } = input;
   switch (target) {
     case "implementer":
       return implementerRework(task, taskId, caps, implementerReason, reportPath);
     case "test-writer":
       return testWriterRework(task, taskId, testWriterReason, reportPath);
     case "architect":
-      return architectRework(state, taskId, caps, "design_repair", reportPath);
+      return architectRework(state, taskId, caps, "design_repair", reportPath, specIds);
     case "contract":
-      return criticRework(state, taskId, caps, specIds, reportPath);
+      return criticRework(state, taskId, caps, specIds, reportPath, findingText);
     case "none":
       return malformedTarget(taskId);
     default:
@@ -48,7 +49,7 @@ export function taskReviewedRule(deps: RuleDeps): TransitionRule {
       const task = taskOf(state, taskId);
       const ledger = hasCostFields(event.payload) ? withCostEntry(state.costLedger, costEntryOf(event.payload, "reviewer", taskId, null)) : state.costLedger;
       const stamped = { ...withTask(state, taskId, { ...task, lastEvent: event.type }), costLedger: ledger };
-      const input: Decision = { state, task, taskId, decision: stringField(event.payload, "decision"), target: stringField(event.payload, "target"), reportPath: stringField(event.payload, "reportPath"), specIds: specIdsOf(event.payload) };
+      const input: Decision = { state, task, taskId, decision: stringField(event.payload, "decision"), target: stringField(event.payload, "target"), reportPath: stringField(event.payload, "reportPath"), specIds: specIdsOf(event.payload), findingText: findingTextOf(event.payload, "findingText", `spec contradiction reported in ${stringField(event.payload, "reportPath")}`) };
       const isArbitration = task.implSha === null;
       if (input.decision !== "request_changes") {
         if (isArbitration) {

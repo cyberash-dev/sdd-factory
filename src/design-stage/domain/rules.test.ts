@@ -32,6 +32,28 @@ const taskSummaries = [
 ];
 
 describe("planner barrier", () => {
+  // @covers design-stage:BEH-001
+  it("accepts the first ready event in spec_approved, the status spec-stage leaves behind, and moves to designing", () => {
+    const result = apply(stateIn("spec_approved"), "design.tech.ready", { path: "design/tech.md" });
+
+    expect([result.state.status, result.state.design.techReady, result.effects]).toEqual(["designing", true, []]);
+  });
+
+  it("accepts design.verification.ready as the first event in spec_approved", () => {
+    const result = apply(stateIn("spec_approved"), "design.verification.ready", { path: "design/verification.md" });
+
+    expect([result.state.status, result.state.design.verificationReady]).toEqual(["designing", true]);
+  });
+
+  // @covers design-stage:BEH-002
+  it("reaches planning from spec_approved after both ready events", () => {
+    const afterTech = apply(stateIn("spec_approved"), "design.tech.ready", { path: "design/tech.md" });
+
+    const result = apply(afterTech.state, "design.verification.ready", { path: "design/verification.md" });
+
+    expect([result.state.status, result.effects.map((effect) => effect.kind)]).toEqual(["planning", ["design.plan"]]);
+  });
+
   // @covers design-stage:BEH-002
   it("starts no planner when only design.tech.ready arrived", () => {
     const result = apply(stateIn("designing"), "design.tech.ready", { path: "design/tech.md" });
@@ -168,7 +190,7 @@ describe("design.rework", () => {
 
   // @covers design-stage:BEH-004
   it("re-runs the architect with the finding and increments the repair counter", () => {
-    const result = apply(stateIn("designing"), "design.rework", { target: "architect", reason: "unpinned dependency: vitest@^5", attempt: 1 });
+    const result = apply(stateIn("spec_approved"), "design.rework", { target: "architect", reason: "unpinned dependency: vitest@^5", attempt: 1 });
 
     expect([result.state.stageAttempts.architectRepairs, result.state.design.techReady, result.effects]).toEqual([1, false, [{ kind: "design.architect", attempt: 2, reworkFinding: "unpinned dependency: vitest@^5", specIds: [] }]]);
   });
@@ -210,6 +232,12 @@ describe("design.blocked", () => {
     const result = apply(stateIn("designing"), "design.blocked", { reason: "tech_md_invalid", detail: "missing section: ## TD-TOOLING" });
 
     expect(result.emits.map((event) => event.payload["detail"])).toEqual(["missing section: ## TD-TOOLING"]);
+  });
+
+  it("is accepted before any ready event while the run is still in spec_approved", () => {
+    const result = apply(stateIn("spec_approved"), "design.blocked", { reason: "architect_blocked" });
+
+    expect(result.emits.map((event) => [event.type, event.payload["reason"]])).toEqual([["run.failed", "design_blocked"]]);
   });
 
   it("is ignored once the run has already failed", () => {

@@ -8,8 +8,8 @@ import { EVENT_TYPES, type EventType } from "../../bus/domain/catalogue.js";
 import type { DeliveredEvent } from "../../bus/domain/envelope.js";
 import { createRunState } from "../../bus/domain/run-state.js";
 import type { FactoryConfig } from "../../shared/config.js";
-import { createApiRoleRunner } from "../../shared/llm/api-role-runner.js";
-import { createCliRoleRunner } from "../../shared/llm/cli-role-runner.js";
+import { createApiRoleRunner, type ApiRoleRunner } from "../../shared/llm/api-role-runner.js";
+import { createCliRoleRunner, type CliRoleRunner } from "../../shared/llm/cli-role-runner.js";
 import { createPromptLibrary } from "../../shared/prompts.js";
 import { createRedactor, redactDeep } from "../../shared/redaction.js";
 import { composeEffectRunner, composeRules, type RunPaths, type Slice, type SliceContext, type SliceFactory } from "../../shared/slice.js";
@@ -32,6 +32,7 @@ export interface StartRunInput {
   readonly now: () => Date;
   readonly log: (line: string) => void;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly roleRunners?: { readonly apiRoles?: ApiRoleRunner; readonly cliRoles?: CliRoleRunner };
 }
 
 export interface RunningFactory {
@@ -93,8 +94,8 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
     push: input.push,
     paths,
     runtime,
-    apiRoles: createApiRoleRunner(runtime, input.config.pricing),
-    cliRoles: createCliRoleRunner(),
+    apiRoles: input.roleRunners?.apiRoles ?? createApiRoleRunner(runtime, input.config.pricing),
+    cliRoles: input.roleRunners?.cliRoles ?? createCliRoleRunner(),
     prompts: createPromptLibrary(join(input.repoRoot, "prompts")),
     log: input.log,
     now: input.now,

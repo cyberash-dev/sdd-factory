@@ -182,10 +182,18 @@ describe("reviewer decision routing", () => {
     expect(result.emits.map((event) => [event.type, event.payload["target"], event.payload["attempt"], event.payload["reason"], event.payload["findingPath"]])).toEqual([[type, reworkTarget, attempt, reason, "reviews/T-001.md"]]);
   });
 
-  it("routes request_changes with target contract to the critic with the blocking spec ids", () => {
-    const result = run(reviewState(), "task.reviewed", reviewed("request_changes", "contract", { specIds: ["greeter:BEH-001", "greeter:CTR-002"] }));
+  it("forwards the blocking spec ids to the architect route", () => {
+    const result = run(reviewState(), "task.reviewed", reviewed("request_changes", "architect", { specIds: ["greeter:CTR-002"] }));
 
-    expect(result.emits).toEqual([{ type: "task.rework", producer: "foreman", payload: { taskId: "T-001", target: "critic", attempt: 1, reason: "spec_contradiction", findingPath: "reviews/T-001.md", specIds: ["greeter:BEH-001", "greeter:CTR-002"] } }]);
+    expect(result.emits.map((event) => event.payload["specIds"])).toEqual([["greeter:CTR-002"]]);
+  });
+
+  it("routes request_changes with target contract to the critic with the blocking spec ids", () => {
+    const result = run(reviewState(), "task.reviewed", reviewed("request_changes", "contract", { specIds: ["greeter:BEH-001", "greeter:CTR-002"], findingText: "RV-001 [contract] BEH-001.then says X; CTR-002.schema says Y" }));
+
+    expect(result.emits).toEqual([
+      { type: "task.rework", producer: "foreman", payload: { taskId: "T-001", target: "critic", attempt: 1, reason: "spec_contradiction", findingPath: "reviews/T-001.md", specIds: ["greeter:BEH-001", "greeter:CTR-002"], finding: "RV-001 [contract] BEH-001.then says X; CTR-002.schema says Y" } },
+    ]);
   });
 
   it("treats request_changes without a target as an unparseable handoff", () => {
@@ -247,28 +255,40 @@ describe("findings and arbitration", () => {
   // @covers build-stage:CST-005
   it("routes the contract target to the critic once per spec id and fails the task on the second route", () => {
     const first = run(arbitrationState(), "task.reviewed", reviewed("request_changes", "contract", { specIds: ["greeter:BEH-001"] }));
-    const afterCritic = run(arbitrationState(), "task.rework", { taskId: "T-001", target: "critic", attempt: 1, reason: "spec_contradiction", findingPath: "reviews/T-001.md", specIds: ["greeter:BEH-001"] });
+    const afterCritic = run(arbitrationState(), "task.rework", { taskId: "T-001", target: "critic", attempt: 1, reason: "spec_contradiction", findingPath: "reviews/T-001.md", specIds: ["greeter:BEH-001"], finding: "RV-001 [contract] then contradicts schema" });
     const second = run({ ...arbitrationState(), assumptionsByRecord: afterCritic.state.assumptionsByRecord }, "task.reviewed", reviewed("request_changes", "contract", { specIds: ["greeter:BEH-001"] }));
 
-    expect([first.emits.map((event) => event.payload["target"]), afterCritic.state.assumptionsByRecord, afterCritic.effects, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
-      ["critic"],
+    expect([first.emits.map((event) => [event.payload["target"], event.payload["finding"]]), afterCritic.state.assumptionsByRecord, afterCritic.effects, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
+      [["critic", "spec contradiction reported in reviews/T-001.md"]],
       { "greeter:BEH-001": 1 },
-      [{ kind: "spec.assume", taskId: "T-001", specIds: ["greeter:BEH-001"], findingPath: "reviews/T-001.md", taskIds: ["T-001"] }],
+      [{ kind: "spec.assume", specIds: ["greeter:BEH-001"], finding: "RV-001 [contract] then contradicts schema", taskIds: ["T-001"], taskId: "T-001", findingPath: "reviews/T-001.md" }],
       [["task.failed", "critic"]],
     ]);
+  });
+
+  it("increments assumptionsByRecord for every spec id in the same transition that runs spec.assume and names every task covering them", () => {
+    const state = buildingState({
+      "T-001": aTask({ status: "review_pending", attempts: { implementer: 1, testWriter: 1 }, covers: ["greeter:BEH-001"] }),
+      "T-002": aTask({ status: "impl_pending", covers: ["greeter:CTR-002"] }),
+      "T-003": aTask({ status: "impl_pending", covers: ["greeter:BEH-009"] }),
+    }, { assumptionsByRecord: { "greeter:CTR-002": 0 } });
+
+    const result = run(state, "task.rework", { taskId: "T-001", target: "critic", attempt: 1, reason: "spec_contradiction", findingPath: "reviews/T-001.md", specIds: ["greeter:BEH-001", "greeter:CTR-002"], finding: "x" });
+
+    expect([result.state.assumptionsByRecord, result.effects.map((effect) => effect["taskIds"]), result.emits]).toEqual([{ "greeter:BEH-001": 1, "greeter:CTR-002": 1 }, [["T-001", "T-002"]], []]);
   });
 
   // @covers build-stage:BEH-009
   // @covers build-stage:CST-003
   it("routes TASK-OVERFLOW to the planner once per run and fails the task on the second overflow", () => {
     const first = run(findingState(), "task.finding", { taskId: "T-001", type: "TASK-OVERFLOW", specIds: [], detail: "missing_dependency: zod" });
-    const forwarded = run(findingState(), "task.rework", { taskId: "T-001", target: "planner", attempt: 1, reason: "task_overflow", findingPath: "/run/handoffs/tasks/T-001/implementer-1/handoff.md" });
+    const forwarded = run(findingState({ stageAttempts: { ...findingState().stageAttempts, architectRepairs: 1 } }), "task.rework", { taskId: "T-001", target: "planner", attempt: 1, reason: "task_overflow", findingPath: "/run/handoffs/tasks/T-001/implementer-1/handoff.md" });
     const second = run(findingState({ stageAttempts: { ...findingState().stageAttempts, plannerRecuts: 1 } }), "task.finding", { taskId: "T-001", type: "TASK-OVERFLOW", specIds: [], detail: "again" });
 
-    expect([first.emits, forwarded.emits, forwarded.state.stageAttempts.plannerRecuts, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
+    expect([first.emits, forwarded.emits, forwarded.state.stageAttempts, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
       [{ type: "task.rework", producer: "foreman", payload: { taskId: "T-001", target: "planner", attempt: 1, reason: "task_overflow", findingPath: "/run/handoffs/tasks/T-001/implementer-1/handoff.md" } }],
-      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "task_overflow", attempt: 1 } }],
-      1,
+      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "task_overflow", attempt: 2 } }],
+      { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 1, assemblyRounds: 0 },
       [["task.failed", "planner"]],
     ]);
   });
@@ -277,13 +297,13 @@ describe("findings and arbitration", () => {
   // @covers build-stage:CST-004
   it("routes VD-INFEASIBLE to the architect once per run and fails the task on the second route", () => {
     const first = run(findingState(), "task.finding", { taskId: "T-001", type: "VD-INFEASIBLE", specIds: ["greeter:BEH-001"], detail: "no entry point" });
-    const forwarded = run(findingState(), "task.rework", { taskId: "T-001", target: "architect", attempt: 1, reason: "design_repair", findingPath: null });
+    const forwarded = run(findingState(), "task.rework", { taskId: "T-001", target: "architect", attempt: 1, reason: "design_repair", findingPath: null, specIds: ["greeter:BEH-001"] });
     const second = run(findingState({ stageAttempts: { ...findingState().stageAttempts, architectRepairs: 1 } }), "task.finding", { taskId: "T-001", type: "VD-INFEASIBLE", specIds: [], detail: "again" });
 
-    expect([first.emits.map((event) => [event.type, event.payload["target"], event.payload["reason"]]), forwarded.emits, forwarded.state.stageAttempts.architectRepairs, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
-      [["task.rework", "architect", "design_repair"]],
-      [{ type: "design.rework", producer: "foreman", payload: { target: "architect", reason: "design_repair", attempt: 1 } }],
-      1,
+    expect([first.emits.map((event) => [event.type, event.payload["target"], event.payload["reason"], event.payload["specIds"]]), forwarded.emits, forwarded.state.stageAttempts.architectRepairs, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
+      [["task.rework", "architect", "design_repair", ["greeter:BEH-001"]]],
+      [{ type: "design.rework", producer: "foreman", payload: { target: "architect", reason: "design_repair", attempt: 1, specIds: ["greeter:BEH-001"] } }],
+      0,
       [["task.failed", "architect"]],
     ]);
   });
@@ -345,6 +365,14 @@ describe("approval and failure", () => {
       [{ type: "run.failed", producer: "foreman", payload: { stage: "build", reason: "cap_exhausted", detail: "T-001: cap_exhausted: implementer" } }],
       [{ kind: "build.terminate-lanes" }],
     ]);
+  });
+
+  it("leaves the run status to the factory's run.failed rule", () => {
+    const state = buildingState({ "T-001": aTask({ status: "verify_pending" }) });
+
+    const result = run(state, "task.failed", { taskId: "T-001", reason: "cap_exhausted", detail: "implementer" });
+
+    expect([result.state.status, result.state.failure]).toEqual(["building", null]);
   });
 
   it("maps a blocked role to run.failed reason runtime_error", () => {

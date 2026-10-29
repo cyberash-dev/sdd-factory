@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { taskBranch } from "../../domain/handoff-paths.js";
-import { modulesOfTask, stubForPath } from "../../domain/stubs.js";
+import { modulesOfTask, stubSource } from "../../domain/stubs.js";
 import { startableTasks } from "../../domain/task-scheduling.js";
 import type { DesignBundle } from "../../ports/outbound/design-source.js";
 import { taskEntryOf } from "../design-cache.js";
@@ -25,15 +25,14 @@ export async function linkNodeModules(productDir: string, worktree: string): Pro
   await symlink(join(productDir, "node_modules"), target, "dir");
 }
 
+/* `owns` are write-set globs; the only file path a module declares is its entry. */
 async function writeStubs(design: DesignBundle, worktree: string, taskId: string): Promise<void> {
   const entry = taskEntryOf(design, taskId);
   for (const module of modulesOfTask(design.tech.modules, entry)) {
-    for (const path of module.owns) {
-      const absolute = join(worktree, path);
-      if (!(await exists(absolute))) {
-        await mkdir(dirname(absolute), { recursive: true });
-        await writeFile(absolute, stubForPath(module, path), "utf8");
-      }
+    const absolute = join(worktree, module.entry);
+    if (!(await exists(absolute))) {
+      await mkdir(dirname(absolute), { recursive: true });
+      await writeFile(absolute, stubSource(module), "utf8");
     }
   }
 }
@@ -69,9 +68,18 @@ export async function startLane(slice: SliceContext, deps: LaneDeps, context: Ef
   }
 }
 
+export const DESIGN_ARTEFACTS_COMMIT = "spec and design artefacts";
+
+/* Worktrees branch from the integration head, so spec/ and design/ must be committed there first. */
 export async function scheduleLanes(slice: SliceContext, deps: LaneDeps, context: EffectContext): Promise<void> {
+  const startable = startableTasks(context.state, slice.config.maxParallelLanes);
+  if (startable.length === 0) {
+    return;
+  }
   const design = await deps.design.reload();
-  for (const taskId of startableTasks(context.state, slice.config.maxParallelLanes)) {
+  await deps.git.checkout(slice.paths.productDir, INTEGRATION_BRANCH);
+  await deps.git.commitAll(slice.paths.productDir, DESIGN_ARTEFACTS_COMMIT);
+  for (const taskId of startable) {
     await startLane(slice, deps, context, design, taskId);
   }
 }

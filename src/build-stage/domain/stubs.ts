@@ -87,10 +87,6 @@ export function stubSource(module: TechModule): string {
   return `${module.exports.map(stubForExport).join("\n\n")}\n`;
 }
 
-export function stubForPath(module: TechModule, path: string): string {
-  return path === module.entry ? stubSource(module) : "export {};\n";
-}
-
 export function modulesOfTask(modules: readonly TechModule[], task: { readonly designRefs: readonly string[]; readonly covers: readonly string[] }): readonly TechModule[] {
   return modules.filter((module) => task.designRefs.includes(module.id) || module.covers.some((id) => task.covers.includes(id)));
 }

@@ -9,10 +9,10 @@ import { composeEffectRunner, composeRules, type Slice } from "../../src/shared/
 import { ARCHITECT_HANDOFF_LINES, handoffPathIn, handoffText, harness, PLANNER_HANDOFF_LINES, readVia, stateIn, tasksJsonText, techMdText, VALID_TASKS, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type Harness, type RoleScript, type TaskInput } from "./harness.js";
 
 const specApprovedStandIn: TransitionRule = {
-  name: "spec.approved -> designing (spec-stage stand-in)",
+  name: "spec.approved -> spec_approved (spec-stage stand-in)",
   eventType: "spec.approved",
-  acceptsRunStatus: ["spec_approved"],
-  apply: ({ state }) => ({ state: { ...state, status: "designing" }, emits: [], effects: [{ kind: "design.architect", attempt: 1 }, { kind: "design.verification", attempt: 1 }] }),
+  acceptsRunStatus: ["spec_review"],
+  apply: ({ state }) => ({ state: { ...state, status: "spec_approved" }, emits: [], effects: [{ kind: "design.architect", attempt: 1 }, { kind: "design.verification", attempt: 1 }] }),
 };
 
 function yieldTurn(): Promise<void> {
@@ -61,7 +61,7 @@ async function scriptedDesignStage(h: Harness, journal: string[]): Promise<Scrip
   const buildStub: Slice = { name: "build-stub", rules: [], effects: { "build.schedule": async (effect) => { scheduled.push(String(effect["tasksPath"])); } }, participants: () => [] };
   const settled: Promise<unknown>[] = [];
   const engine = new RunEngine({
-    initialState: stateIn("spec_approved"),
+    initialState: stateIn("spec_review"),
     rules: composeRules([{ name: "spec-stub", rules: [specApprovedStandIn], effects: {}, participants: () => [] }, designSlice]),
     store: { write: async () => undefined },
     publisher: h.slice.runtime.publisher,
@@ -136,7 +136,7 @@ describe("design stage through the run engine", () => {
 
     const run = await scriptedDesignStage(h, journal);
 
-    expect([journal.includes("started:verification-designer"), journal.includes("started:planner"), run.failedDetail, run.engine.state.status]).toEqual([true, false, "no approved record", "designing"]);
+    expect([journal.includes("started:verification-designer"), journal.includes("started:planner"), run.failedDetail, journal[journal.length - 1]]).toEqual([true, false, "no approved record", "run.failed"]);
   });
 });
 

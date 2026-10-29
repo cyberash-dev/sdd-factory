@@ -156,6 +156,13 @@ export function parseReviewReport(text: string | null): ReviewReportResult {
   return { ok: true, report: { attempt: handoff.handoff.attempt, ...fields, decision, target, findings } };
 }
 
+export function blockingFindingText(report: ReviewReport): string {
+  return report.findings
+    .filter((finding) => finding.severity === "blocking")
+    .map((finding) => `${finding.id} [${finding.target}] ${finding.evidence}`)
+    .join("\n");
+}
+
 export function blockingSpecIds(report: ReviewReport): readonly string[] {
   return [...new Set(report.findings.filter((finding) => finding.severity === "blocking").flatMap((finding) => finding.specIds))];
 }

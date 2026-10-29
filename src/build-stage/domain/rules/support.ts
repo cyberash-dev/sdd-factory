@@ -58,19 +58,29 @@ export function plannerRework(state: RunState, taskId: string, caps: Caps, reaso
   return foreman("task.rework", { taskId, target: "planner", attempt: state.stageAttempts.plannerRecuts + 1, reason, findingPath });
 }
 
-export function architectRework(state: RunState, taskId: string, caps: Caps, reason: string, findingPath: string | null): PendingEvent {
+export function architectRework(state: RunState, taskId: string, caps: Caps, reason: string, findingPath: string | null, specIds: readonly string[]): PendingEvent {
   if (state.stageAttempts.architectRepairs >= caps.architectRepairs) {
     return capExhausted(taskId, "architect");
   }
-  return foreman("task.rework", { taskId, target: "architect", attempt: state.stageAttempts.architectRepairs + 1, reason, findingPath });
+  return foreman("task.rework", { taskId, target: "architect", attempt: state.stageAttempts.architectRepairs + 1, reason, findingPath, specIds });
 }
 
-export function criticRework(state: RunState, taskId: string, caps: Caps, specIds: readonly string[], findingPath: string | null): PendingEvent {
+/* bus:CTR-004 dedupes design.rework on attempt alone, so the ordinal spans both design roles. */
+export function designReworkAttempt(state: RunState): number {
+  return state.stageAttempts.plannerRecuts + state.stageAttempts.architectRepairs + 1;
+}
+
+export function criticRework(state: RunState, taskId: string, caps: Caps, specIds: readonly string[], findingPath: string | null, finding: string): PendingEvent {
   const minted = specIds.map((id) => state.assumptionsByRecord[id] ?? 0);
   if (minted.some((count) => count >= caps.criticAssumptionsPerId)) {
     return capExhausted(taskId, "critic");
   }
-  return foreman("task.rework", { taskId, target: "critic", attempt: Math.max(0, ...minted) + 1, reason: "spec_contradiction", findingPath, specIds });
+  return foreman("task.rework", { taskId, target: "critic", attempt: Math.max(0, ...minted) + 1, reason: "spec_contradiction", findingPath, specIds, finding });
+}
+
+export function findingTextOf(payload: EventPayload, key: string, fallback: string): string {
+  const value = payload[key];
+  return typeof value === "string" && value.length > 0 ? value : fallback;
 }
 
 export function tasksCovering(state: RunState, specIds: readonly string[]): readonly string[] {
@@ -101,8 +111,8 @@ export function laneEffect(kind: (typeof BUILD_EFFECT_KINDS)[keyof typeof BUILD_
   return { kind, ...fields };
 }
 
-export function specAssumeEffect(taskId: string, specIds: readonly string[], findingPath: string | null, taskIds: readonly string[]): Effect {
-  return { kind: FOREIGN_EFFECT_KINDS.specAssume, taskId, specIds, findingPath, taskIds };
+export function specAssumeEffect(taskId: string, specIds: readonly string[], finding: string, findingPath: string | null, taskIds: readonly string[]): Effect {
+  return { kind: FOREIGN_EFFECT_KINDS.specAssume, specIds, finding, taskIds, taskId, findingPath };
 }
 
 export function specIdsOf(payload: EventPayload): readonly string[] {
