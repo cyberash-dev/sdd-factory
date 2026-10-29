@@ -1,0 +1,28 @@
+{
+  "caps": {
+    "lintCycles": 5,
+    "criticRounds": 2,
+    "implementerAttempts": 3,
+    "testWriterRework": 1,
+    "plannerRecuts": 1,
+    "architectRepairs": 1,
+    "criticAssumptionsPerId": 1,
+    "assemblyRounds": 2,
+    "handoffRerun": 1
+  },
+  "timeouts": {
+    "specStageMs": 1200000,
+    "apiRoleMs": 900000,
+    "cliRoleMs": 1500000,
+    "verifierMs": 300000,
+    "shutdownMs": 10000
+  },
+  "maxParallelLanes": 4,
+  "models": {
+    "default": "claude-sonnet-5-5",
+    "critic": "claude-haiku-4-5",
+    "triage": "claude-haiku-4-5",
+    "lane": null
+  },
+  "pricing": {}
+}

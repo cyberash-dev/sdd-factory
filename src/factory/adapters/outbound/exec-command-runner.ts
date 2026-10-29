@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import type { CommandOptions, CommandResult, CommandRunner } from "../../ports/outbound/command-runner.js";
 
-function isExecError(error: unknown): error is { code?: unknown; stdout?: unknown; stderr?: unknown; killed?: boolean } {
-  return typeof error === "object" && error !== null && "stdout" in error;
+function isExecError(error: unknown): error is { code?: unknown; killed?: unknown } {
+  return typeof error === "object" && error !== null && "cmd" in error;
 }
 
 export class ExecCommandRunner implements CommandRunner {
