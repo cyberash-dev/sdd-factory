@@ -1,0 +1,52 @@
+plan_id: 2026-10-29T194041Z-7qbjd
+created_at: 2026-10-29T19:40:41.573Z
+pending_attestations:
+  - id: factory:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:41.572Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: bus:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:41.895Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: trace:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:42.223Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: spec-stage:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:42.546Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: design-stage:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:42.871Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: build-stage:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:43.198Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: assembly-stage:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T19:40:43.521Z
+    change_request: "sdd-factory v0.1.0"
+    scope: first-time-approval
+    target_status: approved

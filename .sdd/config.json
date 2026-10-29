@@ -1,0 +1,49 @@
+{
+  "$schema": "https://github.com/cyberash-dev/agent-sdd/blob/main/schema/sdd.config.schema.json",
+  "spec_file": "spec/factory.md",
+  "baseline_id": "factory:BL-001",
+  "discovery_scope": ["src", "prompts", "tests", "package.json", "tsconfig.json"],
+  "mechanism": "git_tree_hash_v1",
+  "lint": {
+    "spec_files": [
+      "spec/factory.md",
+      "spec/bus.md",
+      "spec/trace.md",
+      "spec/spec-stage.md",
+      "spec/design-stage.md",
+      "spec/build-stage.md",
+      "spec/assembly-stage.md"
+    ],
+    "approver_blocklist": []
+  },
+  "partitions": {
+    "factory": {
+      "spec_paths": ["spec/factory.md"],
+      "test_paths": ["src/factory/**/*.test.ts", "tests/factory/**/*.test.ts"]
+    },
+    "bus": {
+      "spec_paths": ["spec/bus.md"],
+      "test_paths": ["src/bus/**/*.test.ts", "tests/bus/**/*.test.ts"]
+    },
+    "trace": {
+      "spec_paths": ["spec/trace.md"],
+      "test_paths": ["src/trace/**/*.test.ts", "tests/trace/**/*.test.ts"]
+    },
+    "spec-stage": {
+      "spec_paths": ["spec/spec-stage.md"],
+      "test_paths": ["src/spec-stage/**/*.test.ts", "tests/spec-stage/**/*.test.ts"]
+    },
+    "design-stage": {
+      "spec_paths": ["spec/design-stage.md"],
+      "test_paths": ["src/design-stage/**/*.test.ts", "tests/design-stage/**/*.test.ts"]
+    },
+    "build-stage": {
+      "spec_paths": ["spec/build-stage.md"],
+      "test_paths": ["src/build-stage/**/*.test.ts", "tests/build-stage/**/*.test.ts"]
+    },
+    "assembly-stage": {
+      "spec_paths": ["spec/assembly-stage.md"],
+      "test_paths": ["src/assembly-stage/**/*.test.ts", "tests/assembly-stage/**/*.test.ts"]
+    }
+  }
+}

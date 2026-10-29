@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.factory/
+.sdd/plans/*
+!.sdd/plans/finalized/
+.env
+*.log
