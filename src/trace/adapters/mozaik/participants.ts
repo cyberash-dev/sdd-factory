@@ -1,6 +1,7 @@
 import type { Human, SemanticEvent } from "@mozaik-ai/core";
 import { createReactor, createRuntimeObserver, type FactoryRuntime, type ReactorHandlers } from "../../../bus/adapters/mozaik/runtime.js";
 import { EVENT_TYPES } from "../../../bus/domain/catalogue.js";
+import { taskIdOfCapabilities } from "../../../shared/llm/api-role-runner.js";
 import type { TokenCounts } from "../../../shared/llm/pricing.js";
 import type { RuntimeEventInput, Tracer } from "../../application/tracer.js";
 import { isRecord, stringOf } from "../../domain/guards.js";
@@ -24,15 +25,14 @@ export function runtimeEventInputOf(event: SemanticEvent, runtime: FactoryRuntim
     return null;
   }
   const payload = isRecord(event.payload) ? event.payload : {};
-  const participant =
-    event.type === "participant.joined" || event.type === "participant.left"
-      ? (stringOf(payload["name"]) ?? event.producerId)
-      : (runtime.state.getParticipant(event.producerId)?.getManifest().name ?? event.producerId);
+  const manifest = event.type === "participant.joined" || event.type === "participant.left" ? null : (runtime.state.getParticipant(event.producerId)?.getManifest() ?? null);
+  const participant = manifest === null ? (stringOf(payload["name"]) ?? event.producerId) : manifest.name;
   return {
     type: event.type,
     occurredAt: event.occurredAt,
     producerId: event.producerId,
     participant,
+    taskId: manifest === null ? null : taskIdOfCapabilities(manifest.capabilities),
     loopId: stringOf(payload["loopId"]),
     model: stringOf(payload["model"]),
     tokenUsage: tokenUsageOf(payload),

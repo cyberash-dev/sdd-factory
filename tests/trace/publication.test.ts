@@ -44,6 +44,20 @@ describe("published trace copy", () => {
   });
 
   // @covers trace:BEH-007
+  it("copies the same four files through the slice method copyTraceTo", async () => {
+    const harness = await createHarness();
+    const destination = join(harness.root, "elsewhere", "trace");
+
+    await happyPath(harness);
+    await harness.slice.copyTraceTo(destination);
+
+    expect([(await readdir(destination)).sort(), (await readFile(join(destination, "trace.md"), "utf8")).includes("- outcome: published")]).toEqual([
+      ["costs.json", "interventions.md", "trace.jsonl", "trace.md"],
+      true,
+    ]);
+  });
+
+  // @covers trace:BEH-007
   it("copies nothing when the run fails", async () => {
     const harness = await createHarness();
 

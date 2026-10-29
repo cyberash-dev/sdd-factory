@@ -59,6 +59,21 @@ describe("report regeneration", () => {
   });
 
   // @covers trace:BEH-008
+  it("resolves shutdown only once the report of the terminal event is on disk", async () => {
+    const harness = await createHarness();
+    await harness.publish("run.started", "foreman", { specPath: "spec.md", slug: "todo-cli", operator: "cyberash", mode: "autonomous" });
+    harness.runtime.publisher.publish({ type: "run.failed", producer: "foreman", payload: { stage: "workspace", reason: "runtime_error", detail: "boom" } });
+
+    await harness.slice.shutdown();
+
+    expect([
+      (await readFile(join(harness.traceDir, "trace.md"), "utf8")).includes("- outcome: failed:workspace/runtime_error"),
+      (await readFile(join(harness.traceDir, "interventions.md"), "utf8")).endsWith("mid-run interventions: 0\n"),
+      (await readFile(join(harness.traceDir, "trace.jsonl"), "utf8")).includes('"type":"run.failed"'),
+    ]).toEqual([true, true, true]);
+  });
+
+  // @covers trace:BEH-008
   it("publishes run.failed with trace_write_failed when the report rewrite fails", async () => {
     const harness = await createHarness({
       prepare: async ({ traceDir }) => {

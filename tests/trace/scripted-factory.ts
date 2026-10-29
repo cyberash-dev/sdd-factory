@@ -11,9 +11,9 @@ import type { TransitionRule } from "../../src/bus/domain/transition.js";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../../src/shared/config.js";
 import { createApiRoleRunner } from "../../src/shared/llm/api-role-runner.js";
 import type { TokenCounts } from "../../src/shared/llm/pricing.js";
-import type { Slice, SliceContext } from "../../src/shared/slice.js";
+import type { SliceContext } from "../../src/shared/slice.js";
 import type { Environment } from "../../src/trace/domain/redaction.js";
-import { copyTraceTo, createTraceSlice } from "../../src/trace/index.js";
+import { copyTraceTo, createTraceSlice, type TraceSlice } from "../../src/trace/index.js";
 
 export const RUN_ID = "todo-cli-20261029-120000";
 export const SLUG = "todo-cli";
@@ -32,10 +32,10 @@ export interface Harness {
   readonly publishedTraceDir: string;
   readonly runtime: FactoryRuntime;
   readonly engine: RunEngine;
-  readonly slice: Slice;
+  readonly slice: TraceSlice;
   readonly published: DeliveredEvent<EventType>[];
   publish(type: EventType, producer: Producer, payload: EventPayload): Promise<DeliveredEvent<EventType>>;
-  infer(role: Producer, model: string, usage: TokenCounts | null): Promise<void>;
+  infer(role: Producer, model: string, usage: TokenCounts | null, taskId?: string): Promise<void>;
   settle(): Promise<void>;
 }
 
@@ -163,7 +163,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
       await Promise.all(settled.splice(0));
       await new Promise((resolve) => setImmediate(resolve));
     }
-    await slice.shutdown?.();
+    await slice.shutdown();
   };
   return {
     root,
@@ -179,10 +179,11 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
       await settle();
       return delivered;
     },
-    infer: async (role, model, usage) => {
+    infer: async (role, model, usage, taskId) => {
       const tokenUsage = usage === null ? undefined : new TokenUsage(usage.inputTokens, usage.outputTokens, usage.inputTokens + usage.outputTokens, new InputTokenDetails(0), new OutputTokenDetails(0));
       steps.push({ items: [ModelMessageItem.rehydrate({ text: "done" })], tokenUsage, rowResponse: null });
-      await apiRoles.run({ role, instruction: "role", message: "go", model, tools: [], timeoutMs: 5000, maxOutputTokens: 100 });
+      const request = { role, instruction: "role", message: "go", model, tools: [], timeoutMs: 5000, maxOutputTokens: 100 };
+      await apiRoles.run(taskId === undefined ? request : { ...request, taskId });
       await settle();
     },
     settle,

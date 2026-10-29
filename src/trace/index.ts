@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { SliceContext, SliceFactory } from "../shared/slice.js";
+import type { Slice, SliceContext } from "../shared/slice.js";
 import { createTracerParticipants } from "./adapters/mozaik/participants.js";
 import { productTextReader, TraceFiles } from "./adapters/outbound/trace-files.js";
 import { Tracer } from "./application/tracer.js";
@@ -11,6 +11,13 @@ export { TRACE_FILE_NAMES } from "./adapters/outbound/trace-files.js";
 export interface TraceSliceOptions {
   readonly env?: Environment;
 }
+
+export interface TraceSlice extends Slice {
+  shutdown(): Promise<void>;
+  copyTraceTo(destinationDir: string): Promise<void>;
+}
+
+export type TraceSliceFactory = (context: SliceContext) => TraceSlice;
 
 export class TraceError extends Error {
   override readonly name = "TraceError";
@@ -35,7 +42,7 @@ function createTracer(context: SliceContext, secrets: readonly string[]): Tracer
   });
 }
 
-export function createTraceSlice(options: TraceSliceOptions = {}): SliceFactory {
+export function createTraceSlice(options: TraceSliceOptions = {}): TraceSliceFactory {
   const secrets = secretValuesOf(options.env ?? process.env);
   return (context) => {
     const tracer = createTracer(context, secrets);
@@ -47,6 +54,7 @@ export function createTraceSlice(options: TraceSliceOptions = {}): SliceFactory 
       effects: {},
       participants: () => participants,
       shutdown: () => tracer.idle(),
+      copyTraceTo: (destinationDir) => tracer.copyTo(destinationDir),
     };
   };
 }

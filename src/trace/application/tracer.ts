@@ -33,6 +33,8 @@ export interface RuntimeEventInput {
   readonly occurredAt: Date;
   readonly producerId: string;
   readonly participant: string;
+  /* From the agent's `task:<taskId>` capability; null for stage roles and for agents without one. */
+  readonly taskId: string | null;
   readonly loopId: string | null;
   readonly model: string | null;
   readonly tokenUsage: TokenCounts | null;
@@ -72,7 +74,7 @@ export class Tracer {
   private readonly openInferences = new Map<string, OpenInference>();
   private readonly ledgerKeys = new Set<string>();
   private readonly awaitingReview: string[] = [];
-  private readonly reviewerLanes = new Map<string, string>();
+  private readonly lanesByAgent = new Map<string, string>();
   private titles: Readonly<Record<string, string>> = {};
   private startedAtMs: number | null = null;
   private stage: RunStage = "workspace";
@@ -203,7 +205,7 @@ export class Tracer {
     });
   }
 
-  /* The reviewer agent carries no task id; the next reviewer inference belongs to the oldest green-verified task. */
+  /* Fallback for a reviewer agent without a task capability: its next inference belongs to the oldest green-verified task. */
   private noteReviewCandidate(event: DeliveredEvent<EventType>): void {
     const taskId = stringOf(event.payload["taskId"]);
     if (event.type === "task.verified" && event.payload["result"] === "green" && taskId !== null) {
@@ -275,10 +277,17 @@ export class Tracer {
 
   private openInference(input: RuntimeEventInput, inferenceKey: string, occurredAtMs: number): void {
     this.openInferences.set(inferenceKey, { startedAtMs: occurredAtMs, model: input.model });
-    if (input.participant === "reviewer" && !this.reviewerLanes.has(input.producerId)) {
+    if (this.lanesByAgent.has(input.producerId)) {
+      return;
+    }
+    if (input.taskId !== null) {
+      this.lanesByAgent.set(input.producerId, input.taskId);
+      return;
+    }
+    if (input.participant === "reviewer") {
       const taskId = this.awaitingReview.shift();
       if (taskId !== undefined) {
-        this.reviewerLanes.set(input.producerId, taskId);
+        this.lanesByAgent.set(input.producerId, taskId);
       }
     }
   }
@@ -295,7 +304,7 @@ export class Tracer {
     }
     this.entries.push({
       participant: input.participant,
-      taskId: this.reviewerLanes.get(input.producerId) ?? null,
+      taskId: input.taskId ?? this.lanesByAgent.get(input.producerId) ?? null,
       stage: this.stage,
       costUsd,
       inputTokens: tokens.inputTokens,
