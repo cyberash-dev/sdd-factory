@@ -1,0 +1,155 @@
+import { spawn } from "node:child_process";
+
+export interface CliRoleRequest {
+  readonly binary: string;
+  readonly cwd: string;
+  readonly prompt: string;
+  readonly addDirs: readonly string[];
+  readonly model: string | null;
+  readonly timeoutMs: number;
+  readonly env: Readonly<Record<string, string>>;
+}
+
+export interface CliToolUse {
+  readonly name: string;
+  readonly input: Readonly<Record<string, unknown>>;
+}
+
+export interface CliResult {
+  readonly isError: boolean;
+  readonly costUsd: number | null;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly durationMs: number;
+  readonly resultText: string;
+}
+
+export interface CliRoleOutcome {
+  readonly exitCode: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly timedOut: boolean;
+  readonly result: CliResult | null;
+  readonly toolUses: readonly CliToolUse[];
+  readonly stderrTail: string;
+  readonly durationMs: number;
+}
+
+export interface CliRoleRunner {
+  run(request: CliRoleRequest): Promise<CliRoleOutcome>;
+}
+
+export function claudeArgv(request: CliRoleRequest): string[] {
+  const argv = ["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"];
+  for (const dir of request.addDirs) {
+    argv.push("--add-dir", dir);
+  }
+  if (request.model !== null) {
+    argv.push("--model", request.model);
+  }
+  return argv;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+export function parseStreamJsonLine(line: string): { readonly kind: "tool_use"; readonly toolUse: CliToolUse } | { readonly kind: "result"; readonly result: CliResult } | { readonly kind: "other" } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return { kind: "other" };
+  }
+  if (!isRecord(parsed)) {
+    return { kind: "other" };
+  }
+  if (parsed["type"] === "result") {
+    const usage = isRecord(parsed["usage"]) ? parsed["usage"] : {};
+    return {
+      kind: "result",
+      result: {
+        isError: parsed["is_error"] === true,
+        costUsd: typeof parsed["total_cost_usd"] === "number" ? parsed["total_cost_usd"] : null,
+        inputTokens: numberOr(usage["input_tokens"], 0),
+        outputTokens: numberOr(usage["output_tokens"], 0),
+        durationMs: numberOr(parsed["duration_ms"], 0),
+        resultText: typeof parsed["result"] === "string" ? parsed["result"] : "",
+      },
+    };
+  }
+  if (parsed["type"] === "assistant" && isRecord(parsed["message"]) && Array.isArray(parsed["message"]["content"])) {
+    const toolUse = parsed["message"]["content"].find((item: unknown) => isRecord(item) && item["type"] === "tool_use");
+    if (isRecord(toolUse) && typeof toolUse["name"] === "string") {
+      return { kind: "tool_use", toolUse: { name: toolUse["name"], input: isRecord(toolUse["input"]) ? toolUse["input"] : {} } };
+    }
+  }
+  return { kind: "other" };
+}
+
+export function createCliRoleRunner(): CliRoleRunner {
+  return {
+    run(request: CliRoleRequest): Promise<CliRoleOutcome> {
+      return new Promise((resolvePromise, rejectPromise) => {
+        const startedAt = Date.now();
+        const toolUses: CliToolUse[] = [];
+        let result: CliResult | null = null;
+        let stderr = "";
+        let buffer = "";
+        let timedOut = false;
+        const child = spawn(request.binary, claudeArgv(request), { cwd: request.cwd, env: { ...request.env }, stdio: ["pipe", "pipe", "pipe"] });
+        const timer = setTimeout(() => {
+          timedOut = true;
+          child.kill("SIGTERM");
+        }, request.timeoutMs);
+        const consume = (chunk: string): void => {
+          buffer += chunk;
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const message = parseStreamJsonLine(line);
+            if (message.kind === "tool_use") {
+              toolUses.push(message.toolUse);
+            } else if (message.kind === "result") {
+              result = message.result;
+            }
+          }
+        };
+        child.stdout.setEncoding("utf8");
+        child.stdout.on("data", consume);
+        child.stderr.setEncoding("utf8");
+        child.stderr.on("data", (chunk: string) => {
+          stderr = (stderr + chunk).slice(-4000);
+        });
+        child.on("error", (error) => {
+          clearTimeout(timer);
+          rejectPromise(error);
+        });
+        child.on("close", (exitCode, signal) => {
+          clearTimeout(timer);
+          if (buffer.length > 0) {
+            consume("\n");
+          }
+          resolvePromise({ exitCode, signal, timedOut, result, toolUses, stderrTail: stderr, durationMs: Date.now() - startedAt });
+        });
+        child.stdin.end(request.prompt);
+      });
+    },
+  };
+}
+
+const ENV_ALLOWLIST = ["PATH", "HOME", "LANG", "LC_ALL", "TERM", "NODE_OPTIONS", "TMPDIR", "SHELL", "USER", "XDG_CONFIG_HOME"];
+
+export function laneEnvironment(source: Readonly<Record<string, string | undefined>>): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of ENV_ALLOWLIST) {
+    const value = source[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  return env;
+}

@@ -18,7 +18,7 @@ interface Harness {
 
 function buildingState(taskStatus: TaskState["status"]): RunState {
   const base = createRunState({ runId: RUN_ID, slug: "todo-cli", operator: "cyberash", startedAt: "2026-10-29T12:00:00.000Z" });
-  const task: TaskState = { status: taskStatus, attempts: { implementer: 1, testWriter: 1 }, baseSha: SHA, testsSha: SHA, implSha: null, worktree: "/wt/T-001", covers: [], writes: [], lastEvent: "task.tests_red" };
+  const task: TaskState = { status: taskStatus, attempts: { implementer: 1, testWriter: 1 }, handoffReruns: {}, baseSha: SHA, testsSha: SHA, implSha: null, worktree: "/wt/T-001", covers: [], writes: [], dependsOn: [], lastEvent: "task.tests_red" };
   return { ...base, status: "building", tasks: { "T-001": task } };
 }
 

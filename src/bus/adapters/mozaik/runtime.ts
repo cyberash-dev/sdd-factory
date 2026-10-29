@@ -5,6 +5,7 @@ import {
   SemanticEvent,
   SituationSpecification,
   type Human,
+  type InferenceRunner,
   type SituationContext,
   type SituationHandler,
 } from "@mozaik-ai/core";
@@ -83,6 +84,26 @@ export function createReactor(name: Producer, handlers: ReactorHandlers): Human 
   return createHuman({ name, capabilities: [], handlers: situationHandlers });
 }
 
+export type RuntimeObserverHandler = (event: SemanticEvent) => void;
+
+class AnyEventSpecification extends SituationSpecification {
+  isSatisfiedBy(): boolean {
+    return true;
+  }
+}
+
+export function createRuntimeObserver(name: string, handler: RuntimeObserverHandler): Human {
+  return createHuman({
+    name,
+    capabilities: [],
+    handlers: [{ specification: new AnyEventSpecification(), processor: { apply: ({ event }: SituationContext): void => handler(event) } }],
+  });
+}
+
+export interface FactoryRuntimeOptions {
+  readonly inferenceRunner?: InferenceRunner;
+}
+
 export interface FactoryRuntime {
   readonly state: FactoryRuntimeState;
   readonly publisher: EventPublisher;
@@ -91,10 +112,10 @@ export interface FactoryRuntime {
   readonly mozaik: ReturnType<typeof defineRuntime<FactoryRuntimeState>>;
 }
 
-export function createFactoryRuntime(runId: string): FactoryRuntime {
+export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptions = {}): FactoryRuntime {
   const mozaik = defineRuntime<FactoryRuntimeState>();
   const state = new FactoryRuntimeState(runId);
-  mozaik.initializeRuntime({ state });
+  mozaik.initializeRuntime(options.inferenceRunner === undefined ? { state } : { state, inferenceRunnerConfig: { runner: options.inferenceRunner } });
   const bus = createHuman({ name: "bus", capabilities: [], handlers: [] });
   mozaik.join(bus);
   let seq = 0;

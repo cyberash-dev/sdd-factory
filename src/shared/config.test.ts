@@ -1,0 +1,49 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG, loadConfig, mergeConfig } from "./config.js";
+
+describe("factory config", () => {
+  it("overrides caps, timeouts, lanes, models and pricing from a partial document", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, {
+      caps: { implementerAttempts: 5 },
+      timeouts: { verifierMs: 1000 },
+      maxParallelLanes: 2,
+      models: { lane: "claude-opus-5-5" },
+      pricing: { "claude-sonnet-5-5": { inputPerMillion: 3, outputPerMillion: 15 } },
+    });
+
+    expect([merged.caps.implementerAttempts, merged.caps.lintCycles, merged.timeouts.verifierMs, merged.maxParallelLanes, merged.models.lane, merged.pricing["claude-sonnet-5-5"]]).toEqual([
+      5,
+      5,
+      1000,
+      2,
+      "claude-opus-5-5",
+      { inputPerMillion: 3, outputPerMillion: 15 },
+    ]);
+  });
+
+  it("ignores values of the wrong type and keeps the defaults", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { caps: { implementerAttempts: "many" }, maxParallelLanes: -1, pricing: { m: { inputPerMillion: "x" } } });
+
+    expect([merged.caps.implementerAttempts, merged.maxParallelLanes, merged.pricing]).toEqual([3, 4, {}]);
+  });
+
+  it("returns the defaults when the config file does not exist", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "cfg-"));
+
+    const loaded = await loadConfig(join(directory, "factory.config.json"));
+
+    expect(loaded).toEqual(DEFAULT_CONFIG);
+  });
+
+  it("reads overrides from an existing config file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "cfg-"));
+    await writeFile(join(directory, "factory.config.json"), JSON.stringify({ caps: { assemblyRounds: 3 } }), "utf8");
+
+    const loaded = await loadConfig(join(directory, "factory.config.json"));
+
+    expect(loaded.caps.assemblyRounds).toBe(3);
+  });
+});

@@ -41,13 +41,21 @@ export interface TaskAttempts {
 export interface TaskState {
   readonly status: TaskStatus;
   readonly attempts: TaskAttempts;
+  readonly handoffReruns: Readonly<Record<string, number>>;
   readonly baseSha: string | null;
   readonly testsSha: string | null;
   readonly implSha: string | null;
   readonly worktree: string;
   readonly covers: readonly string[];
   readonly writes: readonly string[];
+  readonly dependsOn: readonly string[];
   readonly lastEvent: string;
+}
+
+export interface DesignProgress {
+  readonly techReady: boolean;
+  readonly verificationReady: boolean;
+  readonly tasksPath: string | null;
 }
 
 export interface StageAttempts {
@@ -90,6 +98,9 @@ export interface RunState {
   readonly updatedAt: string;
   readonly lastSeq: number;
   readonly stageAttempts: StageAttempts;
+  readonly stageHandoffReruns: Readonly<Record<string, number>>;
+  readonly design: DesignProgress;
+  readonly assumptionsByRecord: Readonly<Record<string, number>>;
   readonly tasks: Readonly<Record<string, TaskState>>;
   readonly costLedger: CostLedger;
   readonly failure: RunFailure | null;
@@ -111,9 +122,33 @@ export function createRunState(input: {
     updatedAt: input.startedAt,
     lastSeq: 0,
     stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0 },
+    stageHandoffReruns: {},
+    design: { techReady: false, verificationReady: false, tasksPath: null },
+    assumptionsByRecord: {},
     tasks: {},
     costLedger: { entries: [], totalUsd: 0 },
     failure: null,
+  };
+}
+
+export function createTaskState(input: {
+  readonly worktree: string;
+  readonly covers: readonly string[];
+  readonly writes: readonly string[];
+  readonly dependsOn: readonly string[];
+}): TaskState {
+  return {
+    status: "ready",
+    attempts: { implementer: 0, testWriter: 0 },
+    handoffReruns: {},
+    baseSha: null,
+    testsSha: null,
+    implSha: null,
+    worktree: input.worktree,
+    covers: input.covers,
+    writes: input.writes,
+    dependsOn: input.dependsOn,
+    lastEvent: "design.tasks.ready",
   };
 }
 

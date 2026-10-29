@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRunState, stageOf, withCostEntry } from "./run-state.js";
+import { createRunState, createTaskState, stageOf, withCostEntry } from "./run-state.js";
 
 describe("run state snapshot", () => {
   // @covers bus:CTR-008
@@ -16,9 +16,30 @@ describe("run state snapshot", () => {
       updatedAt: "2026-10-29T12:00:00.000Z",
       lastSeq: 0,
       stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0 },
+      stageHandoffReruns: {},
+      design: { techReady: false, verificationReady: false, tasksPath: null },
+      assumptionsByRecord: {},
       tasks: {},
       costLedger: { entries: [], totalUsd: 0 },
       failure: null,
+    });
+  });
+
+  it("creates a task in status ready with zero attempts and the planner's covers, writes and dependencies", () => {
+    const task = createTaskState({ worktree: "/wt/T-001", covers: ["todo-cli:BEH-001"], writes: ["src/cli/**", "tests/cli/**"], dependsOn: [] });
+
+    expect(task).toEqual({
+      status: "ready",
+      attempts: { implementer: 0, testWriter: 0 },
+      handoffReruns: {},
+      baseSha: null,
+      testsSha: null,
+      implSha: null,
+      worktree: "/wt/T-001",
+      covers: ["todo-cli:BEH-001"],
+      writes: ["src/cli/**", "tests/cli/**"],
+      dependsOn: [],
+      lastEvent: "design.tasks.ready",
     });
   });
 

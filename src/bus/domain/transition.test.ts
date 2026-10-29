@@ -11,7 +11,7 @@ function delivered(type: EventType, payload: EventPayload, seq: number): Deliver
 }
 
 function taskIn(status: TaskState["status"]): TaskState {
-  return { status, attempts: { implementer: 1, testWriter: 1 }, baseSha: SHA, testsSha: SHA, implSha: null, worktree: "/wt/T-001", covers: [], writes: [], lastEvent: "task.tests_red" };
+  return { status, attempts: { implementer: 1, testWriter: 1 }, handoffReruns: {}, baseSha: SHA, testsSha: SHA, implSha: null, worktree: "/wt/T-001", covers: [], writes: [], dependsOn: [], lastEvent: "task.tests_red" };
 }
 
 function stateWithTask(status: TaskState["status"]): RunState {

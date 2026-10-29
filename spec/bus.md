@@ -1698,6 +1698,51 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: bus:DLT-002
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: bus
+title: state.json - add design progress, per-task dependsOn and handoff re-run counters, assumption counters
+target_ids:
+  - bus:CTR-008
+  - bus:SUR-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-002
+    intended_version: "0.2.0"
+description: |
+  The pure transition function needs every fact a transition depends on
+  inside state.json, otherwise replay (bus:INV-001) cannot reproduce the
+  snapshots. Added keys: `design {techReady, verificationReady, tasksPath}`
+  for the planner barrier; `tasks.<id>.dependsOn` (string array) for lane
+  scheduling; `tasks.<id>.handoffReruns` and `stageHandoffReruns`
+  (role -> integer) for bus:BEH-003; `assumptionsByRecord` (spec id ->
+  integer) for the critic assumption cap. schemaVersion stays 1: keys are
+  added, none removed or renamed.
+tests_old_behavior:
+  - bus:CTR-008 contract test on the initial snapshot shape stays green with the added keys present
+tests_new_behavior:
+  - to:bus:CTR-008
+  - to:bus:BEH-003
+test_obligation:
+  predicate: |
+    createRunState yields the added keys with their zero values; a task
+    created from tasks.json carries dependsOn and an empty handoffReruns
+    map.
+  test_template: unit
+  boundary_classes:
+    - initial run state
+    - initial task state
+  failure_scenarios:
+    - a key missing from the snapshot
+---
+```
+
 ---
 
 ## 16. Implementation bindings
