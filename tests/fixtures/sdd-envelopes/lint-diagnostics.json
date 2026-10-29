@@ -1,0 +1,1 @@
+{"format_version":1,"ok":false,"error_count":1,"warn_count":0,"diagnostics":[{"severity":"error","rule":"sdd:weasel-word","file":"spec/factory.md","line":1290,"message":"Banned phrase \"etc.\" in normative section \"12. Policies\" (SDD §5.1)."}]}
