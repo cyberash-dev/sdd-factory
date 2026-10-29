@@ -58,6 +58,7 @@ async function runWith(stage: SliceFactory): Promise<{ manifest: RunManifest; st
     versions: { typescript: "7.0.2", vitest: "5.0.5", typesNode: "26.6.6", agentSdd: "2.1.1" },
     now: () => new Date(),
     log: () => undefined,
+    env: {},
   });
   const outcome = await running.terminal;
   await running.shutdown();

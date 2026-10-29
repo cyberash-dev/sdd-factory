@@ -102,6 +102,7 @@ export function createRuntimeObserver(name: string, handler: RuntimeObserverHand
 
 export interface FactoryRuntimeOptions {
   readonly inferenceRunner?: InferenceRunner;
+  readonly redactPayload?: (payload: Record<string, unknown>) => Record<string, unknown>;
 }
 
 export interface FactoryRuntime {
@@ -123,7 +124,8 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
   const publisher: EventPublisher = {
     publish(pending: PendingEvent): DeliveredEvent<EventType> {
       const occurredAt = new Date();
-      const candidate = { ...pending, runId, occurredAt: occurredAt.toISOString() };
+      const payload = options.redactPayload === undefined ? pending.payload : options.redactPayload({ ...pending.payload });
+      const candidate = { ...pending, payload, runId, occurredAt: occurredAt.toISOString() };
       validateEvent(candidate);
       if (TERMINAL_EVENT_TYPES.includes(candidate.type)) {
         if (terminalPublished) {
@@ -133,7 +135,7 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
       }
       seq += 1;
       const delivered: DeliveredEvent<EventType> = { ...candidate, seq };
-      const mozaikPayload: MozaikEventPayload = { runId, producer: pending.producer, seq, payload: { ...pending.payload } };
+      const mozaikPayload: MozaikEventPayload = { runId, producer: pending.producer, seq, payload: { ...payload } };
       mozaik.sendEvent(new SemanticEvent(candidate.type, bus.getId(), occurredAt, mozaikPayload), bus.getId());
       return delivered;
     },

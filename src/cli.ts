@@ -8,7 +8,10 @@ import { failureReport, successSummary } from "./factory/application/terminal-re
 import { parseArgv, USAGE, UsageError } from "./factory/domain/argv.js";
 import { exitCodeOf } from "./factory/domain/run-manifest.js";
 import { loadConfig, mergeConfig } from "./shared/config.js";
+import { createRedactor } from "./shared/redaction.js";
 import { stageSlices } from "./slices.js";
+
+const redactLog = createRedactor(process.env);
 
 async function toolchainVersions(repoRoot: string): Promise<{ typescript: string; vitest: string; typesNode: string; agentSdd: string }> {
   const manifest: { devDependencies?: Record<string, string> } = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
@@ -56,7 +59,8 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     commandRunner: new ExecCommandRunner(),
     versions: await toolchainVersions(repoRoot),
     now: () => new Date(),
-    log: (line) => process.stderr.write(`[factory] ${line}\n`),
+    log: (line) => process.stderr.write(`[factory] ${redactLog(line)}\n`),
+    env: process.env,
   });
   process.stderr.write(`[factory] run ${running.runId} started; run dir ${running.paths.runDir}\n`);
   const outcome = await running.terminal;

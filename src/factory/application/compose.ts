@@ -11,6 +11,7 @@ import type { FactoryConfig } from "../../shared/config.js";
 import { createApiRoleRunner } from "../../shared/llm/api-role-runner.js";
 import { createCliRoleRunner } from "../../shared/llm/cli-role-runner.js";
 import { createPromptLibrary } from "../../shared/prompts.js";
+import { createRedactor, redactDeep } from "../../shared/redaction.js";
 import { composeEffectRunner, composeRules, type RunPaths, type Slice, type SliceContext, type SliceFactory } from "../../shared/slice.js";
 import { runIdOf } from "../domain/run-id.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
@@ -30,6 +31,7 @@ export interface StartRunInput {
   readonly versions: ToolchainVersions;
   readonly now: () => Date;
   readonly log: (line: string) => void;
+  readonly env: Readonly<Record<string, string | undefined>>;
 }
 
 export interface RunningFactory {
@@ -77,7 +79,8 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
   await mkdir(paths.traceDir, { recursive: true });
   await mkdir(join(paths.runDir, "nudges"), { recursive: true });
 
-  const runtime = createFactoryRuntime(runId);
+  const redact = createRedactor(input.env);
+  const runtime = createFactoryRuntime(runId, { redactPayload: (payload) => redactDeep(payload, redact) });
   let resolveTerminal: (outcome: TerminalOutcome) => void = () => undefined;
   const terminal = new Promise<TerminalOutcome>((resolvePromise) => {
     resolveTerminal = resolvePromise;
