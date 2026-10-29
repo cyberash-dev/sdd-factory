@@ -7,8 +7,7 @@ export const ARCHITECT_MESSAGE = `Invocation inputs:
 - attempt: {{attempt}}
 - rework_finding: {{rework_finding}}
 
-Every path you pass to read_file, write_file and list_dir is relative to product_dir.
-{{spec_source_inline}}
+Relative paths you pass to read_file, write_file and list_dir resolve against product_dir; spec_source_path and handoff_path are absolute, pass them as given.
 Write tech_md, then handoff_path, then stop.`;
 
 export const VERIFICATION_DESIGNER_MESSAGE = `Invocation inputs:
@@ -19,7 +18,7 @@ export const VERIFICATION_DESIGNER_MESSAGE = `Invocation inputs:
 - attempt: {{attempt}}
 - rework_finding: {{rework_finding}}
 
-Every path you pass to read_file, write_file and list_dir is relative to product_dir.
+Relative paths you pass to read_file, write_file and list_dir resolve against product_dir; handoff_path is absolute, pass it as given.
 Write verification_md, then handoff_path, then stop.`;
 
 export const PLANNER_MESSAGE = `Invocation inputs:
@@ -32,7 +31,7 @@ export const PLANNER_MESSAGE = `Invocation inputs:
 - attempt: {{attempt}}
 - rework_finding: {{rework_finding}}
 
-Every path you pass to read_file, write_file and list_dir is relative to product_dir.
+Relative paths you pass to read_file, write_file and list_dir resolve against product_dir; handoff_path is absolute, pass it as given.
 Write tasks_json, design/plan.md, then handoff_path, then stop.`;
 
 export const HANDOFF_RERUN_SUFFIX = `

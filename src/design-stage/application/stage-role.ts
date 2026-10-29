@@ -2,9 +2,9 @@ import { rename } from "node:fs/promises";
 import { join } from "node:path";
 import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../bus/domain/handoff.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
-import { listDirTool, readFileTool, writeFileTool } from "../../shared/llm/tools.js";
 import type { SliceContext } from "../../shared/slice.js";
-import { createFirewall, productRelative } from "../domain/firewall.js";
+import { fileTools } from "../adapters/outbound/role-tools.js";
+import { createFirewall } from "../domain/firewall.js";
 import type { RoleUsage } from "../domain/payloads.js";
 import { HANDOFF_RERUN_SUFFIX } from "./messages.js";
 
@@ -13,34 +13,52 @@ export type StageRole = "architect" | "verification-designer" | "planner";
 export interface StageRoleRequest {
   readonly role: StageRole;
   readonly message: string;
-  readonly forbiddenReads: readonly string[];
 }
 
 export type StageRoleOutcome =
   | { readonly kind: "complete"; readonly handoff: ParsedHandoff; readonly usage: RoleUsage; readonly reruns: number }
   | { readonly kind: "blocked"; readonly reason: string; readonly detail: string; readonly usage: RoleUsage; readonly reruns: number };
 
-const MAX_OUTPUT_TOKENS = 32768;
-
-const COMMON_FORBIDDEN_READS: readonly string[] = ["src", "tests", "reviews", "node_modules"];
-
-export function handoffPathOf(slice: SliceContext, role: StageRole): string {
-  const path = join(slice.paths.handoffsDir, role, "handoff.md");
-  if (productRelative(slice.paths.productDir, path).startsWith("..")) {
-    throw new Error(`handoff path ${path} is outside the product directory ${slice.paths.productDir}`);
-  }
-  return path;
+interface RoleScope {
+  readonly reads: readonly string[];
+  readonly writes: readonly string[];
+  readonly lists: readonly string[];
+  readonly deniedReads: readonly string[];
 }
 
+const MAX_OUTPUT_TOKENS = 32768;
+
+export function handoffPathOf(slice: SliceContext, role: StageRole): string {
+  return join(slice.paths.handoffsDir, role, "handoff.md");
+}
+
+/* Absolute prefixes a role must never read (design-stage:BEH-001); also the deny-list of its tools. */
 export function forbiddenReadsFor(slice: SliceContext, role: StageRole): readonly string[] {
-  const handoffs = productRelative(slice.paths.productDir, slice.paths.handoffsDir);
-  const specSource = productRelative(slice.paths.productDir, slice.paths.specSourcePath);
+  const { productDir, specSourcePath, handoffsDir } = slice.paths;
+  const design = (file: string) => join(productDir, "design", file);
+  const common = [join(productDir, "src"), join(productDir, "tests"), join(productDir, "reviews"), join(productDir, "node_modules"), handoffsDir];
   const byRole: Readonly<Record<StageRole, readonly string[]>> = {
-    architect: ["design/verification.md", "design/tasks.json", "design/plan.md"],
-    "verification-designer": ["design/tech.md", "design/tasks.json", "design/plan.md", specSource],
-    planner: [specSource],
+    architect: [design("verification.md"), design("tasks.json"), design("plan.md")],
+    "verification-designer": [design("tech.md"), design("tasks.json"), design("plan.md"), specSourcePath],
+    planner: [specSourcePath],
   };
-  return [...COMMON_FORBIDDEN_READS, handoffs, ...byRole[role]].filter((prefix) => !prefix.startsWith(".."));
+  return [...common, ...byRole[role]];
+}
+
+function scopeFor(slice: SliceContext, role: StageRole): RoleScope {
+  const { productDir, specSourcePath, handoffsDir } = slice.paths;
+  const design = (file: string) => join(productDir, "design", file);
+  const ownFiles: Readonly<Record<StageRole, readonly string[]>> = {
+    architect: [design("tech.md")],
+    "verification-designer": [design("verification.md")],
+    planner: [design("tasks.json"), design("plan.md")],
+  };
+  return {
+    reads: [specSourcePath, join(productDir, "spec"), join(productDir, "design")],
+    writes: [...ownFiles[role], join(handoffsDir, role)],
+    lists: [productDir],
+    deniedReads: forbiddenReadsFor(slice, role),
+  };
 }
 
 export function zeroUsage(model: string): RoleUsage {
@@ -73,9 +91,9 @@ function blockedReason(handoff: ParsedHandoff): string {
 export async function runStageRole(slice: SliceContext, request: StageRoleRequest): Promise<StageRoleOutcome> {
   const handoffPath = handoffPathOf(slice, request.role);
   const instruction = await slice.prompts.load(request.role);
-  const firewall = createFirewall(slice.paths.productDir, request.forbiddenReads);
-  const productDir = slice.paths.productDir;
-  const tools = [readFileTool(productDir, firewall.trace), writeFileTool(productDir, firewall.trace), listDirTool(productDir, firewall.trace)];
+  const scope = scopeFor(slice, request.role);
+  const firewall = createFirewall(slice.paths.productDir, scope.deniedReads);
+  const tools = fileTools({ repoRoot: slice.paths.repoRoot, productDir: slice.paths.productDir, ...scope, trace: firewall.trace });
   const model = slice.config.models.default;
   let usage = zeroUsage(model);
   let message = request.message;
@@ -101,6 +119,6 @@ export async function runStageRole(slice: SliceContext, request: StageRoleReques
       return { kind: "blocked", reason: `${request.role}_unparseable_handoff`, detail: error, usage, reruns };
     }
     reruns += 1;
-    message = request.message + slice.prompts.render(HANDOFF_RERUN_SUFFIX, { handoff_path: productRelative(productDir, handoffPath), handoff_error: error });
+    message = request.message + slice.prompts.render(HANDOFF_RERUN_SUFFIX, { handoff_path: handoffPath, handoff_error: error });
   }
 }

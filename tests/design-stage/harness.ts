@@ -37,7 +37,6 @@ export interface HarnessOptions {
   readonly scripts: Partial<Record<Producer, readonly RoleScript[]>>;
   readonly records?: readonly SpecRecord[];
   readonly command?: (request: CommandRequest) => CommandResult | null;
-  readonly specSourceInside?: boolean;
 }
 
 export interface Harness {
@@ -71,6 +70,14 @@ export async function writeVia(request: ApiRoleRequest, path: string, content: s
 export async function readVia(request: ApiRoleRequest, path: string): Promise<string> {
   const text: unknown = await tool(request, "read_file").invoke({ path });
   return String(text);
+}
+
+export function handoffPathIn(request: ApiRoleRequest): string {
+  const match = /^- handoff_path: (.+)$/m.exec(request.message);
+  if (match === null || match[1] === undefined) {
+    throw new Error(`message to ${request.role} names no handoff_path`);
+  }
+  return match[1];
 }
 
 export function handoffText(role: Producer, attempt: number, frontmatterLines: readonly string[]): string {
@@ -123,14 +130,15 @@ function scriptedCommands(options: HarnessOptions, commands: CommandRequest[]): 
 
 export async function harness(options: HarnessOptions): Promise<Harness> {
   const repoRoot = await mkdtemp(join(tmpdir(), "design-stage-"));
-  const productDir = join(repoRoot, "product");
-  const runDir = join(productDir, ".factory", "runs", RUN_ID);
+  const runDir = join(repoRoot, ".factory", "runs", RUN_ID);
+  const productDir = join(runDir, "product");
   await mkdir(join(productDir, "spec"), { recursive: true });
   await mkdir(join(runDir, "handoffs"), { recursive: true });
   await writeFile(join(productDir, "spec", "spec.md"), "# spec\n", "utf8");
   await writeFile(join(productDir, "package.json"), '{"name":"todo-cli","devDependencies":{}}\n', "utf8");
   await writeFile(join(productDir, "tsconfig.json"), '{"compilerOptions":{"strict":false},"include":["src"]}\n', "utf8");
-  const specSourcePath = options.specSourceInside === false ? join(repoRoot, "source-spec.md") : join(productDir, "spec", "source.md");
+  const specSourcePath = join(repoRoot, "specs", "todo-cli.md");
+  await mkdir(join(repoRoot, "specs"), { recursive: true });
   await writeFile(specSourcePath, "# organisers spec\nintent only\n", "utf8");
   const published: PendingEvent[] = [];
   const commands: CommandRequest[] = [];

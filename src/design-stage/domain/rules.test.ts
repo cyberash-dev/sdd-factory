@@ -173,6 +173,12 @@ describe("design.rework", () => {
     expect([result.state.stageAttempts.architectRepairs, result.state.design.techReady, result.effects]).toEqual([1, false, [{ kind: "design.architect", attempt: 2, reworkFinding: "unpinned dependency: vitest@^5", specIds: [] }]]);
   });
 
+  it("forwards the optional specIds of a build-stage architect rework to the effect", () => {
+    const result = apply(stateIn("building"), "design.rework", { target: "architect", reason: "VD-INFEASIBLE: clock not injectable", attempt: 1, specIds: ["todo-cli:BEH-002"] });
+
+    expect([result.state.status, result.effects]).toEqual(["building", [{ kind: "design.architect", attempt: 2, reworkFinding: "VD-INFEASIBLE: clock not injectable", specIds: ["todo-cli:BEH-002"] }]]);
+  });
+
   // @covers design-stage:CST-002
   it("fails the run with cap_exhausted on the second architect repair", () => {
     const state = stateIn("building", { stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 1, assemblyRounds: 0 } });

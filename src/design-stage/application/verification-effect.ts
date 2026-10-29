@@ -4,13 +4,12 @@ import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
 import { filePathReferences, missingVerificationBlocks, parseVerificationMd, VerificationMdParseError } from "../../shared/design-files/verification-md.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 import type { SliceContext } from "../../shared/slice.js";
-import { productRelative } from "../domain/firewall.js";
 import type { RoleUsage } from "../domain/payloads.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { effectInteger, pending, publishBlocked, VERIFICATION_MD } from "./effect-support.js";
 import { approvedRecordIds, VERIFICATION_BLOCK_TYPES } from "./eligible-ids.js";
 import { VERIFICATION_DESIGNER_MESSAGE } from "./messages.js";
-import { addUsage, forbiddenReadsFor, handoffPathOf, runStageRole, zeroUsage, type StageRoleOutcome } from "./stage-role.js";
+import { addUsage, handoffPathOf, runStageRole, zeroUsage, type StageRoleOutcome } from "./stage-role.js";
 
 type Problems = { readonly kind: "blocked"; readonly reason: string; readonly detail: string } | { readonly kind: "rework"; readonly detail: string } | { readonly kind: "ok" };
 
@@ -44,11 +43,11 @@ async function invoke(slice: SliceContext, attempt: number, reworkFinding: strin
     slug: slice.slug,
     product_dir: slice.paths.productDir,
     verification_md: VERIFICATION_MD,
-    handoff_path: productRelative(slice.paths.productDir, handoffPathOf(slice, "verification-designer")),
+    handoff_path: handoffPathOf(slice, "verification-designer"),
     attempt: String(attempt),
     rework_finding: reworkFinding,
   });
-  return runStageRole(slice, { role: "verification-designer", message, forbiddenReads: forbiddenReadsFor(slice, "verification-designer") });
+  return runStageRole(slice, { role: "verification-designer", message });
 }
 
 /* design-stage:CTR-002: a missing block or a file-path reference re-runs the designer once inside this effect, then blocks. */

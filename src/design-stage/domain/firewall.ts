@@ -14,10 +14,11 @@ export function productRelative(productDir: string, path: string): string {
 }
 
 function isUnder(path: string, prefix: string): boolean {
-  return path === prefix || path.startsWith(`${prefix}/`);
+  const rel = relative(prefix, path);
+  return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/"));
 }
 
-/* Records every tool access; a read of a forbidden path is a context-firewall violation (design-stage:BEH-001). */
+/* Records every tool access; a read attempt on a forbidden absolute prefix is a context-firewall violation (design-stage:BEH-001). */
 export function createFirewall(productDir: string, forbiddenReads: readonly string[]): Firewall {
   const entries: ToolTraceEntry[] = [];
   return {
@@ -28,7 +29,8 @@ export function createFirewall(productDir: string, forbiddenReads: readonly stri
     violations: () =>
       entries
         .filter((entry) => READING_TOOLS.has(entry.tool) && entry.path !== null)
-        .map((entry) => productRelative(productDir, entry.path ?? ""))
-        .filter((path) => forbiddenReads.some((prefix) => isUnder(path, prefix))),
+        .map((entry) => resolve(productDir, entry.path ?? ""))
+        .filter((absolute) => forbiddenReads.some((prefix) => isUnder(absolute, prefix)))
+        .map((absolute) => productRelative(productDir, absolute)),
   };
 }

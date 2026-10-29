@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { runVerificationEffect } from "../../src/design-stage/application/verification-effect.js";
-import { handoffText, harness, readVia, stateIn, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type RoleScript } from "./harness.js";
-
-const HANDOFF = ".factory/runs/todo-cli-20261029-120000/handoffs/verification-designer/handoff.md";
+import { handoffPathIn, handoffText, harness, readVia, stateIn, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type RoleScript } from "./harness.js";
 
 function designerWriting(verificationMd: string, before: RoleScript = async () => undefined): RoleScript {
   return async (request) => {
     await before(request);
     await readVia(request, "spec/spec.md");
     await writeVia(request, "design/verification.md", verificationMd);
-    await writeVia(request, HANDOFF, handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
+    await writeVia(request, handoffPathIn(request), handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
   };
 }
 
@@ -36,9 +34,9 @@ describe("design.verification effect", () => {
     expect(h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])).toEqual([["design.blocked", "context_firewall_violation", "verification-designer read design/tech.md"]]);
   });
 
-  it("blocks the design with context_firewall_violation when the designer reads the source spec inside the product dir", async () => {
+  it("blocks the design with context_firewall_violation when the designer reads the source spec", async () => {
     const peek: RoleScript = async (request) => {
-      await readVia(request, "spec/source.md");
+      await readVia(request, h.slice.paths.specSourcePath);
     };
     const h = await harness({ scripts: { "verification-designer": [designerWriting(verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"]), peek)] } });
 
@@ -79,7 +77,7 @@ describe("design.verification effect", () => {
   it("blocks the design with verification_md_invalid when the file has no blocks", async () => {
     const empty: RoleScript = async (request) => {
       await writeVia(request, "design/verification.md", "# Verification design: todo-cli\n## 3. Blocks\nnone\n");
-      await writeVia(request, HANDOFF, handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
+      await writeVia(request, handoffPathIn(request), handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
     };
     const h = await harness({ scripts: { "verification-designer": [empty] } });
 

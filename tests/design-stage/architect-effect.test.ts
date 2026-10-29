@@ -2,16 +2,14 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runArchitectEffect } from "../../src/design-stage/application/architect-effect.js";
-import { ARCHITECT_HANDOFF_LINES, handoffText, harness, readVia, stateIn, techMdText, writeVia, type RoleScript } from "./harness.js";
-
-const HANDOFF = ".factory/runs/todo-cli-20261029-120000/handoffs/architect/handoff.md";
+import { ARCHITECT_HANDOFF_LINES, handoffPathIn, handoffText, harness, readVia, stateIn, techMdText, writeVia, type RoleScript } from "./harness.js";
 
 function architectWriting(techMd: string, handoffLines: readonly string[] = ARCHITECT_HANDOFF_LINES, before: RoleScript = async () => undefined): RoleScript {
   return async (request) => {
     await before(request);
     await readVia(request, "spec/spec.md");
     await writeVia(request, "design/tech.md", techMd);
-    await writeVia(request, HANDOFF, handoffText("architect", 1, handoffLines));
+    await writeVia(request, handoffPathIn(request), handoffText("architect", 1, handoffLines));
   };
 }
 
@@ -25,21 +23,27 @@ describe("design.architect effect", () => {
     expect(h.published.map((event) => [event.type, event.payload["path"], event.payload["specIds"], event.payload["handoffReruns"]])).toEqual([["design.tech.ready", "design/tech.md", [], 0]]);
   });
 
-  it("renders the invocation inputs into the first message with the product-relative handoff path", async () => {
+  it("renders the invocation inputs into the first message with absolute spec source and handoff paths", async () => {
     const h = await harness({ scripts: { architect: [architectWriting(techMdText())] } });
 
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
     const message = h.roleCalls[0]?.message ?? "";
-    expect([message.includes("- slug: todo-cli"), message.includes(`- product_dir: ${h.productDir}`), message.includes("- spec_source_path: spec/source.md"), message.includes(`- handoff_path: ${HANDOFF}`), message.includes("- attempt: 1"), h.roleCalls[0]?.instruction]).toEqual([true, true, true, true, true, "instruction for architect"]);
+    expect([message.includes("- slug: todo-cli"), message.includes(`- product_dir: ${h.productDir}`), message.includes(`- spec_source_path: ${h.slice.paths.specSourcePath}`), message.includes(`- handoff_path: ${join(h.slice.paths.handoffsDir, "architect", "handoff.md")}`), message.includes("- attempt: 1"), h.roleCalls[0]?.instruction]).toEqual([true, true, true, true, true, "instruction for architect"]);
   });
 
-  it("inlines a source spec that lives outside the product directory instead of pointing at an unreadable path", async () => {
-    const h = await harness({ scripts: { architect: [architectWriting(techMdText())] }, specSourceInside: false });
+  it("lets the architect read the source spec outside the product directory and refuses a write outside its own files", async () => {
+    let sourceText = "";
+    let refusal = "";
+    const probing = architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, async (request) => {
+      sourceText = await readVia(request, h.slice.paths.specSourcePath);
+      refusal = String(await request.tools.find((candidate) => candidate.name === "write_file")?.invoke({ path: "src/index.ts", content: "x" }));
+    });
+    const h = await harness({ scripts: { architect: [probing] } });
 
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
-    expect(h.roleCalls[0]?.message.includes("# organisers spec\nintent only")).toBe(true);
+    expect([sourceText, refusal.startsWith("ERROR: path src/index.ts is outside"), h.published.map((event) => event.type)]).toEqual(["# organisers spec\nintent only\n", true, ["design.tech.ready"]]);
   });
 
   // @covers design-stage:BEH-001
@@ -101,7 +105,7 @@ describe("design.architect effect", () => {
 
   it("blocks the design with tech_md_invalid when the architect never wrote tech.md", async () => {
     const onlyHandoff: RoleScript = async (request) => {
-      await writeVia(request, HANDOFF, handoffText("architect", 1, ARCHITECT_HANDOFF_LINES));
+      await writeVia(request, handoffPathIn(request), handoffText("architect", 1, ARCHITECT_HANDOFF_LINES));
     };
     const h = await harness({ scripts: { architect: [onlyHandoff] } });
 
@@ -113,13 +117,13 @@ describe("design.architect effect", () => {
   it("re-runs the architect once with the parse error when the handoff lacks a required key, keeping the rejected file", async () => {
     const withoutModules = async (request: Parameters<RoleScript>[0]): Promise<void> => {
       await writeVia(request, "design/tech.md", techMdText());
-      await writeVia(request, HANDOFF, handoffText("architect", 1, ["status: complete", 'tooling: { node: "22" }']));
+      await writeVia(request, handoffPathIn(request), handoffText("architect", 1, ["status: complete", 'tooling: { node: "22" }']));
     };
     const h = await harness({ scripts: { architect: [withoutModules, architectWriting(techMdText())] } });
 
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
-    const rejected = await readFile(join(h.productDir, `${HANDOFF}.rejected-1`), "utf8");
+    const rejected = await readFile(join(h.slice.paths.handoffsDir, "architect", "handoff.md.rejected-1"), "utf8");
     expect([h.roleCalls.length, h.roleCalls[1]?.message.includes("missing_required_key:modules"), rejected.includes("role: architect"), h.published.map((event) => [event.type, event.payload["handoffReruns"]])]).toEqual([2, true, true, [["design.tech.ready", 1]]]);
   });
 

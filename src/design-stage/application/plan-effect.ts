@@ -5,7 +5,6 @@ import { parseTasksJson, TasksJsonParseError, type TasksFile } from "../../share
 import { parseTechMd, type TechDesign } from "../../shared/design-files/tech-md.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 import type { SliceContext } from "../../shared/slice.js";
-import { productRelative } from "../domain/firewall.js";
 import { anyGlobMatches } from "../domain/glob.js";
 import type { RoleUsage } from "../domain/payloads.js";
 import { describeViolations, validateTasks } from "../domain/tasks-validator.js";
@@ -14,7 +13,7 @@ import { designReworkAttempt, effectInteger, pending, publishBlocked, reworkFind
 import { approvedRecordIds, TASK_COVER_TYPES } from "./eligible-ids.js";
 import { PLANNER_MESSAGE } from "./messages.js";
 import { productPaths } from "./product-paths.js";
-import { forbiddenReadsFor, handoffPathOf, runStageRole } from "./stage-role.js";
+import { handoffPathOf, runStageRole } from "./stage-role.js";
 import { installTooling } from "./tooling-install.js";
 
 type Verdict = { readonly kind: "valid"; readonly tasks: TasksFile } | { readonly kind: "invalid"; readonly reason: string };
@@ -124,11 +123,11 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     tech_md: TECH_MD,
     verification_md: VERIFICATION_MD,
     tasks_json: TASKS_JSON,
-    handoff_path: productRelative(slice.paths.productDir, handoffPathOf(slice, "planner")),
+    handoff_path: handoffPathOf(slice, "planner"),
     attempt: String(attempt),
     rework_finding: finding,
   });
-  const outcome = await runStageRole(slice, { role: "planner", message, forbiddenReads: forbiddenReadsFor(slice, "planner") });
+  const outcome = await runStageRole(slice, { role: "planner", message });
   if (outcome.kind === "blocked") {
     publishBlocked(context, outcome.reason, outcome.detail, outcome.usage, outcome.reruns);
     return;

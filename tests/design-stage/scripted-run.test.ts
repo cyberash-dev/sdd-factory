@@ -6,9 +6,7 @@ import type { DeliveredEvent } from "../../src/bus/domain/envelope.js";
 import type { TransitionRule } from "../../src/bus/domain/transition.js";
 import { createDesignStageSlice } from "../../src/design-stage/index.js";
 import { composeEffectRunner, composeRules, type Slice } from "../../src/shared/slice.js";
-import { ARCHITECT_HANDOFF_LINES, handoffText, harness, PLANNER_HANDOFF_LINES, readVia, stateIn, tasksJsonText, techMdText, VALID_TASKS, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type Harness, type RoleScript, type TaskInput } from "./harness.js";
-
-const HANDOFFS = ".factory/runs/todo-cli-20261029-120000/handoffs";
+import { ARCHITECT_HANDOFF_LINES, handoffPathIn, handoffText, harness, PLANNER_HANDOFF_LINES, readVia, stateIn, tasksJsonText, techMdText, VALID_TASKS, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type Harness, type RoleScript, type TaskInput } from "./harness.js";
 
 const specApprovedStandIn: TransitionRule = {
   name: "spec.approved -> designing (spec-stage stand-in)",
@@ -27,7 +25,7 @@ function architect(journal: string[]): RoleScript {
     await yieldTurn();
     await readVia(request, "spec/spec.md");
     await writeVia(request, "design/tech.md", techMdText());
-    await writeVia(request, `${HANDOFFS}/architect/handoff.md`, handoffText("architect", 1, ARCHITECT_HANDOFF_LINES));
+    await writeVia(request, handoffPathIn(request), handoffText("architect", 1, ARCHITECT_HANDOFF_LINES));
   };
 }
 
@@ -36,7 +34,7 @@ function verificationDesigner(journal: string[]): RoleScript {
     journal.push("started:verification-designer");
     await yieldTurn();
     await writeVia(request, "design/verification.md", verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"]));
-    await writeVia(request, `${HANDOFFS}/verification-designer/handoff.md`, handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
+    await writeVia(request, handoffPathIn(request), handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
   };
 }
 
@@ -45,7 +43,7 @@ function planner(journal: string[], tasks: readonly TaskInput[]): RoleScript {
     journal.push("started:planner");
     await yieldTurn();
     await writeVia(request, "design/tasks.json", tasksJsonText(tasks));
-    await writeVia(request, `${HANDOFFS}/planner/handoff.md`, handoffText("planner", 1, PLANNER_HANDOFF_LINES));
+    await writeVia(request, handoffPathIn(request), handoffText("planner", 1, PLANNER_HANDOFF_LINES));
   };
 }
 
@@ -132,7 +130,7 @@ describe("design stage through the run engine", () => {
     const blockedArchitect: RoleScript = async (request) => {
       journal.push("started:architect");
       await yieldTurn();
-      await writeVia(request, `${HANDOFFS}/architect/handoff.md`, handoffText("architect", 1, ["status: blocked", "modules: []", "tooling: {}", "blocked_reason: no approved record"]));
+      await writeVia(request, handoffPathIn(request), handoffText("architect", 1, ["status: blocked", "modules: []", "tooling: {}", "blocked_reason: no approved record"]));
     };
     const h = await harness({ scripts: { architect: [blockedArchitect], "verification-designer": [verificationDesigner(journal)], planner: [] } });
 

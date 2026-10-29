@@ -2,9 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runPlanEffect } from "../../src/design-stage/application/plan-effect.js";
-import { handoffText, harness, PLANNER_HANDOFF_LINES, readVia, stateIn, tasksJsonText, techMdText, VALID_TASKS, verificationMdText, writeVia, type RoleScript, type TaskInput } from "./harness.js";
-
-const HANDOFF = ".factory/runs/todo-cli-20261029-120000/handoffs/planner/handoff.md";
+import { handoffPathIn, handoffText, harness, PLANNER_HANDOFF_LINES, readVia, stateIn, tasksJsonText, techMdText, VALID_TASKS, verificationMdText, writeVia, type RoleScript, type TaskInput } from "./harness.js";
 
 function plannerWriting(tasks: readonly TaskInput[], handoffLines: readonly string[] = PLANNER_HANDOFF_LINES): RoleScript {
   return async (request) => {
@@ -12,7 +10,7 @@ function plannerWriting(tasks: readonly TaskInput[], handoffLines: readonly stri
     await readVia(request, "design/verification.md");
     await writeVia(request, "design/tasks.json", tasksJsonText(tasks));
     await writeVia(request, "design/plan.md", "# Plan: todo-cli\n");
-    await writeVia(request, HANDOFF, handoffText("planner", 1, handoffLines));
+    await writeVia(request, handoffPathIn(request), handoffText("planner", 1, handoffLines));
   };
 }
 
@@ -94,7 +92,7 @@ describe("design.plan effect", () => {
   it("routes a tasks.json schema error to the planner naming the offending task and field", async () => {
     const broken: RoleScript = async (request) => {
       await writeVia(request, "design/tasks.json", tasksJsonText(VALID_TASKS).replace('"maxTests": 8', '"maxTests": 0'));
-      await writeVia(request, HANDOFF, handoffText("planner", 1, PLANNER_HANDOFF_LINES));
+      await writeVia(request, handoffPathIn(request), handoffText("planner", 1, PLANNER_HANDOFF_LINES));
     };
     const h = await harness({ scripts: { planner: [broken] } });
     await seedDesign(h.productDir, techMdText());
