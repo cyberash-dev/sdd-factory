@@ -1,7 +1,8 @@
 import type { SliceFactory } from "./shared/slice.js";
 import { createSpecStageSlice } from "./spec-stage/index.js";
+import { createTraceSlice } from "./trace/index.js";
 
-/* Stage slices join here as their partitions land; the factory slice is composed separately. */
+/* Stage slices join here as their partitions land; the tracer goes first so it observes every participant. */
 export function stageSlices(): readonly SliceFactory[] {
-  return [createSpecStageSlice()];
+  return [createTraceSlice({ env: process.env }), createSpecStageSlice()];
 }

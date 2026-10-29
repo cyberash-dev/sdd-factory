@@ -13,6 +13,14 @@ export interface ApiRoleRequest {
   readonly tools: readonly Tool[];
   readonly timeoutMs: number;
   readonly maxOutputTokens: number;
+  readonly taskId?: string;
+}
+
+export const TASK_CAPABILITY_PREFIX = "task:";
+
+export function taskIdOfCapabilities(capabilities: readonly string[] | undefined): string | null {
+  const capability = (capabilities ?? []).find((item) => item.startsWith(TASK_CAPABILITY_PREFIX));
+  return capability === undefined ? null : capability.slice(TASK_CAPABILITY_PREFIX.length);
 }
 
 export interface ApiRoleUsage {
@@ -63,7 +71,8 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
         let inputTokens = 0;
         let outputTokens = 0;
         let inferenceCount = 0;
-        const agent = createAgent({ name: request.role, capabilities: ["inference"], instruction: request.instruction, tools: [...request.tools], handlers: [] });
+        const capabilities = request.taskId === undefined ? ["inference"] : ["inference", `${TASK_CAPABILITY_PREFIX}${request.taskId}`];
+        const agent = createAgent({ name: request.role, capabilities, instruction: request.instruction, tools: [...request.tools], handlers: [] });
         const agentId = agent.getId();
         const observer = createRuntimeObserver(`${request.role}-observer`, (event: SemanticEvent) => {
           if (event.producerId !== agentId) {
