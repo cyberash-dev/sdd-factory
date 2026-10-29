@@ -1175,7 +1175,59 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+---
+id: trace:DLT-001
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: trace
+title: trace-files 0.1.0 -> 0.2.0 - list boundary behaviours as Surface members
+target_ids:
+  - trace:SUR-001
+  - trace:BEH-001
+  - trace:BEH-002
+  - trace:BEH-003
+  - trace:BEH-004
+  - trace:BEH-005
+  - trace:BEH-006
+  - trace:BEH-007
+  - trace:BEH-008
+  - trace:BEH-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: trace:SUR-001
+    intended_version: "0.2.0"
+description: |
+  BEH-001 to BEH-009 declare surface_ref trace:SUR-001 but the Surface lists
+  only its Contracts as members, which `sdd ready` reports as
+  surface_member_drift. Finalising this Delta adds the nine behaviours to the
+  members and bumps the Surface version. No observable behaviour changes.
+tests_old_behavior:
+  - trace:CTR-001 to trace:CTR-004 contract tests stay green
+tests_new_behavior:
+  - to:trace:BEH-001
+  - to:trace:BEH-002
+  - to:trace:BEH-003
+  - to:trace:BEH-004
+  - to:trace:BEH-005
+  - to:trace:BEH-006
+  - to:trace:BEH-007
+  - to:trace:BEH-008
+  - to:trace:BEH-009
+test_obligation:
+  predicate: |
+    After finalize, trace:SUR-001.members contains BEH-001 to BEH-009 and
+    `sdd ready --partition trace` reports no surface_member_drift.
+  test_template: contract
+  boundary_classes:
+    - members after finalize
+  failure_scenarios:
+    - drift still reported
+---
+```
 
 ---
 

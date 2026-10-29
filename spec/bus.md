@@ -1645,7 +1645,58 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+---
+id: bus:DLT-001
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: bus
+title: factory-events and handoff-files 0.1.0 -> 0.2.0 - list boundary behaviours as Surface members
+target_ids:
+  - bus:SUR-001
+  - bus:SUR-002
+  - bus:BEH-001
+  - bus:BEH-002
+  - bus:BEH-003
+  - bus:BEH-004
+  - bus:BEH-005
+  - bus:BEH-006
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.2.0"
+  - id: bus:SUR-002
+    intended_version: "0.2.0"
+description: |
+  BEH-001, BEH-002, BEH-005 and BEH-006 declare surface_ref bus:SUR-001 and
+  BEH-003, BEH-004 declare surface_ref bus:SUR-002, but the Surfaces list
+  only their Contracts as members, which `sdd ready` reports as
+  surface_member_drift. Finalising this Delta adds the behaviours to the
+  members and bumps both Surface versions. No observable behaviour changes.
+tests_old_behavior:
+  - bus:CTR-001 to bus:CTR-008 contract tests stay green
+tests_new_behavior:
+  - to:bus:BEH-001
+  - to:bus:BEH-002
+  - to:bus:BEH-003
+  - to:bus:BEH-004
+  - to:bus:BEH-005
+  - to:bus:BEH-006
+test_obligation:
+  predicate: |
+    After finalize, bus:SUR-001.members contains BEH-001, BEH-002, BEH-005,
+    BEH-006 and bus:SUR-002.members contains BEH-003, BEH-004; `sdd ready
+    --partition bus` reports no surface_member_drift.
+  test_template: contract
+  boundary_classes:
+    - members after finalize
+  failure_scenarios:
+    - drift still reported
+---
+```
 
 ---
 

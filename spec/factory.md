@@ -121,13 +121,13 @@ discovery_scope:
   - tsconfig.json
 coverage_evidence:
   - kind: git_tree_hash_v1
-    reference: "0000000000000000000000000000000000000000"
+    reference: 060fb31c63f645fef99bf3ecb34bde78b80e5749
     note: |
-      Greenfield repository. The token and commit sha are placeholders until
-      the first implementation commit exists; they are then filled from
-      `sdd token --format=json` and the block is approved by the operator.
-freshness_token: "0000000000000000000000000000000000000000000000000000000000000000"
-baseline_commit_sha: "0000000000000000000000000000000000000000"
+      Token computed by `sdd token --format=json` at the first implementation
+      commit (bus engine, toolchain, tests). Refreshed on every
+      scope-touching commit via `sdd check` / `sdd refresh`.
+freshness_token: c5ba3e7cfbd4002ec6f3f58a3f373266fbf91388a349fcafbaf05b68a6dd7a36
+baseline_commit_sha: 060fb31c63f645fef99bf3ecb34bde78b80e5749
 mechanism: git_tree_hash_v1
 notes: |
   The baseline carries no preserved as-is behaviour: there is no prior code.
@@ -1505,7 +1505,49 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+---
+id: factory:DLT-001
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: factory
+title: factory-cli 0.1.0 -> 0.2.0 - list boundary behaviours as Surface members
+target_ids:
+  - factory:SUR-001
+  - factory:BEH-001
+  - factory:BEH-005
+  - factory:BEH-006
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: factory:SUR-001
+    intended_version: "0.2.0"
+description: |
+  BEH-001, BEH-005 and BEH-006 declare surface_ref factory:SUR-001 but the
+  Surface lists only its Contracts as members, which `sdd ready` reports as
+  surface_member_drift. Finalising this Delta adds the three behaviours to
+  the members and bumps the Surface version. No observable behaviour
+  changes.
+tests_old_behavior:
+  - factory:CTR-001 and factory:CTR-002 contract tests stay green
+tests_new_behavior:
+  - to:factory:BEH-001
+  - to:factory:BEH-005
+  - to:factory:BEH-006
+test_obligation:
+  predicate: |
+    After finalize, factory:SUR-001.members contains BEH-001, BEH-005 and
+    BEH-006 and `sdd ready --partition factory` reports no
+    surface_member_drift.
+  test_template: contract
+  boundary_classes:
+    - members after finalize
+  failure_scenarios:
+    - drift still reported
+---
+```
 
 ---
 
@@ -1604,6 +1646,33 @@ default_if_unresolved: a
 ---
 ```
 
+```yaml
+---
+id: factory:OQ-004
+type: Open-Q
+lifecycle:
+  status: proposed
+partition_id: factory
+question: |
+  factory:BEH-002, BEH-004 and BEH-007 name run.failed reasons
+  (toolchain_install_failed, sdd_token_failed, worktree_failed,
+  unhandled_error, provider_error) and stages (bootstrap, runtime) that are
+  not in the enums of bus:CTR-002. Should (a) the factory map them onto the
+  bus enums and keep the original word as a detail prefix, or (b) the bus
+  enums be widened by a Delta?
+options:
+  - id: a
+    label: map_onto_bus_enums
+    consequence: "no spec change now; detail carries the original word as a prefix; stage bootstrap maps to workspace, runtime maps to the current stage"
+  - id: b
+    label: widen_bus_enums
+    consequence: "Delta on approved bus:CTR-002 plus re-approval before the hackathon"
+blocking: no
+owner: operator
+default_if_unresolved: a
+---
+```
+
 ---
 
 ## 18. Assumptions
@@ -1674,6 +1743,23 @@ review_by: "2026-10-31"
 default_if_unresolved: keep_assumption
 tests:
   - factory:BEH-004 boundary class "maxParallelLanes smaller than the number of ready tasks"
+---
+```
+
+```yaml
+---
+id: factory:ASM-004
+type: ASSUMPTION
+lifecycle:
+  status: proposed
+partition_id: factory
+assumption: "run.failed reasons and stages named in factory behaviours are mapped onto the bus:CTR-002 enums; the original reason word is kept as a prefix of detail"
+source_open_q: factory:OQ-004
+blocking: no
+review_by: "2026-10-31"
+default_if_unresolved: keep_assumption
+tests:
+  - "factory:BEH-002 negative cases (reason mapped to tooling_broken and runtime_error)"
 ---
 ```
 
