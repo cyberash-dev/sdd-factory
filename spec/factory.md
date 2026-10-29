@@ -154,11 +154,14 @@ lifecycle:
     scope: first-time-approval
 partition_id: factory
 name: factory-cli
-version: "0.1.0"
+version: "0.2.0"
 boundary_type: cli
 members:
   - factory:CTR-001
   - factory:CTR-002
+  - factory:BEH-001
+  - factory:BEH-005
+  - factory:BEH-006
 consumer_compat_policy: semver_per_surface
 notes: |
   The single operator-facing command. Judges run exactly this surface.
@@ -1510,7 +1513,13 @@ none
 id: factory:DLT-001
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:20.311Z
+    change_request: surface members 0.2.0
+    scope: first-time-approval
 partition_id: factory
 title: factory-cli 0.1.0 -> 0.2.0 - list boundary behaviours as Surface members
 target_ids:
@@ -1651,7 +1660,13 @@ default_if_unresolved: a
 id: factory:OQ-004
 type: Open-Q
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:21.410Z
+    change_request: reason enum mapping
+    scope: first-time-approval
 partition_id: factory
 question: |
   factory:BEH-002, BEH-004 and BEH-007 name run.failed reasons
@@ -1751,7 +1766,13 @@ tests:
 id: factory:ASM-004
 type: ASSUMPTION
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:21.777Z
+    change_request: reason enum mapping
+    scope: first-time-approval
 partition_id: factory
 assumption: "run.failed reasons and stages named in factory behaviours are mapped onto the bus:CTR-002 enums; the original reason word is kept as a prefix of detail"
 source_open_q: factory:OQ-004

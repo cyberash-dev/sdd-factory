@@ -112,13 +112,22 @@ lifecycle:
     scope: first-time-approval
 partition_id: trace
 name: trace-files
-version: "1.0.0"
+version: "0.2.0"
 boundary_type: public_storage
 members:
   - trace:CTR-001
   - trace:CTR-002
   - trace:CTR-003
   - trace:CTR-004
+  - trace:BEH-001
+  - trace:BEH-002
+  - trace:BEH-003
+  - trace:BEH-004
+  - trace:BEH-005
+  - trace:BEH-006
+  - trace:BEH-007
+  - trace:BEH-008
+  - trace:BEH-009
 consumer_compat_policy: semver_per_surface
 notes: |
   Consumers are the hackathon judges (reading hidden/<slug>/trace/ on
@@ -1180,7 +1189,13 @@ none
 id: trace:DLT-001
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:21.040Z
+    change_request: surface members 0.2.0
+    scope: first-time-approval
 partition_id: trace
 title: trace-files 0.1.0 -> 0.2.0 - list boundary behaviours as Surface members
 target_ids:

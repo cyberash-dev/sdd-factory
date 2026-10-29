@@ -1,0 +1,38 @@
+plan_id: 2026-10-29T212920Z-o4fnv
+created_at: 2026-10-29T21:29:20.313Z
+pending_attestations:
+  - id: factory:DLT-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:20.311Z
+    change_request: "surface members 0.2.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: bus:DLT-*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:20.672Z
+    change_request: "surface members and state keys 0.2.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: trace:DLT-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:21.040Z
+    change_request: "surface members 0.2.0"
+    scope: first-time-approval
+    target_status: approved
+  - id: factory:OQ-004
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:21.410Z
+    change_request: "reason enum mapping"
+    scope: first-time-approval
+    target_status: approved
+  - id: factory:ASM-004
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:21.777Z
+    change_request: "reason enum mapping"
+    scope: first-time-approval
+    target_status: approved

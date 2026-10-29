@@ -1650,7 +1650,13 @@ none
 id: bus:DLT-001
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:20.672Z
+    change_request: surface members and state keys 0.2.0
+    scope: first-time-approval
 partition_id: bus
 title: factory-events and handoff-files 0.1.0 -> 0.2.0 - list boundary behaviours as Surface members
 target_ids:
@@ -1703,7 +1709,13 @@ test_obligation:
 id: bus:DLT-002
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-29T21:29:20.672Z
+    change_request: surface members and state keys 0.2.0
+    scope: first-time-approval
 partition_id: bus
 title: state.json - add design progress, per-task dependsOn and handoff re-run counters, assumption counters
 target_ids:
