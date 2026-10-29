@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "1.0.0"
+version: "0.2.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -122,6 +122,10 @@ members:
   - bus:CTR-004
   - bus:CTR-005
   - bus:CTR-006
+  - bus:BEH-001
+  - bus:BEH-002
+  - bus:BEH-005
+  - bus:BEH-006
 consumer_compat_policy: semver_per_surface
 notes: |
   Consumers are every participant of the runtime and the tracer. Adding
@@ -145,11 +149,13 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: handoff-files
-version: "1.0.0"
+version: "0.2.0"
 boundary_type: public_storage
 members:
   - bus:CTR-007
   - bus:CTR-008
+  - bus:BEH-003
+  - bus:BEH-004
 consumer_compat_policy: semver_per_surface
 notes: |
   Files under `.factory/runs/<runId>/`. Producers of handoff.md are the
