@@ -40,6 +40,7 @@ export interface Slice {
   readonly rules: readonly TransitionRule[];
   readonly effects: Readonly<Record<string, EffectHandler>>;
   participants(context: SliceContext): readonly Human[];
+  shutdown?(): Promise<void>;
 }
 
 export type SliceFactory = (context: SliceContext) => Slice;

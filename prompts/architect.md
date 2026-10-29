@@ -50,6 +50,7 @@ Module block shape:
 - responsibility: <one sentence>
 - covers: [<slug>:CTR-001, <slug>:BEH-002]
 - owns: src/<area>/**          (disjoint across modules)
+- entry: src/<area>/index.ts   (the one file that exports the public interface; the foreman generates the stub there and tests import it)
 - depends_on: []               (modules whose interface this one imports; prefer empty)
 - public interface:
   ```ts
