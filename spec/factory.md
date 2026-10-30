@@ -121,13 +121,13 @@ discovery_scope:
   - tsconfig.json
 coverage_evidence:
   - kind: git_tree_hash_v1
-    reference: 7951c3728584b6362b2ca045a543f7998bc656ca
+    reference: 761fbbce3fbd0ca7fd830b7d740bf9ae14d5004c
     note: |
       Token computed by `sdd token --format=json` at the first implementation
       commit (bus engine, toolchain, tests). Refreshed on every
       scope-touching commit via `sdd check` / `sdd refresh`.
-freshness_token: 33fcf2baa5ea8fd9760fa26ec29a3ebd98f310c92dfdfdcfd6140bfcd3b376e1
-baseline_commit_sha: 7951c3728584b6362b2ca045a543f7998bc656ca
+freshness_token: a7bcfc6b8bd1469445ab0687755b97eec3e9d44db7d97e1dc83c2f6b44e0c87f
+baseline_commit_sha: 761fbbce3fbd0ca7fd830b7d740bf9ae14d5004c
 mechanism: git_tree_hash_v1
 notes: |
   The baseline carries no preserved as-is behaviour: there is no prior code.
@@ -154,7 +154,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: factory
 name: factory-cli
-version: "0.5.0"
+version: "0.6.0"
 boundary_type: cli
 members:
   - factory:CTR-001
@@ -163,6 +163,7 @@ members:
   - factory:BEH-005
   - factory:BEH-006
   - factory:BEH-009
+  - factory:BEH-010
 consumer_compat_policy: semver_per_surface
 notes: |
   The single operator-facing command. Judges run exactly this surface.
@@ -770,6 +771,70 @@ test_obligation:
     - bootstrap re-run on the existing product directory
     - redo event applied twice (state advanced during replay and again at publication)
     - resume creating a second terminal event in R0's trace
+---
+```
+
+```yaml
+---
+id: factory:BEH-010
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:51:47.000Z
+    change_request: termination signals end the run cleanly
+    scope: first-time-approval
+partition_id: factory
+title: a termination signal ends the run as run.failed terminated
+surface_ref: factory:SUR-001
+given: |
+  - a run is in progress (no terminal event yet)
+when: the factory process receives SIGINT or SIGTERM
+then: |
+  - the foreman publishes `run.failed{stage: <current stage>, reason:
+    "terminated", detail: "<signal name>"}` and the run finalises as any
+    failed run does (factory:BEH-005): run.json status `failed`, trace
+    files and cloud mirror closed, terminal report on stderr, exit code 1
+  - a lane subprocess still running receives the same signal; its
+    worktree is left as it is
+  - the operator continues the run later with `factory resume <runId>`
+    without `--force`, since run.json no longer says `running`
+  - a second signal while finalising does not shorten the finalisation
+    (shutdown is still bounded by `timeouts.shutdownMs`)
+negative_cases:
+  - "signal after the terminal event => ignored, exit code of the run kept"
+  - "SIGKILL => cannot be handled; run.json stays running and resume needs --force (factory:BEH-009)"
+out_of_scope:
+  - pausing a run and continuing it in the same process
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: single
+  read_consistency: strong
+  idempotency: exactly_once_with_key:runId
+  time_source: wall_clock:1s
+data_scope: new_writes_only
+policy_refs:
+  - factory:POL-001
+  - factory:POL-003
+test_obligation:
+  predicate: |
+    Given a run whose spec stage is waiting on a role, emitting SIGTERM to
+    the process yields a trace that ends with run.failed{reason:
+    "terminated", detail: "SIGTERM"} at the current stage, a run.json
+    with status failed, and a terminal outcome the CLI maps to exit 1;
+    the same signal after run.published changes nothing; a resume of the
+    terminated run needs no --force.
+  test_template: integration
+  boundary_classes:
+    - SIGTERM mid-stage
+    - SIGINT mid-stage
+    - signal after the terminal event
+  failure_scenarios:
+    - the process exiting before the trace is finalised
+    - run.json left at status running
 ---
 ```
 
@@ -1949,6 +2014,56 @@ test_obligation:
   failure_scenarios:
     - resume accepted without a runId
     - drift still reported
+---
+```
+
+```yaml
+---
+id: factory:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:51:47.405Z
+    change_request: termination signals end the run cleanly
+    scope: first-time-approval
+partition_id: factory
+title: factory-cli 0.5.0 -> 0.6.0 - termination signals end the run cleanly
+target_ids:
+  - factory:SUR-001
+  - factory:BEH-005
+  - factory:BEH-010
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: factory:SUR-001
+    intended_version: "0.6.0"
+description: |
+  Stopping a run today kills the process: no run.failed, run.json stays
+  at status running, the trace has no terminal event and the cloud
+  mirror is never closed, so `factory resume` needs --force and the
+  trace report shows a run that never ended. factory:BEH-010 handles
+  SIGINT and SIGTERM as a run failure with reason `terminated` and the
+  signal name as detail, and joins factory:SUR-001 as a member (minor
+  bump). The reason value itself is added by bus:DLT-004.
+tests_old_behavior:
+  - a run.failed from any other reason still finalises as before
+tests_new_behavior:
+  - to:factory:BEH-010
+test_obligation:
+  predicate: |
+    After finalize factory:SUR-001 is at version 0.6.0 with
+    factory:BEH-010 among its members; the terminated reason reaches
+    run.json and the terminal report like every other reason.
+  test_template: contract
+  boundary_classes:
+    - surface members and version
+    - terminated reason in the manifest
+  failure_scenarios:
+    - the signal handler installed before the run has a state to report
 ---
 ```
 
