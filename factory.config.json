@@ -1,18 +1,18 @@
 {
   "caps": {
-    "lintCycles": 5,
+    "lintCycles": 8,
     "criticRounds": 4,
     "implementerAttempts": 3,
     "testWriterRework": 1,
-    "plannerRecuts": 1,
-    "architectRepairs": 1,
+    "plannerRecuts": 2,
+    "architectRepairs": 2,
     "criticAssumptionsPerId": 1,
     "assemblyRounds": 2,
-    "handoffRerun": 1
+    "handoffRerun": 2
   },
   "timeouts": {
-    "specStageMs": 1200000,
-    "apiRoleMs": 900000,
+    "specStageMs": 2400000,
+    "apiRoleMs": 1200000,
     "cliRoleMs": 1500000,
     "verifierMs": 300000,
     "shutdownMs": 10000
