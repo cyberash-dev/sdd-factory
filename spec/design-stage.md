@@ -1128,6 +1128,66 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-006
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T21:04:45.651Z
+    change_request: "nested product typecheck: pin skipLibCheck and typeRoots"
+    scope: first-time-approval
+partition_id: design-stage
+title: the tooling step pins skipLibCheck and typeRoots so the nested product typechecks
+target_ids:
+  - design-stage:BEH-003
+  - design-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Run 13 lost its first task to the tooling step again: the product
+  lives under .factory/runs/<runId>/product inside the factory
+  repository, TypeScript includes every ancestor node_modules/@types
+  automatically, and the factory's own @types/chai collided with the
+  chai declarations bundled in vitest 2.1.8, so `npx tsc --noEmit`
+  reported TS2300 duplicate identifiers in node_modules on every red
+  check. The simple-fixer correctly made no edit (the cause is outside
+  the allowed paths) and its transcript showed `--skipLibCheck` passing
+  while `--types node` did not. The foreman now writes the product
+  tsconfig.json with `skipLibCheck: true` and
+  `typeRoots: ["./node_modules/@types"]` on top of the architect's
+  compilerOptions (after dropping rootDir per DLT-002), logs
+  `design-stage: tsconfig skipLibCheck and typeRoots pinned`, and keeps
+  include as scaffolded. The product's own code is still typechecked
+  in full; only declaration files of dependencies are skipped, and
+  type packages are looked up in the product's node_modules only. The
+  architect prompt states that both options are owned by the foreman.
+tests_old_behavior:
+  - the architect's other compilerOptions still land in tsconfig.json; rootDir is still dropped
+tests_new_behavior:
+  - to:design-stage:BEH-003
+test_obligation:
+  predicate: |
+    Given TD-TOOLING compilerOptions without the two keys, the written
+    tsconfig.json carries skipLibCheck true and typeRoots
+    ["./node_modules/@types"] next to the architect's options; given an
+    architect value skipLibCheck false, the written value is true and
+    the log line names the pin; the include list is unchanged.
+  test_template: unit
+  boundary_classes:
+    - keys absent
+    - architect sets skipLibCheck false
+  failure_scenarios:
+    - architect value overriding the pin
+    - include list rewritten
+---
+```
+
 ---
 
 ## 16. Implementation bindings

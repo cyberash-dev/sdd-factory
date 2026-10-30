@@ -1,0 +1,10 @@
+plan_id: 2026-10-30T210445Z-mz1bq
+created_at: 2026-10-30T21:04:45.652Z
+pending_attestations:
+  - id: design-stage:DLT-006
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T21:04:45.651Z
+    change_request: "nested product typecheck: pin skipLibCheck and typeRoots"
+    scope: first-time-approval
+    target_status: approved
