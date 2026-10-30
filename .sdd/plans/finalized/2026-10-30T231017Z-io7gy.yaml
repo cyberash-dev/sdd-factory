@@ -1,0 +1,10 @@
+plan_id: 2026-10-30T231017Z-io7gy
+created_at: 2026-10-30T23:10:17.826Z
+pending_attestations:
+  - id: design-stage:DLT-007
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T23:10:17.825Z
+    change_request: "repairing architect reads the task graph; forbidden read re-runs once before blocking"
+    scope: first-time-approval
+    target_status: approved

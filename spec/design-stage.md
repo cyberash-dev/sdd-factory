@@ -1188,6 +1188,72 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T23:10:17.825Z
+    change_request: repairing architect reads the task graph; forbidden read re-runs once before blocking
+    scope: first-time-approval
+partition_id: design-stage
+title: a repairing architect reads the task graph; a forbidden read re-runs the role once before blocking
+target_ids:
+  - design-stage:BEH-001
+  - design-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Run 17 ended with design.blocked{"architect read design/plan.md"}: a
+  VD-INFEASIBLE finding sent the architect into repair during the build
+  stage, the architect opened the planner's plan to see how its module
+  had been cut, and the context firewall of design-stage:BEH-001, built
+  for the parallel first design pass, failed the whole run over one
+  read. Changes:
+  - design-stage:BEH-004: during a repair (design.rework{target:
+    architect} or {target: planner} while the run is building) the
+    architect may read design/tasks.json and design/plan.md, since the
+    repair must respect the existing cut; design/verification.md stays
+    forbidden for the architect and design/tech.md for the
+    verification-designer.
+  - design-stage:BEH-001 negative case: a read of a forbidden file is a
+    rework finding, not a block: the role is re-run once from its first
+    message with the note "you read <file>, which this role never reads;
+    continue without it" (the forbidden file's content is not part of the
+    rerun), counted like a handoff re-run (bus:CST-003); a second
+    forbidden read in the same invocation ends in
+    design.blocked{reason: "context_firewall_violation"} as before.
+tests_old_behavior:
+  - the first-pass firewall still forbids the architect design/verification.md and the verification-designer design/tech.md and the source spec
+tests_new_behavior:
+  - to:design-stage:BEH-001
+  - to:design-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given an architect repair in building whose tool log reads
+    design/plan.md and design/tasks.json, the repair completes and
+    design.tech.ready is published; given a first-pass architect whose
+    first run reads design/verification.md, the role is re-run once with
+    the note and a clean second run publishes design.tech.ready; given
+    two runs that both read it, design.blocked carries
+    context_firewall_violation.
+  test_template: integration
+  boundary_classes:
+    - repair reads the plan
+    - first pass forbidden read then clean
+    - forbidden read twice
+  failure_scenarios:
+    - the run blocked on the first forbidden read
+    - the forbidden file content reaching the rerun
+---
+```
+
 ---
 
 ## 16. Implementation bindings
