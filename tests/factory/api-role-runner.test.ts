@@ -1,6 +1,6 @@
 import { FunctionCallItem, InputTokenDetails, ModelMessageItem, OutputTokenDetails, TokenUsage, type InferenceInput, type InferenceOutput, type InferenceRunner, type SemanticEvent, type Tool } from "@mozaik-ai/core";
 import { describe, expect, it } from "vitest";
-import { createFactoryRuntime } from "../../src/bus/adapters/mozaik/runtime.js";
+import { createFactoryRuntime, createRuntimeObserver } from "../../src/bus/adapters/mozaik/runtime.js";
 import { ApiRoleTimeoutError, createApiRoleRunner } from "../../src/shared/llm/api-role-runner.js";
 
 const RUN_ID = "todo-cli-20261029-120000";
@@ -64,6 +64,18 @@ describe("API role runner on the Mozaik loop", () => {
     expect([calls, result.inputTokens, result.outputTokens, result.inferenceCount, result.costUsd, result.answer]).toEqual([["spec/spec.md"], 150, 30, 2, 0.0045, "handoff written"]);
   });
 
+  // @covers factory:EXT-001
+  it("keeps the agent joined while the loop is still publishing its final answer", async () => {
+    const runtime = createFactoryRuntime(RUN_ID, { inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: usage(1, 1), rowResponse: null }]) });
+    const joinedAtAnswer: boolean[] = [];
+    const pending = createApiRoleRunner(runtime, {}).run({ role: "planner", instruction: "p", message: "m", model: "m", tools: [], timeoutMs: 5000, maxOutputTokens: 100 });
+    runtime.join(createRuntimeObserver("late-probe", (event) => (event.type === "model.answer" ? joinedAtAnswer.push(runtime.state.getParticipant(event.producerId) !== undefined) : undefined)));
+
+    await pending;
+
+    expect(joinedAtAnswer).toEqual([true]);
+  });
+
   it("records cost null when the provider returns no usage", async () => {
     const runtime = createFactoryRuntime(RUN_ID, {
       inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: undefined, rowResponse: null }]),
@@ -80,11 +92,12 @@ describe("API role runner on the Mozaik loop", () => {
     await expect(createApiRoleRunner(runtime, {}).run({ role: "planner", instruction: "p", message: "m", model: "m", tools: [], timeoutMs: 50, maxOutputTokens: 100 })).rejects.toBeInstanceOf(ApiRoleTimeoutError);
   });
 
-  it("leaves the agent and its observer once the answer arrived", async () => {
+  it("leaves the agent and its observer once the answer arrived and the loop finished publishing", async () => {
     const runtime = createFactoryRuntime(RUN_ID, { inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: undefined, rowResponse: null }]) });
     const before = runtime.state.getParticipants().length;
 
     await createApiRoleRunner(runtime, {}).run({ role: "architect", instruction: "a", message: "m", model: "m", tools: [], timeoutMs: 5000, maxOutputTokens: 100 });
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(runtime.state.getParticipants().length).toBe(before);
   });

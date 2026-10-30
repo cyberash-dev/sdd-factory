@@ -100,8 +100,11 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
           }
           finished = true;
           clearTimeout(timer);
-          runtime.leave(observer);
-          runtime.mozaik.leave(agent);
+          /* The loop still publishes under the agent's id after model.answer; leaving inside the delivery breaks that publication. */
+          setImmediate(() => {
+            runtime.leave(observer);
+            runtime.mozaik.leave(agent);
+          });
           if ("error" in outcome) {
             rejectPromise(outcome.error);
             return;
