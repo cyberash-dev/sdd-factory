@@ -95,13 +95,27 @@ describe("spec.approve effect", () => {
   });
 
   // @covers spec-stage:CTR-001
-  it("never approves a spec with a contract outside the surface members", async () => {
+  // @covers spec-stage:DLT-004
+  it("adds a contract missing from the surface members before lint and approves the repaired spec", async () => {
     const ws = await stageWorkspace(CLI_SPEC.replace("members: [todo-cli:CTR-001]", "members: []"));
+    const commands = scriptedCommands(sddReplies({ finalize: FINALIZED }));
+    const { context, published } = effectContext(runStateAt("spec_review"));
+
+    await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
+
+    const spec = await readFile(ws.specPath, "utf8");
+    expect([published.map((event) => event.type), commands.calls[0]?.[0], spec.includes("members:\n  - todo-cli:CTR-001\nversion: \"0.1.0\"")]).toEqual([["spec.approved"], "lint", true]);
+  });
+
+  // @covers spec-stage:DLT-004
+  it("still blocks with spec_integrity when the spec holds two surfaces", async () => {
+    const secondSurface = CLI_SPEC.slice(CLI_SPEC.indexOf("```yaml"), CLI_SPEC.indexOf("## 7.")).replace("todo-cli:SUR-001", "todo-cli:SUR-002");
+    const ws = await stageWorkspace(CLI_SPEC.replace("## 7. Data contracts", `${secondSurface}\n## 7. Data contracts`));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands: scriptedCommands(sddReplies({ finalize: FINALIZED })), clock: createStageClock() });
 
-    expect(published[0]?.payload["detail"]).toBe("spec_integrity: todo-cli:CTR-001 is not a member of todo-cli:SUR-001");
+    expect([published[0]?.type, String(published[0]?.payload["detail"]).startsWith("spec_integrity: expected exactly one Surface, found 2")]).toEqual(["spec.blocked", true]);
   });
 
   it("blocks when lint fails after finalize", async () => {

@@ -6,7 +6,7 @@ import { readTextOrNull } from "../../shared/fs/text.js";
 import { parseFinalizeEnvelope } from "../../shared/sdd/envelope.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { appendAssumptions, nextAssumptionNumber, renderDefaultAssumption } from "../domain/assumption-records.js";
-import { openQuestionsDecidableByDefault, parseSpecRecords, specIntegrityProblems, specIntegrityWarnings } from "../domain/spec-records.js";
+import { openQuestionsDecidableByDefault, parseSpecRecords, repairSurfaceMembers, specIntegrityProblems, specIntegrityWarnings } from "../domain/spec-records.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
 
 const APPROVAL_MODE = "pre-authorized-at-launch";
@@ -31,10 +31,22 @@ async function decideByDefault(slice: SliceContext, specPath: string): Promise<s
   return next;
 }
 
+/* spec-stage:DLT-004: a Contract absent from the single Surface's members is appended; zero or several Surfaces stay for the integrity check. */
+async function repairMembers(slice: SliceContext, specPath: string, specText: string): Promise<string> {
+  const repair = repairSurfaceMembers(specText);
+  if (repair === null || repair.added.length === 0) {
+    return specText;
+  }
+  await writeFile(specPath, repair.text, "utf8");
+  slice.log(`spec.approve: ${repair.surfaceId} members += ${repair.added.join(", ")}`);
+  return repair.text;
+}
+
 export async function runApprove(_effect: Effect, context: EffectContext, slice: SliceContext, deps: StageDeps): Promise<void> {
   const productDir = slice.paths.productDir;
   const blocked = (detail: string): void => concludeStage(deps, context, specBlocked("foreman", "analyst_blocked", detail));
-  const specText = await decideByDefault(slice, join(productDir, "spec", "spec.md"));
+  const specPath = join(productDir, "spec", "spec.md");
+  const specText = await repairMembers(slice, specPath, await decideByDefault(slice, specPath));
   const lintBefore = await deps.commands.run(["lint", "--format=json"], productDir);
   if (lintBefore.exitCode !== 0) {
     blocked(`lint_failed: ${outputTail(lintBefore)}`);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSpecRecords, specIntegrityProblems, specIntegrityWarnings } from "./spec-records.js";
+import { parseSpecRecords, repairSurfaceMembers, specIntegrityProblems, specIntegrityWarnings } from "./spec-records.js";
 
 function record(id: string, type: string, body: string): string {
   return `\`\`\`yaml\n---\nid: ${id}\ntype: ${type}\nlifecycle: {status: proposed}\n${body}\n---\n\`\`\`\n`;
@@ -90,5 +90,39 @@ describe("product spec records", () => {
   // @covers spec-stage:CTR-001
   it("requires exactly one surface", () => {
     expect(specIntegrityProblems(CONTRACTS)).toEqual(["expected exactly one Surface, found 0"]);
+  });
+});
+
+describe("surface membership repair", () => {
+  // @covers spec-stage:DLT-004
+  it("appends the contracts missing from a flow-style members list in record order without touching the rest", () => {
+    const spec = SURFACE + CONTRACTS + record("todo-cli:CTR-003", "Contract", "title: done");
+
+    const repaired = repairSurfaceMembers(spec);
+
+    expect([repaired?.added, repaired?.text.includes("members:\n  - todo-cli:CTR-001\n  - todo-cli:CTR-002\n  - todo-cli:CTR-003\n"), repaired?.text.includes("title: done")]).toEqual([["todo-cli:CTR-003"], true, true]);
+  });
+
+  // @covers spec-stage:DLT-004
+  it("appends to a block-style members list keeping the existing order and no duplicates", () => {
+    const surface = record("todo-cli:SUR-001", "Surface", "members:\n  - todo-cli:CTR-002\n  - todo-cli:CTR-001\nversion: \"0.1.0\"");
+    const spec = surface + CONTRACTS + record("todo-cli:CTR-003", "Contract", "title: done");
+
+    const repaired = repairSurfaceMembers(spec);
+
+    expect([repaired?.added, repaired?.text.includes("members:\n  - todo-cli:CTR-002\n  - todo-cli:CTR-001\n  - todo-cli:CTR-003\nversion: \"0.1.0\""), specIntegrityProblems(repaired?.text ?? "")]).toEqual([["todo-cli:CTR-003"], true, []]);
+  });
+
+  // @covers spec-stage:DLT-004
+  it("reports nothing to add when every contract is already a member", () => {
+    expect(repairSurfaceMembers(SURFACE + CONTRACTS)).toEqual({ surfaceId: "todo-cli:SUR-001", added: [], text: SURFACE + CONTRACTS });
+  });
+
+  // @covers spec-stage:DLT-004
+  it.each([
+    ["zero", CONTRACTS],
+    ["two", SURFACE + SURFACE.replace("SUR-001", "SUR-002") + CONTRACTS],
+  ])("declines to repair a spec with %s surfaces", (_count, spec) => {
+    expect(repairSurfaceMembers(spec)).toBeNull();
   });
 });

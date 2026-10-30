@@ -1043,6 +1043,61 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:58:58.853Z
+    change_request: approval repairs surface membership
+    scope: first-time-approval
+partition_id: spec-stage
+title: approval repairs Surface membership mechanically instead of blocking
+target_ids:
+  - spec-stage:CTR-001
+  - spec-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The approval step checks that spec/spec.md holds exactly one Surface
+  whose members list every Contract. A Contract missing from members is
+  a bookkeeping slip with one correct repair (the analyst's own rule
+  says members = all Contract ids), so the foreman repairs it instead of
+  ending the stage: before the pre-authorised approval it appends every
+  Contract id absent from `members` to the Surface record, re-runs
+  `sdd lint`, logs `spec.approve: <SUR-id> members += <ids>` and records
+  the repair in the run trace as part of the approval. Zero or several
+  Surface records, a lint failure after the repair, and `sdd approve` /
+  `sdd finalize` failures still block with their existing reasons: they
+  have no single mechanical repair.
+tests_old_behavior:
+  - a spec with exactly one Surface listing every Contract approves unchanged
+  - zero or two Surface records still block with spec_integrity
+tests_new_behavior:
+  - to:spec-stage:CTR-001
+test_obligation:
+  predicate: |
+    Given a lint-clean spec whose Surface lists two of its three
+    Contracts, the approve effect appends the third id to members,
+    lints again, logs the repair and emits spec.approved; given two
+    Surface records, it still emits spec.blocked with spec_integrity.
+  test_template: integration
+  boundary_classes:
+    - one missing member
+    - every member present
+    - zero or two Surfaces
+  failure_scenarios:
+    - members rewritten in a different order or duplicated
+    - the repair skipping the lint
+---
+```
+
 ---
 
 ## 16. Implementation bindings
