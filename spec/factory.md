@@ -2420,6 +2420,65 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-008
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:31:04.924Z
+    change_request: "DLT-007 oracle: failed task seeded before its lane entry; run.started never redone"
+    scope: first-time-approval
+partition_id: factory
+title: resume seeds a failed task before its lane entry and never redoes run.started
+target_ids:
+  - factory:DLT-007
+  - factory:BEH-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Two clarifications found while implementing factory:DLT-007 against
+  the run 11 trace. First, its test obligation says the seeded T-007
+  status is review_pending with implSha kept; that contradicts
+  factory:BEH-009 and DLT-006, which seed a task in the state before its
+  redo event. The redo event of T-007 is task.verified{green}, the event
+  that sets implSha and moves the task from verify_pending to
+  review_pending, and the task.verified rule accepts only verify_pending,
+  so a review_pending seed would make the republished event
+  out_of_order_ignored and the reviewer would never run. The seeded
+  status of the task named by task.failed is therefore the state before
+  its lane entry: for run 11 verify_pending with implSha null; the
+  obligation of DLT-007 reads that way. Second, run.started is never a
+  redo candidate even though its transition produces the bootstrap
+  effect: BEH-009 lists "bootstrap re-run on the existing product
+  directory" as a failure scenario, and a trace holding only run.started
+  and run.failed reports "nothing to resume".
+tests_old_behavior:
+  - every other DLT-007 and DLT-006 case is unchanged
+tests_new_behavior:
+  - to:factory:DLT-007
+test_obligation:
+  predicate: |
+    Given the trace of DLT-007 case (a), the seeded T-007 status is
+    verify_pending with implSha null and attempts.implementer 1, and the
+    republished task.verified is applied (not out_of_order_ignored);
+    given a trace of run.started and run.failed only, planReplay reports
+    "nothing to resume" although run.started has an effect.
+  test_template: unit
+  boundary_classes:
+    - failed task seeded before its entry event
+    - run.started with an effect
+  failure_scenarios:
+    - task.verified ignored after the seed
+    - run.started republished
+---
+```
+
 ---
 
 ## 16. Implementation bindings
