@@ -19,15 +19,42 @@
   },
   "maxParallelLanes": 4,
   "models": {
-    "default": "claude-sonnet-5-5",
-    "critic": "claude-haiku-4-5",
-    "triage": "claude-haiku-4-5",
-    "reviewer": "gpt-6.1-sol",
-    "lane": null
+    "default": "claude-opus-5-5",
+    "critic": "gpt-6.1-terra",
+    "triage": "gpt-6-luna",
+    "reviewer": "gpt-6.1-terra",
+    "lane": null,
+    "effort": {
+      "spec-analyst": "high",
+      "architect": "high",
+      "verification-designer": "high",
+      "planner": "high"
+    }
   },
   "pricing": {
-    "claude-sonnet-5-5": { "inputPerMillion": 2, "outputPerMillion": 10 },
-    "claude-haiku-4-5": { "inputPerMillion": 1, "outputPerMillion": 5 },
-    "gpt-6.1-sol": { "inputPerMillion": 2, "outputPerMillion": 10 }
+    "claude-opus-5-5": {
+      "inputPerMillion": 4,
+      "outputPerMillion": 20
+    },
+    "claude-sonnet-5-5": {
+      "inputPerMillion": 2,
+      "outputPerMillion": 10
+    },
+    "claude-haiku-4-5": {
+      "inputPerMillion": 1,
+      "outputPerMillion": 5
+    },
+    "gpt-6.1-terra": {
+      "inputPerMillion": 1,
+      "outputPerMillion": 5
+    },
+    "gpt-6.1-sol": {
+      "inputPerMillion": 2,
+      "outputPerMillion": 10
+    },
+    "gpt-6-luna": {
+      "inputPerMillion": 0.1,
+      "outputPerMillion": 0.5
+    }
   }
 }
