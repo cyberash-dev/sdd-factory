@@ -12,11 +12,18 @@ async function surfaceRecord(file: string, id: string): Promise<{ version: strin
   return { version: String("version" in surface ? surface.version : ""), members: surface.members.filter((member: unknown): member is string => typeof member === "string") };
 }
 
-describe("factory-cli surface after the member delta", () => {
+describe("factory-cli surface after the member and provider-key deltas", () => {
   // @covers factory:DLT-001
-  it("lists the three boundary behaviours next to its contracts at version 0.2.0", async () => {
+  it("lists the three boundary behaviours next to its contracts", async () => {
     const surface = await surfaceRecord("factory.md", "factory:SUR-001");
 
-    expect([surface.version, surface.members.sort()]).toEqual(["0.2.0", ["factory:BEH-001", "factory:BEH-005", "factory:BEH-006", "factory:CTR-001", "factory:CTR-002"]]);
+    expect(surface.members.sort()).toEqual(["factory:BEH-001", "factory:BEH-005", "factory:BEH-006", "factory:CTR-001", "factory:CTR-002"]);
+  });
+
+  // @covers factory:DLT-002
+  it("carries version 0.3.0 after the OPENAI_API_KEY identifier joined the argv contract", async () => {
+    const surface = await surfaceRecord("factory.md", "factory:SUR-001");
+
+    expect(surface.version).toBe("0.3.0");
   });
 });

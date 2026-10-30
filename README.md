@@ -15,17 +15,18 @@ Everything is observable: `trace/trace.jsonl` (every bus event), `trace/trace.md
 ## Architecture
 
 - **Bus.** Mozaik participants exchange typed `SemanticEvent`s over the Mozaik runtime. The event catalogue (`spec/bus.md`) validates every payload at publication; an unknown type or missing field throws. State lives in one `RunState` snapshot (`state.json`), rewritten atomically after every transition; replaying `trace.jsonl` through the pure transition function reproduces every snapshot.
-- **Participants.** Deterministic reactors (foreman, assembler, tracer) are Mozaik humans with situation handlers; LLM roles are Mozaik agents driven through `runLoop` with function tools (spec-analyst, spec-critic, architect, verification-designer, planner, reviewer, triage), or `claude --print` subprocesses in git worktrees (test-writer, implementer). At least two LLM participants are active at the same time in the design stage and across independent lanes.
+- **Participants.** Deterministic reactors (foreman, assembler, tracer) are Mozaik humans with situation handlers; LLM roles are Mozaik agents driven through `runLoop` with function tools (spec-analyst, spec-critic, architect, verification-designer, planner, reviewer, triage), or `claude --print` subprocesses in git worktrees (test-writer, implementer). The reviewer runs on a different vendor's model (`gpt-6.1-sol` through Mozaik's OpenAI provider) than the implementer, so the two share fewer blind spots. At least two LLM participants are active at the same time in the design stage and across independent lanes.
 - **Slices.** The factory's own code is organised by partition of its specification (`spec/*.md`): `bus`, `factory`, `trace`, `spec-stage`, `design-stage`, `build-stage`, `assembly-stage`. Each slice contributes transition rules (pure), effect handlers (I/O) and participants; the composition root wires them. The factory is built with the same methodology it applies: every approved record of `spec/` is covered by a test with an `@covers` marker, and `sdd ready` gates every commit.
 - **Autonomy.** The factory detects its own mistakes through deterministic oracles (`sdd lint`, the red/green Verifier, `sdd ready`, the tasks.json validator) and recovers through typed rework routes with caps. When a cap is exhausted the run fails with a terminal report; the operator fixes the factory, never the product, and launches again.
 
 ## How to run
 
-Requirements: Node ≥ 22, git, the `claude` CLI logged in (lanes run `claude --print`), and `ANTHROPIC_API_KEY` (API roles).
+Requirements: Node ≥ 22, git, the `claude` CLI logged in (lanes run `claude --print`), `ANTHROPIC_API_KEY` (API roles) and `OPENAI_API_KEY` (the reviewer, see `models.reviewer` in `factory.config.json`). Preflight requires the key of every provider a configured model routes to and exits 3 before the run starts when one is missing.
 
 ```sh
 npm ci
 export ANTHROPIC_API_KEY=...
+export OPENAI_API_KEY=...                   # reviewer model; drop it only after pointing models.reviewer at an Anthropic model
 export FACTORY_OPERATOR=<your identity>     # owner of the pre-authorised approvals; never an agent name
 npm run factory -- run specs/todo-cli.md    # output lands in hidden/todo-cli/
 ```
@@ -34,7 +35,7 @@ Flags: `--operator <identity>`, `--no-push` (dry run), `--out <dir>`, `--max-par
 
 Exit codes: `0` published, `1` run failed (see the terminal report and `.factory/runs/<runId>/`), `2` usage error, `3` environment error.
 
-Optional `factory.config.json` (see `factory.config.example.json`): rework caps, timeouts, models per role, parallel lanes, and a price table (`pricing`) used to cost API roles; lanes report their own cost from `claude --print`.
+`factory.config.json` (template: `factory.config.example.json`): rework caps, timeouts, models per role (`default`, `critic`, `triage`, `reviewer`, `lane`; `reviewer` falls back to `default` when absent), parallel lanes, and a price table (`pricing`) used to cost API roles; lanes report their own cost from `claude --print`. Any model id from Mozaik's supported list works per role; an unknown id or a provider without a key mapping is a configuration error (exit 2).
 
 ## Developing the factory
 

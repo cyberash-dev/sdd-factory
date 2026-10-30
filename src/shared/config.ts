@@ -29,6 +29,7 @@ export interface RoleModels {
   readonly default: string;
   readonly critic: string;
   readonly triage: string;
+  readonly reviewer: string | null;
   readonly lane: string | null;
 }
 
@@ -64,6 +65,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
     default: "claude-sonnet-5-5",
     critic: "claude-haiku-4-5",
     triage: "claude-haiku-4-5",
+    reviewer: null,
     lane: null,
   },
   pricing: {},
@@ -139,6 +141,7 @@ export function mergeConfig(base: FactoryConfig, override: unknown): FactoryConf
       default: pickString(models, "default", base.models.default),
       critic: pickString(models, "critic", base.models.critic),
       triage: pickString(models, "triage", base.models.triage),
+      reviewer: pickStringOrNull(models, "reviewer", base.models.reviewer),
       lane: pickStringOrNull(models, "lane", base.models.lane),
     },
     pricing,
@@ -154,4 +157,12 @@ export async function loadConfig(path: string): Promise<FactoryConfig> {
   }
   const parsed: unknown = JSON.parse(text);
   return mergeConfig(DEFAULT_CONFIG, parsed);
+}
+
+export function reviewerModel(models: RoleModels): string {
+  return models.reviewer ?? models.default;
+}
+
+export function apiRoleModelIds(models: RoleModels): readonly string[] {
+  return [...new Set([models.default, models.critic, models.triage, reviewerModel(models)])];
 }

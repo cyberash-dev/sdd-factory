@@ -93,7 +93,7 @@ export function scriptedApiRoles(script: ApiScript): ScriptedApiRoles {
     async run(request: ApiRoleRequest): Promise<ApiRoleUsage> {
       requests.push(request);
       await script(request, requests.length);
-      return usage();
+      return usage({ model: request.model });
     },
   };
 }

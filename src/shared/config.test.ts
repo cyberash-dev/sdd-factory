@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, loadConfig, mergeConfig } from "./config.js";
+import { DEFAULT_CONFIG, loadConfig, mergeConfig, reviewerModel } from "./config.js";
 
 describe("factory config", () => {
   it("overrides caps, timeouts, lanes, models and pricing from a partial document", () => {
@@ -22,6 +22,14 @@ describe("factory config", () => {
       "claude-opus-5-5",
       { inputPerMillion: 3, outputPerMillion: 15 },
     ]);
+  });
+
+  // @covers factory:DLT-002
+  it("reads the reviewer model and falls back to the default model while it is unset", () => {
+    const withReviewer = mergeConfig(DEFAULT_CONFIG, { models: { default: "claude-opus-5-5", reviewer: "gpt-6.1-sol" } });
+    const withoutReviewer = mergeConfig(DEFAULT_CONFIG, { models: { default: "claude-opus-5-5" } });
+
+    expect([DEFAULT_CONFIG.models.reviewer, withReviewer.models.reviewer, reviewerModel(withReviewer.models), reviewerModel(withoutReviewer.models)]).toEqual([null, "gpt-6.1-sol", "gpt-6.1-sol", "claude-opus-5-5"]);
   });
 
   it("ignores values of the wrong type and keeps the defaults", () => {

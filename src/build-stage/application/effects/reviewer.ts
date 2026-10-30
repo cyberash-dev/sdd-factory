@@ -4,6 +4,7 @@ import { describeHandoffError, parseHandoff } from "../../../bus/domain/handoff.
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../../shared/fs/text.js";
 import type { ApiRoleUsage } from "../../../shared/llm/api-role-runner.js";
+import { reviewerModel } from "../../../shared/config.js";
 import { listDirTool, readFileTool } from "../../../shared/llm/tools.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { laneHandoffPath, reviewReportPath, taskHandoffDir } from "../../domain/handoff-paths.js";
@@ -83,7 +84,7 @@ export async function runReviewer(slice: SliceContext, deps: LaneDeps, context: 
       handoffPath: worktreeHandoff,
       maxReruns: slice.config.caps.handoffRerun,
       invoke: (text) =>
-        slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model: slice.config.models.default, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS }),
+        slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model: reviewerModel(slice.config.models), tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS }),
       parse: () => parseReviewOutputs(worktree, worktreeHandoff, run, implSha),
     },
     message,

@@ -154,7 +154,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: factory
 name: factory-cli
-version: "0.2.0"
+version: "0.3.0"
 boundary_type: cli
 members:
   - factory:CTR-001
@@ -1256,6 +1256,63 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:EXT-005
+type: ExternalDependency
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T07:42:25.735Z
+    change_request: cross-vendor reviewer
+    scope: first-time-approval
+partition_id: factory
+title: OpenAI Responses API through the Mozaik OpenAI provider
+provider: OpenAI
+provider_surface: "OpenAI Responses API as wrapped by @mozaik-ai/core 4.1.0 (openai SDK 6.x)"
+interface: HTTPS JSON, model selected by model id string, key from OPENAI_API_KEY
+authority_url_or_doc: https://developers.openai.com/api/docs/pricing
+consumer_contract: |
+  Used only for API roles whose configured model id routes to the Mozaik
+  provider `openai` (the default configuration routes every role to
+  Anthropic, factory:EXT-001). The factory sends the same system + user
+  messages and function-tool definitions through Mozaik `runLoop` as for
+  Anthropic; it expects `inference.completed` events carrying
+  `tokenUsage.inputTokens` and `tokenUsage.outputTokens`, treats a missing
+  usage object as cost null and prices tokens from `pricing.<model>`.
+failure_modes:
+  - 401 invalid key
+  - 429 rate limited
+  - 5xx or network error
+fallback_policy: "none; any provider failure surfaces as run.failed{reason:\"provider_error\"}, no cross-provider fallback"
+drift_detection:
+  mechanism: none_with_review_by:2026-11-30
+last_verified_at: "2026-10-30"
+auth_scope: OPENAI_API_KEY environment variable, never written to disk, never forwarded to lanes
+rate_limits: provider-enforced per key; the factory bounds concurrency by maxParallelLanes and emits no retries
+retry_idempotency: no automatic retry; a failed inference fails the participant and the run
+error_taxonomy:
+  - "provider_error:<http status> in run.failed.detail"
+test_obligation:
+  predicate: |
+    With `models.reviewer` set to an OpenAI-routed model id and a fake
+    inference for that model, the reviewer request carries that model id,
+    task.reviewed carries the same model id and costUsd computed from
+    `pricing.<model>`; with usage absent costUsd is null and the run
+    continues; the key value appears in no artefact.
+  test_template: integration
+  boundary_classes:
+    - priced OpenAI model
+    - usage absent
+    - provider error
+  failure_scenarios:
+    - reviewer silently falling back to the Anthropic default model
+    - key value appearing in any artefact
+---
+```
+
 ---
 
 ## 10. Generated artifacts
@@ -1555,6 +1612,79 @@ test_obligation:
     - members after finalize
   failure_scenarios:
     - drift still reported
+---
+```
+
+```yaml
+---
+id: factory:DLT-002
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T07:42:26.055Z
+    change_request: cross-vendor reviewer
+    scope: first-time-approval
+partition_id: factory
+title: factory-cli 0.2.0 -> 0.3.0 - per-provider API keys and a reviewer model knob
+target_ids:
+  - factory:SUR-001
+  - factory:BEH-001
+  - factory:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: factory:SUR-001
+    intended_version: "0.3.0"
+description: |
+  The code reviewer runs on a model from a different vendor than the
+  implementer so that both share fewer blind spots. Changes:
+  - factory config gains `models.reviewer` (default: the value of
+    `models.default`); the build-stage reviewer role runs on it. The
+    config file stays an internal decision; only the preflight effect is
+    observable.
+  - preflight (factory:BEH-001) resolves the provider of every API-role
+    model (`models.default`, `models.critic`, `models.triage`,
+    `models.reviewer`; `models.lane` names a Claude Code model and is
+    excluded) through the Mozaik supported-model list and requires the key
+    variable of each provider in use: anthropic => ANTHROPIC_API_KEY,
+    openai => OPENAI_API_KEY (factory:EXT-005). A missing key exits 3
+    naming the variable, before any participant joins. The old
+    unconditional ANTHROPIC_API_KEY check is replaced by this rule; with
+    the default configuration the observable behaviour is unchanged.
+  - a configured API-role model id unknown to Mozaik, or routed to a
+    provider without a key mapping (google, deepseek), exits 2 naming the
+    model id, before any participant joins.
+  - factory:CTR-001 external identifiers gain the environment variable
+    OPENAI_API_KEY (optional) => minor bump on factory:SUR-001.
+tests_old_behavior:
+  - preflight with the default model set and only ANTHROPIC_API_KEY set still passes; the argv contract tests stay green
+tests_new_behavior:
+  - to:factory:BEH-001
+  - to:factory:CTR-001
+  - to:factory:EXT-005
+test_obligation:
+  predicate: |
+    With `models.reviewer` routed to openai and OPENAI_API_KEY unset,
+    preflight exits 3 naming OPENAI_API_KEY and no run directory is
+    created; with every model routed to anthropic OPENAI_API_KEY is not
+    required; a model id unknown to Mozaik exits 2 naming the id; the
+    reviewer invocation uses `models.reviewer` and `models.reviewer`
+    falls back to `models.default` when absent from the config file.
+  test_template: integration
+  boundary_classes:
+    - anthropic-only model set
+    - mixed anthropic and openai model set
+    - unknown model id
+    - provider without a key mapping
+    - reviewer key absent from config
+  failure_scenarios:
+    - run.failed provider_error on the first review instead of exit 3 at launch
+    - key value appearing in any artefact
+    - exit 3 demanded for a provider no configured role uses
 ---
 ```
 

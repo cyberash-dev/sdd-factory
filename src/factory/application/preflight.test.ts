@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG } from "../../shared/config.js";
 import { preflight, PreflightError } from "./preflight.js";
 
 const PRESENT = new Set(["specs/todo-cli.md", "/usr/bin/claude", "/usr/bin/git"]);
@@ -8,6 +9,7 @@ function input(overrides: Partial<Parameters<typeof preflight>[0]> = {}): Parame
     specPath: "specs/todo-cli.md",
     operatorFlag: "cyberash",
     env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-test" },
+    models: DEFAULT_CONFIG.models,
     nodeMajor: 26,
     fileExists: async (path) => PRESENT.has(path),
     ...overrides,
@@ -38,9 +40,19 @@ describe("preflight", () => {
     ["no operator", { operatorFlag: null, env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk" } }, "2 operator identity is required: pass --operator <identity> or set FACTORY_OPERATOR"],
     ["old node", { nodeMajor: 20 }, "3 node >= 22 required, running 20"],
     ["no api key", { env: { PATH: "/usr/bin" } }, "3 ANTHROPIC_API_KEY is not set"],
+    ["no openai key for an openai reviewer model", { models: { ...DEFAULT_CONFIG.models, reviewer: "gpt-6.1-sol" } }, "3 OPENAI_API_KEY is not set"],
+    ["unknown model id", { models: { ...DEFAULT_CONFIG.models, critic: "gpt-99" } }, "2 unknown model gpt-99: not in the Mozaik supported model list"],
+    ["provider without a key mapping", { models: { ...DEFAULT_CONFIG.models, triage: "gemini-3.5-flash" } }, "2 model gemini-3.5-flash routes to provider google, which has no API key mapping"],
     ["claude missing", { env: { PATH: "/opt/none", ANTHROPIC_API_KEY: "sk" } }, "3 claude not found on PATH"],
   ])("fails %s with the documented exit code", async (_label, overrides, expected) => {
     expect(await failure(overrides)).toBe(expected);
+  });
+
+  // @covers factory:DLT-002
+  it("requires the key of every provider in use and accepts a mixed model set once both keys are present", async () => {
+    const mixed = { ...DEFAULT_CONFIG.models, reviewer: "gpt-6.1-sol" };
+
+    expect(await preflight(input({ models: mixed, env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-test", OPENAI_API_KEY: "sk-openai" } }))).toEqual({ slug: "todo-cli", operator: "cyberash" });
   });
 
   it("takes the operator from FACTORY_OPERATOR when the flag is absent", async () => {

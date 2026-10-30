@@ -3,41 +3,11 @@ import { join } from "node:path";
 import YAML from "yaml";
 import { describe, expect, it } from "vitest";
 import { greeterDesign } from "./support/design.js";
-import { aLaneHarness, type LaneHarness } from "./support/harness.js";
-import { GREEN_IMPL, laneState, provisionLane, RED_TEST, runLaneEffect, type ProvisionedLane } from "./support/lanes.js";
+import { aLaneHarness } from "./support/harness.js";
+import { laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
 import { aProductRepo, git, writeProductFile } from "./support/product.js";
-import { invokeTool, reviewFrontmatter, scriptedApiRoles, type ScriptedApiRoles } from "./support/runners.js";
-import type { ApiRoleRequest } from "../../src/shared/llm/api-role-runner.js";
-import type { RunState } from "../../src/bus/domain/run-state.js";
-
-interface VerifiedLane {
-  readonly harness: LaneHarness;
-  readonly lane: ProvisionedLane;
-  readonly implSha: string;
-  readonly testsSha: string;
-  readonly state: RunState;
-}
-
-async function verifiedLane(apiRoles: ScriptedApiRoles): Promise<VerifiedLane> {
-  const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), apiRoles });
-  const lane = await provisionLane(harness);
-  await writeProductFile(lane.worktree, "tests/greet.test.ts", RED_TEST);
-  await git(lane.worktree, ["add", "-A"]);
-  await git(lane.worktree, ["commit", "-q", "-m", "tests T-001"]);
-  const testsSha = await git(lane.worktree, ["rev-parse", "HEAD"]);
-  await writeProductFile(lane.worktree, "src/greet.ts", GREEN_IMPL);
-  await git(lane.worktree, ["add", "-A"]);
-  await git(lane.worktree, ["commit", "-q", "-m", "impl T-001 attempt 1"]);
-  const implSha = await git(lane.worktree, ["rev-parse", "HEAD"]);
-  await writeProductFile(harness.context.paths.handoffsDir, "tasks/T-001/verifier-green-1.json", `{"verdict":"pass","testsUnchanged":true,"writeSetOk":true,"implSha":"${implSha}"}\n`);
-  return { harness, lane, implSha, testsSha, state: laneState(lane, { status: "review_pending", attempts: { implementer: 1, testWriter: 1 }, testsSha, implSha }) };
-}
-
-async function writeReview(request: ApiRoleRequest, frontmatter: Readonly<Record<string, unknown>>, attempt = 1): Promise<void> {
-  const text = `---\n${YAML.stringify(frontmatter)}---\n## Scope checked\n\n## Spec conformance\n\n## Findings\n\n## Verdict rationale\n`;
-  await invokeTool(request, "write_file", { path: "reviews/T-001.md", content: text });
-  await invokeTool(request, "write_file", { path: `.handoff/reviewer-${attempt}.md`, content: text });
-}
+import { verifiedLane, writeReview } from "./support/reviews.js";
+import { invokeTool, reviewFrontmatter, scriptedApiRoles } from "./support/runners.js";
 
 describe("reviewer invocation", () => {
   // @covers build-stage:BEH-012

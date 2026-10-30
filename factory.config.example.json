@@ -22,7 +22,12 @@
     "default": "claude-sonnet-5-5",
     "critic": "claude-haiku-4-5",
     "triage": "claude-haiku-4-5",
+    "reviewer": "gpt-6.1-sol",
     "lane": null
   },
-  "pricing": {}
+  "pricing": {
+    "claude-sonnet-5-5": { "inputPerMillion": 2, "outputPerMillion": 10 },
+    "claude-haiku-4-5": { "inputPerMillion": 1, "outputPerMillion": 5 },
+    "gpt-6.1-sol": { "inputPerMillion": 2, "outputPerMillion": 10 }
+  }
 }

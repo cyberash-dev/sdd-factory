@@ -38,14 +38,15 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     process.stdout.write(`nudge recorded: ${path}\n`);
     return 0;
   }
+  const baseConfig = await loadConfig(join(repoRoot, "factory.config.json"));
   const checked = await preflight({
     specPath: command.specPath,
     operatorFlag: command.operator,
     env: process.env,
+    models: baseConfig.models,
     nodeMajor: Number(process.versions.node.split(".")[0]),
     fileExists,
   });
-  const baseConfig = await loadConfig(join(repoRoot, "factory.config.json"));
   const config = command.maxParallelLanes === null ? baseConfig : mergeConfig(baseConfig, { maxParallelLanes: command.maxParallelLanes });
   const running = await startRun({
     repoRoot,
