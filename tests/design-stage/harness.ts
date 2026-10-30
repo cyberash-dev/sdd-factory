@@ -147,8 +147,9 @@ export async function harness(options: HarnessOptions): Promise<Harness> {
   const log: string[] = [];
   const commandRunner = scriptedCommands(options, commands);
   const slice: SliceContext = {
-    /* The fixture spec holds three ids cut 2 + 1 so lanes stay distinguishable; DLT-004 size tests opt back in via caps. */
-    config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, minCoversPerTask: 1, ...options.caps } },
+    /* The fixture spec holds three ids cut 2 + 1 so lanes stay distinguishable; DLT-004 size tests opt back in via caps.
+       No simple-fixer runs by default (no CLI lane here); DLT-005 tests opt in via caps.simpleFixes. */
+    config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, minCoversPerTask: 1, simpleFixes: 0, ...options.caps } },
     runId: RUN_ID,
     slug: "todo-cli",
     operator: "cyberash",

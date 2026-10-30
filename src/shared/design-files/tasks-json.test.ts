@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTasksJson, TasksJsonParseError } from "./tasks-json.js";
+import { parseTasksJson, tasksJsonSyntaxError, tasksJsonTaskData, TasksJsonParseError } from "./tasks-json.js";
 
 function task(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -49,5 +49,33 @@ describe("parseTasksJson", () => {
   ])("rejects %s naming the offending field", (_label, text, message) => {
     expect(() => parseTasksJson(text)).toThrow(TasksJsonParseError);
     expect(() => parseTasksJson(text)).toThrow(message);
+  });
+});
+
+describe("tasksJsonTaskData", () => {
+  // @covers design-stage:DLT-005
+  it("maps each task id to the JSON of its task object", () => {
+    const data = tasksJsonTaskData('{"schemaVersion": 1, "tasks": [{"id": "T-001", "title": "a"}]}');
+
+    expect([...data.entries()]).toEqual([["T-001", '{"id":"T-001","title":"a"}']]);
+  });
+
+  // @covers design-stage:DLT-005
+  it("yields no tasks for text that is not JSON", () => {
+    const data = tasksJsonTaskData('{"tasks": [{"id": "T-001"}],}');
+
+    expect(data.size).toBe(0);
+  });
+});
+
+describe("tasksJsonSyntaxError", () => {
+  // @covers design-stage:DLT-005
+  it("names invalid JSON for a trailing comma", () => {
+    expect(tasksJsonSyntaxError('{"tasks": [],}')).toMatch(/^invalid JSON: /);
+  });
+
+  // @covers design-stage:DLT-005
+  it("is null for JSON that breaks the schema", () => {
+    expect(tasksJsonSyntaxError('{"unknown": true}')).toBeNull();
   });
 });

@@ -113,3 +113,29 @@ export function parseTasksJson(text: string): TasksFile {
   }
   return { schemaVersion: 1, partition, tasks };
 }
+
+/* The message parseTasksJson raises when the text is not JSON at all; null when it is JSON. */
+export function tasksJsonSyntaxError(text: string): string | null {
+  try {
+    JSON.parse(text);
+    return null;
+  } catch (error) {
+    return `invalid JSON: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/* factory:BEH-012 format-only input: task id -> canonical JSON of every task object of a JSON file; empty when the text is not JSON. */
+export function tasksJsonTaskData(text: string): ReadonlyMap<string, string> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return new Map();
+  }
+  const tasks: unknown = isRecord(parsed) ? parsed["tasks"] : null;
+  if (!Array.isArray(tasks)) {
+    return new Map();
+  }
+  const entries: readonly unknown[] = tasks;
+  return new Map(entries.filter(isRecord).flatMap((task) => (typeof task["id"] === "string" ? [[task["id"], JSON.stringify(task)] as const] : [])));
+}

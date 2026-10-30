@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filePathReferences, missingVerificationBlocks, parseVerificationMd, VerificationMdParseError } from "./verification-md.js";
+import { filePathReferences, missingVerificationBlocks, parseVerificationMd, verificationBlockData, VerificationMdParseError } from "./verification-md.js";
 
 function block(id: string, template: string, extra = ""): string {
   return [`### ${id}`, "```yaml", `id: ${id}`, `template: ${template}`, 'obligation: "argv --help prints usage"', "input_classes:", "  - name: typical", '    input: "todo add milk"', '    expected: "exit 0"', "negative_oracle:", "  - input_class: invalid_empty", '    must_fail_with: "E_USAGE"', '    must_not: "exit 0"', "assertion_summary:", '  - "stdout lists the todo"', extra, "```"].join("\n");
@@ -80,5 +80,16 @@ describe("filePathReferences", () => {
     const design = parseVerificationMd(verificationMd([block("todo-cli:CTR-001", "Contract")]));
 
     expect(filePathReferences(design.blocks[0] ?? { id: "", template: "", feasibility: "feasible", yamlSource: "" })).toEqual([]);
+  });
+});
+
+describe("verificationBlockData", () => {
+  // @covers design-stage:DLT-005
+  it("keeps the canonical data of a block that parses while a sibling block does not", () => {
+    const text = verificationMd([block("todo-cli:CTR-001", "Contract", 'notes: "unterminated'), "### todo-cli:BEH-002\n```yaml\nid: todo-cli:BEH-002\ntemplate: Behavior\n```"]);
+
+    const data = verificationBlockData(text);
+
+    expect([...data.entries()]).toEqual([["todo-cli:BEH-002", '{"id":"todo-cli:BEH-002","template":"Behavior"}']]);
   });
 });

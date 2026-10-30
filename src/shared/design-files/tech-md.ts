@@ -330,3 +330,17 @@ export function parseTechMd(markdown: string): TechDesign {
     traceability: parseTraceability(traceabilitySection),
   };
 }
+
+/* factory:BEH-012 format-only input; the parser is all-or-nothing, so a file that does not parse yields no blocks. Never throws. */
+export function techMdBlockData(markdown: string): ReadonlyMap<string, string> {
+  let design: TechDesign;
+  try {
+    design = parseTechMd(markdown);
+  } catch (error) {
+    if (error instanceof TechMdParseError) {
+      return new Map();
+    }
+    throw error;
+  }
+  return new Map([...design.modules.map((module) => [module.id, JSON.stringify(module)] as const), ["TD-TOOLING", JSON.stringify(design.tooling)], ["traceability", JSON.stringify(design.traceability)]]);
+}

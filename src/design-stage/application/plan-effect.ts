@@ -1,14 +1,16 @@
 import { join } from "node:path";
 import type { Effect } from "../../bus/domain/transition.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
-import { parseTasksJson, TasksJsonParseError, type TasksFile } from "../../shared/design-files/tasks-json.js";
+import { parseTasksJson, tasksJsonSyntaxError, tasksJsonTaskData, TasksJsonParseError, type TasksFile } from "../../shared/design-files/tasks-json.js";
 import { parseTechMd, type TechDesign } from "../../shared/design-files/tech-md.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
+import type { SimpleFixDeps } from "../../shared/fixer/index.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { anyGlobMatches } from "../domain/glob.js";
 import type { RoleUsage } from "../domain/payloads.js";
 import { describeViolations, validateTasks, type TasksViolation } from "../domain/tasks-validator.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
+import { createDesignFileFixer, UNWIRED_FIX_DEPS, type DesignFileFixer } from "./design-file-fix.js";
 import { designReworkAttempt, effectInteger, pending, publishBlocked, reworkFindingText, TASKS_JSON, TECH_MD, VERIFICATION_MD } from "./effect-support.js";
 import { approvedRecordIds, TASK_COVER_TYPES } from "./eligible-ids.js";
 import { PLANNER_MESSAGE } from "./messages.js";
@@ -70,8 +72,20 @@ function reworkReason(violations: readonly TasksViolation[], slice: SliceContext
   return violations.some((violation) => CAP_RULES.includes(violation.rule)) ? `${reason}; caps: graphDepth ${graphDepth}, minCoversPerTask ${minCoversPerTask}` : reason;
 }
 
-async function judgeTasks(slice: SliceContext, commands: CommandRunner, tech: TechDesign, previous: TasksFile | null, finding: string): Promise<Verdict> {
-  const text = await readTextOrNull(join(slice.paths.productDir, TASKS_JSON));
+/* design-stage:DLT-005: tasks.json that is not JSON goes to the simple-fixer first; the file is read again after it. */
+async function readTasksText(slice: SliceContext, fixer: DesignFileFixer): Promise<string | null> {
+  const path = join(slice.paths.productDir, TASKS_JSON);
+  const text = await readTextOrNull(path);
+  const syntaxError = text === null ? null : tasksJsonSyntaxError(text);
+  if (syntaxError === null) {
+    return text;
+  }
+  await fixer.repair({ owner: "planner", file: TASKS_JSON, failureOutput: syntaxError, blocks: tasksJsonTaskData, parseError: tasksJsonSyntaxError });
+  return readTextOrNull(path);
+}
+
+async function judgeTasks(slice: SliceContext, commands: CommandRunner, tech: TechDesign, previous: TasksFile | null, finding: string, fixer: DesignFileFixer): Promise<Verdict> {
+  const text = await readTasksText(slice, fixer);
   if (text === null) {
     return { kind: "invalid", reason: `schema: ${TASKS_JSON} was not written` };
   }
@@ -121,7 +135,7 @@ function publishRework(context: EffectContext, reason: string, usage: RoleUsage,
 }
 
 /* design-stage:BEH-002/BEH-003: run the planner, validate tasks.json mechanically, install TD-TOOLING once, then announce the tasks. */
-export async function runPlanEffect(effect: Effect, context: EffectContext, slice: SliceContext, commands: CommandRunner): Promise<void> {
+export async function runPlanEffect(effect: Effect, context: EffectContext, slice: SliceContext, commands: CommandRunner, fix: SimpleFixDeps = UNWIRED_FIX_DEPS): Promise<void> {
   const attempt = effectInteger(effect, "attempt", 1);
   const finding = reworkFindingText(effect);
   const tech = await readTechDesign(slice);
@@ -148,7 +162,7 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     publishRework(context, `uncovered_ids: ${uncovered.join(", ")}`, outcome.usage, outcome.reruns);
     return;
   }
-  const verdict = await judgeTasks(slice, commands, tech, previous, finding);
+  const verdict = await judgeTasks(slice, commands, tech, previous, finding, createDesignFileFixer(slice, fix, context));
   if (verdict.kind === "invalid") {
     publishRework(context, verdict.reason, outcome.usage, outcome.reruns);
     return;

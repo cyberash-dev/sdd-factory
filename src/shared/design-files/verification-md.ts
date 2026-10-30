@@ -133,3 +133,19 @@ export function missingVerificationBlocks(design: VerificationDesign, requiredId
 export function filePathReferences(block: VerificationBlock): readonly string[] {
   return [...new Set(block.yamlSource.match(FILE_PATH_REFERENCE) ?? [])];
 }
+
+/* factory:BEH-012 format-only input: block id -> canonical JSON of each block that parses on its own; never throws. */
+export function verificationBlockData(markdown: string): ReadonlyMap<string, string> {
+  const data = new Map<string, string>();
+  for (const raw of collectRawBlocks(markdown)) {
+    try {
+      const block = parseBlock(raw);
+      data.set(block.id, JSON.stringify(YAML.parse(block.yamlSource)));
+    } catch (error) {
+      if (!(error instanceof VerificationMdParseError)) {
+        throw error;
+      }
+    }
+  }
+  return data;
+}
