@@ -66,3 +66,32 @@ describe("attempt counters over a lane with a test-writer restart and two implem
     expect(states.map((state) => state.tasks["T-001"]?.attempts.testWriter ?? 0)).toEqual([0, 1, 1, 2, 2]);
   });
 });
+
+const restartAfterAnImplementerAttempt: readonly (readonly [EventType, EventPayload])[] = [
+  ["task.ready", { taskId: "T-001", worktree: "/run/worktrees/T-001", baseSha: BASE_SHA, covers: ["greeter:BEH-001"], writes: ["src/greet.ts", "tests/greet.test.ts"] }],
+  ["task.tests_written", { taskId: "T-001", ...cost }],
+  ["task.tests_red", { taskId: "T-001", testsSha: TESTS_SHA, testFiles: ["tests/greet.test.ts"] }],
+  ["task.impl_done", { taskId: "T-001", ...cost }],
+  ["task.verified", { taskId: "T-001", result: "red", evidencePath: "/run/handoffs/tasks/T-001/verifier-green-1.json", testsUnchanged: true, writeSetOk: true, implSha: null }],
+  ["task.rework", { taskId: "T-001", target: "test-writer", attempt: 2, reason: "tests_wrong", findingPath: null }],
+  ["task.tests_written", { taskId: "T-001", ...cost, attempt: 2 }],
+  ["task.tests_red", { taskId: "T-001", testsSha: TESTS_SHA, testFiles: ["tests/greet.test.ts"] }],
+  ["task.impl_done", { taskId: "T-001", ...cost, attempt: 2 }],
+];
+
+describe("attempt counters over a lane restarted after an implementer attempt", () => {
+  // @covers bus:INV-002
+  // @covers build-stage:DLT-008
+  it("applies the impl_done of implementer attempt 2 after the restart instead of dropping it as a duplicate", () => {
+    const states = snapshots(restartAfterAnImplementerAttempt);
+
+    expect([states.at(-1)?.tasks["T-001"]?.status, states.at(-1)?.tasks["T-001"]?.attempts.implementer]).toEqual(["verify_pending", 2]);
+  });
+
+  // @covers bus:INV-002
+  it("never decreases the implementer counter across the restart", () => {
+    const states = snapshots(restartAfterAnImplementerAttempt);
+
+    expect(states.map((state) => state.tasks["T-001"]?.attempts.implementer ?? 0)).toEqual([0, 0, 0, 1, 1, 1, 1, 1, 2, 2]);
+  });
+});

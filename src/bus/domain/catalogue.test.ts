@@ -20,7 +20,7 @@ const VALID_PAYLOADS: Readonly<Record<EventType, EventPayload>> = {
   "design.tech.ready": { path: "design/tech.md" },
   "design.verification.ready": { path: "design/verification.md" },
   "design.tasks.ready": { path: "design/tasks.json", taskCount: 3 },
-  "design.rework": { target: "planner", reason: "overlapping writes", attempt: 1 },
+  "design.rework": { target: "planner", reason: "overlapping writes", attempt: 1, originTaskId: "T-001" },
   "design.blocked": { reason: "planner_cap" },
   "task.ready": { taskId: "T-001", worktree: "/tmp/run/worktrees/T-001", baseSha: SHA, covers: ["todo-cli:BEH-001"], writes: ["src/cli/**", "tests/cli/**"] },
   "task.tests_written": { taskId: "T-001", ...COST },
@@ -95,6 +95,29 @@ describe("event catalogue validation", () => {
   // @covers bus:CTR-002
   it("accepts run.failed with the terminated reason carrying the signal name", () => {
     const event = eventOf("run.failed", { stage: "spec", reason: "terminated", detail: "SIGTERM" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
+  // @covers bus:DLT-006
+  // @covers bus:CTR-004
+  it("accepts a design-stage design.rework with a null originTaskId", () => {
+    const event = eventOf("design.rework", { ...VALID_PAYLOADS["design.rework"], originTaskId: null });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
+  // @covers bus:DLT-006
+  it("rejects design.rework with an originTaskId outside the task id grammar", () => {
+    const event = eventOf("design.rework", { ...VALID_PAYLOADS["design.rework"], originTaskId: "task-1" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("envelope_invalid:payload.originTaskId");
+  });
+
+  // @covers bus:DLT-007
+  // @covers bus:CTR-002
+  it("accepts run.failed with the stalled reason", () => {
+    const event = eventOf("run.failed", { stage: "build", reason: "stalled", detail: "T-003 review_pending last=task.rework" });
 
     expect(codeOf(() => validateEvent(event))).toBe("no error");
   });

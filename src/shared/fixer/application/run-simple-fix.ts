@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import type { LaneParticipant } from "../../../bus/adapters/mozaik/roster.js";
+import { fixerLaneUnit, type LaneParticipant } from "../../../bus/adapters/mozaik/roster.js";
 import { simpleFixAttempts } from "../../../bus/domain/run-state.js";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../fs/text.js";
@@ -138,7 +138,7 @@ interface RunInput {
 /* null: the run was ended by the factory's termination signal; it is not an attempt and the worktree stays as the subprocess left it. */
 async function fixOnce(slice: SliceContext, deps: SimpleFixDeps, context: EffectContext, request: SimpleFixRequest, input: RunInput): Promise<(SimpleFixRun & { readonly nextOutput: string }) | null> {
   const prompt: FixerPromptInput = { ...request, attempt: input.attempt, cap: slice.config.caps.simpleFixes, formatOnlyPaths: request.formatOnly.map((file) => file.path), failureOutput: input.failureOutput };
-  return withLaneParticipant(slice, "simple-fixer", request.unit, async (lane) => {
+  return withLaneParticipant(slice, "simple-fixer", fixerLaneUnit(request.owner, request.unit), async (lane) => {
     const before = await parsedFiles(request.directory, request.formatOnly);
     const snapshot = await deps.tree.snapshot(request.directory);
     const files = await claimRunFiles(join(slice.paths.handoffsDir, request.unit, "simple-fixer"));

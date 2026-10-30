@@ -184,7 +184,7 @@ describe("assembly.triaged rule", () => {
 
     expect([result.state.status, result.emits, result.effects]).toEqual([
       "building",
-      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts", attempt: 1 } }],
+      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts", attempt: 1, originTaskId: null } }],
       [{ kind: "assembly.record", triage: [{ round: 1, task_id: null, target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts" }] }],
     ]);
   });

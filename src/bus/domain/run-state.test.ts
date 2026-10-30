@@ -41,7 +41,7 @@ describe("run state snapshot", () => {
 
     expect(task).toEqual({
       status: "ready",
-      attempts: { implementer: 0, testWriter: 0 },
+      attempts: { implementer: 0, testWriter: 0, critic: 0 },
       handoffReruns: {},
       baseSha: null,
       testsSha: null,

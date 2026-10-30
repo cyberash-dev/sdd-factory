@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import type { DeliveredEvent } from "../../domain/envelope.js";
+import { fixerLaneUnit } from "./roster.js";
 import { createFactoryRuntime, createReactor, createRuntimeObserver } from "./runtime.js";
 
 const RUN_ID = "todo-cli-20261029-120000";
@@ -119,7 +120,7 @@ describe("Mozaik runtime adapter", () => {
     const runtime = createFactoryRuntime(RUN_ID);
     const senders: string[] = [];
     runtime.join(createRuntimeObserver("probe", (event) => (event.type === "fix.attempted" ? senders.push(event.producerId) : undefined)));
-    const fixer = runtime.joinLane("simple-fixer", "design");
+    const fixer = runtime.joinLane("simple-fixer", fixerLaneUnit("architect", "design"));
 
     runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED });
 
@@ -131,7 +132,7 @@ describe("Mozaik runtime adapter", () => {
     const runtime = createFactoryRuntime(RUN_ID);
     const senders: string[] = [];
     runtime.join(createRuntimeObserver("probe", (event) => (event.type === "fix.attempted" ? senders.push(event.producerId) : undefined)));
-    const fixer = runtime.joinLane("simple-fixer", "design");
+    const fixer = runtime.joinLane("simple-fixer", fixerLaneUnit("architect", "design"));
     runtime.leaveLane(fixer);
 
     const code = codeOf(() => runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED }));
@@ -141,11 +142,41 @@ describe("Mozaik runtime adapter", () => {
 
   it("rejects fix.attempted when only a fixer for another unit is joined", () => {
     const runtime = createFactoryRuntime(RUN_ID);
-    runtime.joinLane("simple-fixer", "spec");
+    runtime.joinLane("simple-fixer", fixerLaneUnit("architect", "spec"));
 
     const code = codeOf(() => runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED }));
 
     expect(code).toBe("producer_not_joined");
+  });
+
+  // @covers bus:DLT-006
+  // @covers bus:BEH-007
+  it("sends fix.attempted of two owners on one unit from each owner's own fixer participant", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    const senders: string[] = [];
+    runtime.join(createRuntimeObserver("probe", (event) => (event.type === "fix.attempted" ? senders.push(event.producerId) : undefined)));
+    const architectFixer = runtime.joinLane("simple-fixer", fixerLaneUnit("architect", "design"));
+    const designerFixer = runtime.joinLane("simple-fixer", fixerLaneUnit("verification-designer", "design"));
+
+    runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED });
+    runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: { ...FIX_ATTEMPTED, owner: "verification-designer" } });
+
+    expect(senders).toEqual([architectFixer.id, designerFixer.id]);
+  });
+
+  // @covers bus:DLT-006
+  it("keeps the other owner's fixer joined after one fixer on the same unit left", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    const architectFixer = runtime.joinLane("simple-fixer", fixerLaneUnit("architect", "design"));
+    const designerFixer = runtime.joinLane("simple-fixer", fixerLaneUnit("verification-designer", "design"));
+    runtime.leaveLane(architectFixer);
+
+    const codes = [
+      codeOf(() => runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED })),
+      codeOf(() => runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: { ...FIX_ATTEMPTED, owner: "verification-designer" } })),
+    ];
+
+    expect([codes, runtime.state.getParticipant(designerFixer.id)?.getManifest().capabilities]).toEqual([["producer_not_joined", "no error"], ["lane", "unit:design"]]);
   });
 
   // @covers bus:BEH-005

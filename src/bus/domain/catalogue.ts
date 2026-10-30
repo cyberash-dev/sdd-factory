@@ -35,6 +35,7 @@ export const RUN_FAILED_REASONS = [
   "publish_failed",
   "trace_write_failed",
   "terminated",
+  "stalled",
 ] as const;
 export const INTERVENTION_KINDS = ["launch", "fix_between_runs", "mid_run_nudge"] as const;
 export const FINDING_TYPES = ["TEST-CONTRACT-CONFLICT", "TASK-OVERFLOW", "VD-INFEASIBLE", "TOOLING-BROKEN"] as const;
@@ -82,7 +83,7 @@ export const EVENT_CATALOGUE = {
   "design.tech.ready": { path: string() },
   "design.verification.ready": { path: string() },
   "design.tasks.ready": { path: string(), taskCount: integer({ min: 1 }) },
-  "design.rework": { target: string({ values: ["planner", "architect"] }), reason: string(), attempt: integer({ min: 1 }) },
+  "design.rework": { target: string({ values: ["planner", "architect"] }), reason: string(), attempt: integer({ min: 1 }), originTaskId: stringOrNull({ pattern: TASK_ID }) },
   "design.blocked": { reason: string() },
   "task.ready": { taskId: string({ pattern: TASK_ID }), worktree: string(), baseSha: string({ pattern: SHA }), covers: strings(), writes: strings() },
   "task.tests_written": { taskId: string({ pattern: TASK_ID }), ...costFields },

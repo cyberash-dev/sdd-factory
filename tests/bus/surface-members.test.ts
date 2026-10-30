@@ -35,10 +35,19 @@ describe("bus surfaces after the member, state and roster deltas", () => {
   });
 
   // @covers bus:DLT-005
-  it("carries version 0.5.0 with the fixer events contract as a factory-events member", async () => {
+  it("carries a version past 0.4 with the fixer events contract as a factory-events member", async () => {
     const events = await surfaceRecord("bus:SUR-001");
 
-    expect([events.version, events.members.includes("bus:CTR-009")]).toEqual(["0.5.0", true]);
+    const [major, minor] = events.version.split(".").map(Number);
+    expect([major, (minor ?? 0) >= 5, events.members.includes("bus:CTR-009")]).toEqual([0, true, true]);
+  });
+
+  // @covers bus:DLT-006
+  // @covers bus:DLT-007
+  it("carries version 0.6.0 after the collision-free dedupe keys and the stalled reason", async () => {
+    const events = await surfaceRecord("bus:SUR-001");
+
+    expect(events.version).toBe("0.6.0");
   });
 
   // @covers bus:DLT-003

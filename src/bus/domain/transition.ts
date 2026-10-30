@@ -36,12 +36,21 @@ export type ReduceOutcome =
   | { readonly kind: "unknown_task_ignored" }
   | { readonly kind: "no_rule" };
 
-/* bus:CTR-009: fix.attempted is idempotent per (owner, unit, attempt); several units carry no taskId. */
+function stringOrEmpty(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/* bus:BEH-002 (DLT-006): distinct legitimate events of one attempt differ in their scope, never only in a field the key ignores. */
 function dedupeScopeOf(event: DeliveredEvent): string {
   if (event.type === "fix.attempted") {
     return `${String(event.payload["owner"])}:${String(event.payload["unit"])}`;
   }
-  return typeof event.payload["taskId"] === "string" ? event.payload["taskId"] : "";
+  if (event.type === "design.rework") {
+    return `${stringOrEmpty(event.payload["target"])}:${stringOrEmpty(event.payload["originTaskId"])}`;
+  }
+  const taskId = stringOrEmpty(event.payload["taskId"]);
+  const target = event.payload["target"];
+  return typeof target === "string" ? `${taskId}:${target}` : taskId;
 }
 
 export function dedupeKey(event: DeliveredEvent): string | null {

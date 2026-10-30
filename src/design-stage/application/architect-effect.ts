@@ -69,7 +69,7 @@ export async function runArchitectEffect(effect: Effect, context: EffectContext,
       publishBlocked(context, "tech_md_invalid", error.message, outcome.usage, outcome.reruns);
       return;
     }
-    context.publish(pending("design.rework", { target: "architect", reason: error.message, attempt: designReworkAttempt(context.state), specIds, usage: outcome.usage, handoffReruns: outcome.reruns }));
+    context.publish(pending("design.rework", { target: "architect", reason: error.message, attempt: designReworkAttempt(context.state), originTaskId: null, specIds, usage: outcome.usage, handoffReruns: outcome.reruns }));
     return;
   }
   context.publish(pending("design.tech.ready", { path: TECH_MD, specIds, usage: outcome.usage, handoffReruns: outcome.reruns }));

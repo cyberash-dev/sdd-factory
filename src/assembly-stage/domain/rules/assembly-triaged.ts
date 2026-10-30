@@ -26,7 +26,7 @@ export function assemblyTriagedRule(deps: AssemblyRuleDeps): TransitionRule {
       if (taskId === null) {
         return {
           state: { ...state, status: "building" },
-          emits: [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason, attempt: designReworkAttempt(state) } }],
+          emits: [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason, attempt: designReworkAttempt(state), originTaskId: null } }],
           effects: [recordEffect({ triage })],
         };
       }

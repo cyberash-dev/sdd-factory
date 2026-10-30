@@ -5,7 +5,7 @@ export const LANE_ROLES = ["test-writer", "implementer", "simple-fixer"] as cons
 export type LaneRole = (typeof LANE_ROLES)[number];
 const HUMAN_PRODUCERS: ReadonlySet<string> = new Set(["foreman", "assembler", "tracer"]);
 
-/* A lane's unit is its task id for test-writer and implementer, and the factory:CST-005 unit (task id, stage name or "run") for simple-fixer. */
+/* A lane's unit is its task id for test-writer and implementer, and owner:unit (fixerLaneUnit, factory:CST-005 unit) for simple-fixer. */
 export interface LaneParticipant {
   readonly role: LaneRole;
   readonly unit: string;
@@ -21,18 +21,32 @@ export function isLaneRole(producer: string): producer is LaneRole {
   return (LANE_ROLES as readonly string[]).includes(producer);
 }
 
+/* bus:BEH-007 (DLT-006): two owners fix the same unit independently, so the fixer lane is keyed by owner and unit. */
+export function fixerLaneUnit(owner: string, unit: string): string {
+  return `${owner}:${unit}`;
+}
+
+function fixUnitOf(laneUnit: string): string {
+  return laneUnit.slice(laneUnit.indexOf(":") + 1);
+}
+
 function laneKey(role: LaneRole, unit: string): string {
   return `${role}:${unit}`;
 }
 
 function laneCapability(role: LaneRole, unit: string): string {
-  return role === "simple-fixer" ? `unit:${unit}` : `task:${unit}`;
+  return role === "simple-fixer" ? `unit:${fixUnitOf(unit)}` : `task:${unit}`;
 }
 
 /* bus:BEH-007: the payload field naming the lane that sent an event; null when the event cannot name one. */
 export function laneUnitOf(role: LaneRole, payload: Readonly<Record<string, unknown>>): string | null {
-  const unit = role === "simple-fixer" ? payload["unit"] : payload["taskId"];
-  return typeof unit === "string" ? unit : null;
+  if (role === "simple-fixer") {
+    const owner = payload["owner"];
+    const unit = payload["unit"];
+    return typeof owner === "string" && typeof unit === "string" ? fixerLaneUnit(owner, unit) : null;
+  }
+  const taskId = payload["taskId"];
+  return typeof taskId === "string" ? taskId : null;
 }
 
 function rosterParticipant(producer: Producer): Participant {

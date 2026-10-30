@@ -36,11 +36,14 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export interface TaskAttempts {
   readonly implementer: number;
   readonly testWriter: number;
+  /* bus:CTR-008 (DLT-006): absent in snapshots written before factory-events 0.6.0; read through criticAttempts. */
+  readonly critic?: number;
 }
 
 export interface TaskState {
   readonly status: TaskStatus;
   readonly attempts: TaskAttempts;
+  readonly implementerAtRestart?: number;
   readonly handoffReruns: Readonly<Record<string, number>>;
   readonly baseSha: string | null;
   readonly testsSha: string | null;
@@ -141,7 +144,7 @@ export function createTaskState(input: {
 }): TaskState {
   return {
     status: "ready",
-    attempts: { implementer: 0, testWriter: 0 },
+    attempts: { implementer: 0, testWriter: 0, critic: 0 },
     handoffReruns: {},
     baseSha: null,
     testsSha: null,
@@ -198,4 +201,12 @@ export function simpleFixAttempts(state: RunState, owner: string, unit: string):
 export function withSimpleFix(state: RunState, owner: string, unit: string): RunState {
   const key = simpleFixKey(owner, unit);
   return { ...state, simpleFixes: { ...state.simpleFixes, [key]: simpleFixAttempts(state, owner, unit) + 1 } };
+}
+
+export function criticAttempts(task: TaskState): number {
+  return task.attempts.critic ?? 0;
+}
+
+export function withCriticAttempt(task: TaskState): TaskState {
+  return { ...task, attempts: { ...task.attempts, critic: criticAttempts(task) + 1 } };
 }
