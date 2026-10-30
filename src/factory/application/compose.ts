@@ -18,7 +18,7 @@ import { composeEffectRunner, composeRules, type RunPaths, type Slice, type Slic
 import { runIdOf } from "../domain/run-id.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { createFactorySlice, type TerminalOutcome } from "./factory-slice.js";
-import { planReplay, readResumeSource } from "./resume.js";
+import { planReplay, readResumeSource, type CapGrant, type GrantedRole } from "./resume.js";
 import type { ToolchainVersions } from "./product-scaffold.js";
 
 export interface StartRunInput {
@@ -47,6 +47,12 @@ export interface RunningFactory {
   readonly terminal: Promise<TerminalOutcome>;
   terminate(signal: TerminationSignal): void;
   shutdown(): Promise<void>;
+}
+
+const GRANT_NOTES: Readonly<Record<GrantedRole, string>> = { "test-writer": "test-writer attempt", implementer: "implementer attempt", planner: "planner re-cut", architect: "architect repair" };
+
+function grantNoteOf(grant: CapGrant): string {
+  return `one more ${GRANT_NOTES[grant.role]}${grant.taskId === null ? "" : ` for ${grant.taskId}`}`;
 }
 
 /* The redo event keeps its original producer; a lane producer needs its lane participant around the publication (bus:BEH-007). */
@@ -175,7 +181,8 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
   if (input.resume !== undefined && source !== null && replay !== null) {
     const isChain = source.chain.length > 1;
     const redone = replay.redo.map((event) => `${event.type} seq ${event.seq}${isChain ? ` of ${event.runId}` : ""}`).join(", ");
-    const note = `resume of ${input.resume.fromRunId} from ${redone}${input.resume.note === null ? "" : `; ${input.resume.note}`}`;
+    const granted = replay.grant === null ? "" : `; ${grantNoteOf(replay.grant)}`;
+    const note = `resume of ${input.resume.fromRunId} from ${redone}${granted}${input.resume.note === null ? "" : `; ${input.resume.note}`}`;
     runtime.publisher.publish({ type: "human.intervention", producer: "foreman", payload: { kind: "fix_between_runs", note, actor: input.operator } });
     for (const event of replay.redo) {
       republish(runtime, event);

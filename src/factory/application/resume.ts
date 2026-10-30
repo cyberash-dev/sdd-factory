@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { isEventType, type EventType } from "../../bus/domain/catalogue.js";
 import { isProducer, type DeliveredEvent } from "../../bus/domain/envelope.js";
 import type { RunState, TaskState, TaskStatus } from "../../bus/domain/run-state.js";
-import { dedupeKey, reduce, type TransitionRule } from "../../bus/domain/transition.js";
+import { dedupeKey, reduce, type PendingEvent, type TransitionRule } from "../../bus/domain/transition.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 
 export class ResumeError extends Error {
@@ -32,9 +32,17 @@ interface RunHistory {
   readonly events: readonly DeliveredEvent<EventType>[];
 }
 
+export type GrantedRole = "test-writer" | "implementer" | "planner" | "architect";
+
+export interface CapGrant {
+  readonly role: GrantedRole;
+  readonly taskId: string | null;
+}
+
 export interface ReplayPlan {
   readonly state: RunState;
   readonly redo: readonly DeliveredEvent<EventType>[];
+  readonly grant: CapGrant | null;
 }
 
 interface ReplayPoint {
@@ -117,10 +125,56 @@ function runDirOf(repoRoot: string, runId: string): string {
   return join(repoRoot, ".factory", "runs", runId);
 }
 
+function failureChainStart(events: readonly DeliveredEvent<EventType>[]): number {
+  const end = events.findIndex((event) => REPLAY_END_EVENTS.includes(event.type));
+  return end === -1 ? events.length : end;
+}
+
 /* factory:DLT-007: the events from the first event of the failure chain onwards are neither applied nor redone. */
 function beforeFailureChain(events: readonly DeliveredEvent<EventType>[]): readonly DeliveredEvent<EventType>[] {
-  const end = events.findIndex((event) => REPLAY_END_EVENTS.includes(event.type));
-  return end === -1 ? events : events.slice(0, end);
+  return events.slice(0, failureChainStart(events));
+}
+
+const TASK_CAP_ROLES: readonly GrantedRole[] = ["test-writer", "implementer"];
+
+const DESIGN_CAP_ROLES: Readonly<Record<string, GrantedRole>> = { planner_cap: "planner", architect_cap: "architect" };
+
+/* factory:DLT-012: only a cap as the head of the failure chain earns the resumed run one more attempt. */
+function capGrantOf(head: DeliveredEvent<EventType> | undefined): CapGrant | null {
+  if (head === undefined) {
+    return null;
+  }
+  const reason = stringOf(head.payload, "reason");
+  if (head.type === "task.failed" && reason === "cap_exhausted") {
+    const role = TASK_CAP_ROLES.find((candidate) => candidate === stringOf(head.payload, "detail"));
+    const taskId = stringOf(head.payload, "taskId");
+    return role === undefined || taskId === null ? null : { role, taskId };
+  }
+  const designRole = head.type === "design.blocked" && reason !== null ? DESIGN_CAP_ROLES[reason] : undefined;
+  return designRole === undefined ? null : { role: designRole, taskId: null };
+}
+
+function isEmitOf(emit: PendingEvent, head: DeliveredEvent<EventType>): boolean {
+  return emit.type === head.type && ["taskId", "reason", "detail"].every((key) => stringOf(emit.payload, key) === stringOf(head.payload, key));
+}
+
+function lowered(count: number): number {
+  return Math.max(0, count - 1);
+}
+
+/* factory:DLT-012: the operator's fix is the justification the caps ask for; the configured cap itself stays unchanged. */
+function withGrantedAttempt(state: RunState, grant: CapGrant): RunState {
+  const { stageAttempts } = state;
+  if (grant.role === "planner" || grant.role === "architect") {
+    const next = grant.role === "planner" ? { plannerRecuts: lowered(stageAttempts.plannerRecuts) } : { architectRepairs: lowered(stageAttempts.architectRepairs) };
+    return { ...state, stageAttempts: { ...stageAttempts, ...next } };
+  }
+  const task = grant.taskId === null ? undefined : state.tasks[grant.taskId];
+  if (grant.taskId === null || task === undefined) {
+    return state;
+  }
+  const attempts = grant.role === "test-writer" ? { ...task.attempts, testWriter: lowered(task.attempts.testWriter) } : { ...task.attempts, implementer: lowered(task.attempts.implementer) };
+  return { ...state, tasks: { ...state.tasks, [grant.taskId]: { ...task, attempts } } };
 }
 
 /* factory:DLT-009: a resumed run's history is its ancestor's history cut at the ancestor's failure chain, then its own events. */
@@ -183,7 +237,7 @@ function withTaskRolledBack(state: RunState, taskId: string, taskBefore: TaskSta
 }
 
 /* factory:DLT-006: every other task still in flight before the latest event gets its lane entry redone from the state before it. */
-function withInFlightLanes(latest: ReplayPoint, laneEntries: ReadonlyMap<string, LaneEntry>): ReplayPlan {
+function withInFlightLanes(latest: ReplayPoint, laneEntries: ReadonlyMap<string, LaneEntry>): Omit<ReplayPlan, "grant"> {
   const latestTaskId = taskIdOf(latest.event);
   let state = latest.state;
   const redo: { readonly event: DeliveredEvent<EventType>; readonly position: number }[] = [latest];
@@ -205,7 +259,10 @@ export function planReplay(rules: readonly TransitionRule[], initialState: RunSt
   const consumed = new Set<string>();
   let latest: ReplayPoint | null = null;
   const laneEntries = new Map<string, LaneEntry>();
-  for (const [position, event] of beforeFailureChain(events).entries()) {
+  const chainStart = failureChainStart(events);
+  const head = events[chainStart];
+  const grant = capGrantOf(head);
+  for (const [position, event] of events.slice(0, chainStart).entries()) {
     const outcome = reduce(rules, state, event, consumed);
     const key = dedupeKey(event);
     if (key !== null) {
@@ -214,7 +271,9 @@ export function planReplay(rules: readonly TransitionRule[], initialState: RunSt
     if (outcome.kind !== "applied") {
       continue;
     }
-    if (outcome.result.effects.length > 0 && !NON_REDO_EVENTS.includes(event.type)) {
+    /* factory:DLT-012: the event whose transition hit the cap is the entry the granted attempt redoes. */
+    const hitCap = grant !== null && head !== undefined && outcome.result.emits.some((emit) => isEmitOf(emit, head));
+    if ((outcome.result.effects.length > 0 || hitCap) && !NON_REDO_EVENTS.includes(event.type)) {
       latest = { state, event, position };
       const taskId = taskIdOf(event);
       if (taskId !== null) {
@@ -226,5 +285,6 @@ export function planReplay(rules: readonly TransitionRule[], initialState: RunSt
   if (latest === null) {
     throw new ResumeError("nothing to resume: no replayed event produced an effect");
   }
-  return withInFlightLanes(latest, laneEntries);
+  const plan = withInFlightLanes(latest, laneEntries);
+  return { ...plan, state: grant === null ? plan.state : withGrantedAttempt(plan.state, grant), grant };
 }

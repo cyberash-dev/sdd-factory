@@ -370,3 +370,139 @@ describe("resume replay plan over a chain of runs", () => {
     ]);
   });
 });
+
+function capFailed(taskId: string, role: string): { readonly type: "task.failed"; readonly producer: Producer; readonly payload: Record<string, unknown> } {
+  return { type: "task.failed", producer: "foreman", payload: { taskId, reason: "cap_exhausted", detail: role } };
+}
+
+const CAP_RULES: readonly TransitionRule[] = [
+  ...FAILURE_CHAIN_RULES.filter((rule) => rule.eventType !== "task.tests_rejected" && rule.eventType !== "task.verified"),
+  {
+    name: "rejected with cap",
+    eventType: "task.tests_rejected",
+    acceptsTaskStatus: ["tests_pending"],
+    apply: ({ state, event }) => {
+      const taskId = taskIdOf(event.payload);
+      const task = state.tasks[taskId];
+      if (task !== undefined && task.attempts.testWriter > 1) {
+        return { state, emits: [capFailed(taskId, "test-writer")], effects: [] };
+      }
+      return { state: withTaskChange(state, taskId, (current) => ({ ...current, attempts: { implementer: 0, testWriter: current.attempts.testWriter + 1 } })), emits: [], effects: [{ kind: "build.restart-lane" }] };
+    },
+  },
+  {
+    name: "verified red with cap",
+    eventType: "task.verified",
+    acceptsTaskStatus: ["verify_pending"],
+    apply: ({ state, event }) => {
+      const taskId = taskIdOf(event.payload);
+      const task = state.tasks[taskId];
+      const emit = task !== undefined && task.attempts.implementer >= 1 ? capFailed(taskId, "implementer") : { type: "task.rework" as const, producer: "foreman" as const, payload: { taskId, target: "implementer" } };
+      return { state, emits: [emit], effects: [] };
+    },
+  },
+  {
+    name: "design rework with cap",
+    eventType: "design.rework",
+    apply: ({ state }) => {
+      const recuts = state.stageAttempts.plannerRecuts + 1;
+      if (recuts > 1) {
+        return { state, emits: [{ type: "design.blocked", producer: "foreman", payload: { reason: "planner_cap" } }], effects: [] };
+      }
+      return { state: { ...state, stageAttempts: { ...state.stageAttempts, plannerRecuts: recuts } }, emits: [], effects: [{ kind: "design.plan" }] };
+    },
+  },
+];
+
+describe("resume after a cap failure", () => {
+  const testWriterCapped = [
+    delivered(1, "task.ready", "foreman", { taskId: "T-004" }),
+    delivered(2, "task.tests_rejected", "foreman", { taskId: "T-004", reason: "unsupported", detail: "first" }),
+    delivered(3, "task.tests_rejected", "foreman", { taskId: "T-004", reason: "unsupported", detail: "second" }),
+    delivered(4, "task.failed", "foreman", { taskId: "T-004", reason: "cap_exhausted", detail: "test-writer" }),
+    delivered(5, "run.failed", "foreman", { reason: "cap_exhausted" }),
+  ];
+
+  // @covers factory:DLT-012
+  it("seeds the task whose test-writer cap failed the run with its test-writer attempts lowered by one", () => {
+    const plan = planReplay(CAP_RULES, buildingWith(["T-004"]), testWriterCapped);
+
+    expect(taskSummary(plan.state, "T-004")).toEqual(["tests_pending", 1]);
+  });
+
+  // @covers factory:DLT-012
+  it("redoes the tests_rejected event whose transition hit the test-writer cap", () => {
+    const plan = planReplay(CAP_RULES, buildingWith(["T-004"]), testWriterCapped);
+
+    expect(plan.redo.map((event) => [event.type, event.seq])).toEqual([["task.tests_rejected", 3]]);
+  });
+
+  // @covers factory:DLT-012
+  it("restarts the lane instead of failing the task when the redone tests_rejected is applied to the seed", () => {
+    const plan = planReplay(CAP_RULES, buildingWith(["T-004"]), testWriterCapped);
+
+    const outcomes = plan.redo.map((event) => reduce(CAP_RULES, plan.state, event, new Set()));
+    expect(outcomes.map((outcome) => (outcome.kind === "applied" ? [outcome.result.effects, outcome.result.emits] : outcome.kind))).toEqual([[[{ kind: "build.restart-lane" }], []]]);
+  });
+
+  // @covers factory:DLT-012
+  it("names the test-writer of the failed task as the granted attempt", () => {
+    const plan = planReplay(CAP_RULES, buildingWith(["T-004"]), testWriterCapped);
+
+    expect(plan.grant).toEqual({ role: "test-writer", taskId: "T-004" });
+  });
+
+  // @covers factory:DLT-012
+  it("seeds the task whose implementer cap failed the run with its implementer attempts lowered by one and redoes the capped event", () => {
+    const events = [
+      delivered(1, "task.ready", "foreman", { taskId: "T-007" }),
+      delivered(2, "task.impl_done", "implementer", { taskId: "T-007", attempt: 1 }),
+      delivered(3, "task.verified", "foreman", { taskId: "T-007", result: "red" }),
+      delivered(4, "task.failed", "foreman", { taskId: "T-007", reason: "cap_exhausted", detail: "implementer" }),
+      delivered(5, "run.failed", "foreman"),
+    ];
+
+    const plan = planReplay(CAP_RULES, buildingWith(["T-007"]), events);
+
+    const task = plan.state.tasks["T-007"];
+    expect([task?.status, task?.attempts.implementer, plan.redo.map((event) => [event.type, event.seq]), plan.grant]).toEqual(["verify_pending", 0, [["task.verified", 3]], { role: "implementer", taskId: "T-007" }]);
+  });
+
+  // @covers factory:DLT-012
+  it("seeds the run with its planner re-cuts lowered by one after design.blocked{planner_cap}", () => {
+    const events = [
+      delivered(1, "design.rework", "foreman", { target: "planner", reason: "first" }),
+      delivered(2, "design.rework", "foreman", { target: "planner", reason: "second" }),
+      delivered(3, "design.blocked", "foreman", { reason: "planner_cap" }),
+      delivered(4, "run.failed", "foreman"),
+    ];
+
+    const plan = planReplay(CAP_RULES, { ...initial(), status: "planning" }, events);
+
+    expect([plan.state.stageAttempts.plannerRecuts, plan.redo.map((event) => [event.type, event.seq]), plan.grant]).toEqual([0, [["design.rework", 2]], { role: "planner", taskId: null }]);
+  });
+
+  // @covers factory:DLT-012
+  it("keeps the counters and grants nothing after a failure that is not a cap", () => {
+    const events = [
+      delivered(1, "task.ready", "foreman", { taskId: "T-007" }),
+      delivered(2, "task.impl_done", "implementer", { taskId: "T-007", attempt: 1 }),
+      delivered(3, "task.failed", "foreman", { taskId: "T-007", reason: "unparseable_handoff", detail: "verifier" }),
+      delivered(4, "run.failed", "foreman"),
+    ];
+
+    const plan = planReplay(CAP_RULES, buildingWith(["T-007"]), events);
+
+    const task = plan.state.tasks["T-007"];
+    expect([task?.attempts.testWriter, task?.attempts.implementer, plan.grant]).toEqual([1, 0, null]);
+  });
+
+  // @covers factory:DLT-012
+  it("never lowers a counter below zero", () => {
+    const events = [delivered(1, "spec.approved", "foreman"), delivered(2, "task.failed", "foreman", { taskId: "T-001", reason: "cap_exhausted", detail: "implementer" }), delivered(3, "run.failed", "foreman")];
+
+    const plan = planReplay(CAP_RULES, buildingWith(["T-001"]), events);
+
+    expect(plan.state.tasks["T-001"]?.attempts.implementer).toBe(0);
+  });
+});

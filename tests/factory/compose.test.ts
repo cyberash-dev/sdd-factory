@@ -501,3 +501,62 @@ describe("composed run", () => {
     expect([process.stdin.isTTY ?? false, manifest.status, written.status]).toEqual([false, "failed", "failed"]);
   });
 });
+
+/* T-004's test-writer is rejected twice in the first run, so its cap fails the run; the next lane run publishes the run. */
+function testWriterCapStage(): SliceFactory {
+  let rejections = 0;
+  return () => ({
+    name: "test-writer-cap-stage",
+    rules: [
+      {
+        name: "workspace.ready -> building",
+        eventType: "workspace.ready",
+        apply: ({ state }) => ({ state: { ...state, status: "building", tasks: { "T-004": { ...createTaskState({ worktree: "worktrees/T-004", covers: [], writes: [], dependsOn: [] }), status: "tests_pending", attempts: { implementer: 0, testWriter: 1 } } } }, emits: [], effects: [{ kind: "lane.write" }] }),
+      },
+      {
+        name: "task.tests_rejected -> restart or cap",
+        eventType: "task.tests_rejected",
+        acceptsTaskStatus: ["tests_pending"],
+        apply: ({ state, event }) => {
+          const task = state.tasks["T-004"];
+          if (task !== undefined && task.attempts.testWriter > 1) {
+            return { state, emits: [{ type: "task.failed", producer: "foreman", payload: { taskId: "T-004", reason: "cap_exhausted", detail: "test-writer" } }], effects: [] };
+          }
+          const next = task === undefined ? state : { ...state, tasks: { ...state.tasks, "T-004": { ...task, attempts: { implementer: 0, testWriter: task.attempts.testWriter + 1 } } } };
+          return { state: next, emits: [], effects: [{ kind: "lane.write", taskId: taskIdIn(event.payload) }] };
+        },
+      },
+      { name: "task.failed -> run.failed", eventType: "task.failed", apply: ({ state }) => ({ state, emits: [{ type: "run.failed", producer: "foreman", payload: { stage: "build", reason: "cap_exhausted", detail: "T-004: cap_exhausted: test-writer" } }], effects: [] }) },
+    ],
+    effects: {
+      "lane.write": async (_effect, context) => {
+        rejections += 1;
+        if (rejections <= 2) {
+          context.publish({ type: "task.tests_rejected", producer: "foreman", payload: { taskId: "T-004", reason: "vacuous", detail: `rejection ${rejections}` } });
+          return;
+        }
+        context.publish({ type: "run.published", producer: "foreman", payload: { commitSha: "ab".repeat(20), outputDir: "hidden/todo-cli", pushed: false } });
+      },
+    },
+    participants: () => [],
+  });
+}
+
+describe("resumed run after a cap failure", () => {
+  // @covers factory:DLT-012
+  it("names the granted test-writer attempt in the fix_between_runs note", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
+    const input = { repoRoot, specPath: join(repoRoot, "todo-cli.md"), slug: "todo-cli", operator: "cyberash", push: false, outDir: null, config: DEFAULT_CONFIG, stageSlices: [createTraceSlice({ env: {} }), testWriterCapStage()], commandRunner: fakeCommands, versions: { typescript: "7.0.2", vitest: "5.0.5", typesNode: "26.6.6", agentSdd: "2.1.1" }, log: () => undefined, env: {} };
+    const first = await startRun({ ...input, now: () => new Date("2026-10-30T16:00:00.000Z") });
+    await first.terminal;
+    await first.shutdown();
+
+    const second = await startRun({ ...input, now: () => new Date("2026-10-30T17:00:00.000Z"), resume: { fromRunId: first.runId, note: "rejections were false", force: false } });
+    await second.terminal;
+    await second.shutdown();
+
+    const lines = (await readFile(join(second.paths.runDir, "trace", "trace.jsonl"), "utf8")).split("\n").filter((line) => line.length > 0);
+    const intervention = lines.map((line) => JSON.parse(line) as { type: string; payload: Record<string, unknown> }).find((record) => record.type === "human.intervention");
+    expect(intervention?.payload["note"]).toBe(`resume of ${first.runId} from task.tests_rejected seq 6; one more test-writer attempt for T-004; rejections were false`);
+  });
+});
