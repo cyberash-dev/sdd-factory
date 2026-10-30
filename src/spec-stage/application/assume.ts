@@ -11,6 +11,7 @@ import { sha256OrNull } from "./file-digest.js";
 import { criticTools } from "./review.js";
 import { invokeRole, promptBody, type HandoffVerdict } from "./role-invocation.js";
 import { outputTail, type StageDeps } from "./stage-deps.js";
+import { lintProductSpec } from "./spec-lint.js";
 
 const ASSUME_MESSAGE = `Assumption mode for product "{{slug}}", task {{task_id}}.
 A lane finding needs a decision on approved records that can no longer change: {{spec_ids}}.
@@ -101,7 +102,7 @@ export async function runAssume(effect: Effect, context: EffectContext, slice: S
     context.publish(taskFailed(firstTask, "unparseable_handoff", outcome.error));
     return;
   }
-  const lint = await deps.commands.run(["lint", "--format=json"], productDir);
+  const lint = await lintProductSpec(deps.commands, productDir);
   if (lint.exitCode !== 0) {
     context.publish(taskFailed(firstTask, "blocked", `assumptions_file_invalid: ${outputTail(lint)}`));
     return;

@@ -180,6 +180,26 @@ export function repairSurfaceMembers(specText: string): SurfaceRepair | null {
   return { surfaceId: surface.id, added, text: `${specText.slice(0, start)}${repairedBody}${specText.slice(start + body.length)}` };
 }
 
+/* spec-stage:DLT-005: sdd lint skips a fence its yaml parser rejects; the factory reports it so the author repairs it. */
+export function yamlInvalidDiagnostics(specText: string, file: string): readonly string[] {
+  const diagnostics: string[] = [];
+  for (const match of specText.matchAll(YAML_FENCE)) {
+    const body = match[1] ?? "";
+    const document = YAML.parseDocument(stripDocumentMarkers(body));
+    const firstError = document.errors[0];
+    if (firstError === undefined) {
+      continue;
+    }
+    const fenceLine = specText.slice(0, match.index).split("\n").length;
+    const recordLine = fenceLine + 1 + (body.startsWith("---\n") ? 1 : 0);
+    const id = /^id:\s*(\S+)/m.exec(body)?.[1];
+    const subject = id === undefined ? `fence at line ${recordLine}` : id;
+    const message = firstError.message.split("\n")[0] ?? firstError.message;
+    diagnostics.push(`yaml_invalid ${subject} (${file}, record at line ${recordLine}): ${message}`);
+  }
+  return diagnostics;
+}
+
 export function specIntegrityProblems(specText: string): readonly string[] {
   const records = parseSpecRecords(specText);
   return [...surfaceProblems(records), ...undecidedOpenQuestions(records)];

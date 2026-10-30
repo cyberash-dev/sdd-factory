@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runArchitectEffect } from "../../src/design-stage/application/architect-effect.js";
+import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { ARCHITECT_HANDOFF_LINES, handoffPathIn, handoffText, harness, readVia, stateIn, techMdText, writeVia, type RoleScript } from "./harness.js";
 
 function architectWriting(techMd: string, handoffLines: readonly string[] = ARCHITECT_HANDOFF_LINES, before: RoleScript = async () => undefined): RoleScript {
@@ -82,6 +83,43 @@ describe("design.architect effect", () => {
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
     expect(h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])).toEqual([["design.blocked", "architect_blocked", "spec has no approved record"]]);
+  });
+
+  // @covers factory:BEH-011
+  it("re-runs the architect with the timeout note when its loop exceeds the budget, then accepts the second file", async () => {
+    const timingOut: RoleScript = async () => {
+      throw new ApiRoleTimeoutError("architect exceeded 1200000 ms");
+    };
+    const h = await harness({ scripts: { architect: [timingOut, architectWriting(techMdText())] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([h.roleCalls.length, h.roleCalls[1]?.message.includes("without a handoff; continue from the files on disk and write the handoff first"), h.published.map((event) => [event.type, event.payload["handoffReruns"]])]).toEqual([2, true, [["design.tech.ready", 1]]]);
+  });
+
+  // @covers factory:BEH-011
+  it("blocks the design with architect_timeout when the re-run exceeds the budget too", async () => {
+    const timingOut: RoleScript = async () => {
+      throw new ApiRoleTimeoutError("architect exceeded 1200000 ms");
+    };
+    const h = await harness({ scripts: { architect: [timingOut, timingOut, timingOut] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([h.roleCalls.length, h.published.map((event) => [event.type, event.payload["reason"]])]).toEqual([2, [["design.blocked", "architect_timeout"]]]);
+  });
+
+  // @covers factory:BEH-011
+  it("uses the handoff the architect wrote before its budget ran out instead of re-running", async () => {
+    const writesThenHangs: RoleScript = async (request) => {
+      await architectWriting(techMdText())(request);
+      throw new ApiRoleTimeoutError("architect exceeded 1200000 ms");
+    };
+    const h = await harness({ scripts: { architect: [writesThenHangs] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([h.roleCalls.length, h.published.map((event) => event.type)]).toEqual([1, ["design.tech.ready"]]);
   });
 
   // @covers design-stage:BEH-003

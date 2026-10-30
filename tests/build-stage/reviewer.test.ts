@@ -7,6 +7,7 @@ import { aLaneHarness } from "./support/harness.js";
 import { laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
 import { aProductRepo, git, writeProductFile } from "./support/product.js";
 import { verifiedLane, writeReview } from "./support/reviews.js";
+import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { invokeTool, reviewFrontmatter, scriptedApiRoles } from "./support/runners.js";
 
 describe("reviewer invocation", () => {
@@ -80,6 +81,21 @@ describe("reviewer invocation", () => {
   });
 
   // @covers build-stage:BEH-013
+  // @covers factory:BEH-011
+  it("re-runs the reviewer with the timeout note when its loop exceeds the budget and publishes the second review", async () => {
+    const apiRoles = scriptedApiRoles(async (request, invocation) => {
+      if (invocation === 1) {
+        throw new ApiRoleTimeoutError("reviewer exceeded 1200000 ms");
+      }
+      await writeReview(request, reviewFrontmatter({ impl_sha: (request.message.match(/Reviewed commit: ([0-9a-f]{40})/) ?? [])[1] ?? null }));
+    });
+    const { harness, state } = await verifiedLane(apiRoles);
+
+    const published = await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
+
+    expect([apiRoles.requests.length, apiRoles.requests[1]?.message.includes("without a handoff; continue from the files on disk and write the handoff first"), published.map((event) => [event.type, event.payload["decision"]])]).toEqual([2, true, [["task.reviewed", "approve"]]]);
+  });
+
   it("treats request_changes with target none as a malformed handoff: one re-run, then task.failed", async () => {
     const apiRoles = scriptedApiRoles(async (request) => {
       await writeReview(request, reviewFrontmatter({ decision: "request_changes", target: "none", findings: [{ id: "RV-001", severity: "blocking", target: "implementer", spec_ids: [], evidence: "x" }], impl_sha: (request.message.match(/Reviewed commit: ([0-9a-f]{40})/) ?? [])[1] ?? null }));

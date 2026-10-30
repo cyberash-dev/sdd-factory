@@ -80,6 +80,8 @@ One yaml fence, a list. Every free-text value in it (`finding`, `required_change
 ## Assumptions
 <one yaml fence per ASSUMPTION body, verbatim as the analyst must insert it>
 
+Every ASSUMPTION body you write obeys the same scalar rule as the spec records: A scalar value that contains `: ` or ` #`, or that starts with a backtick, `@`, `*`, `&`, `!`, `%`, `|` or `>`, is written as a double-quoted YAML string (a `"` inside it as `\"`); the yaml parser rejects such plain values and the record silently vanishes from every check.
+
 ## Open-Q decisions
 | Open-Q | option | finding | rationale |
 

@@ -3,6 +3,7 @@ import type { Tool } from "@mozaik-ai/core";
 import { editFileTool, listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../shared/llm/tools.js";
 import { isRecord } from "../domain/guards.js";
 import type { CommandRunner } from "../ports/command-runner.js";
+import { lintProductSpec } from "../application/spec-lint.js";
 
 export interface PathScope {
   readonly base: string;
@@ -54,7 +55,7 @@ export function sddTool(commands: CommandRunner, productDir: string, lintCap: nu
         lintRuns += 1;
       }
       trace({ tool: "run_sdd", path: null, argv: parts });
-      const result = await commands.run(parts, productDir);
+      const result = parts[0] === "lint" ? await lintProductSpec(commands, productDir) : await commands.run(parts, productDir);
       return `exit ${result.exitCode}\n${result.stdout}${result.stderr}`;
     },
   };

@@ -74,6 +74,15 @@ export interface ApiRoleRunner {
   run(request: ApiRoleRequest): Promise<ApiRoleUsage>;
 }
 
+/* factory:BEH-011: a role that exhausted its budget is re-run like a missing handoff, with this note appended to its message. */
+export function roleTimeoutNote(timeoutMs: number): string {
+  return `\n\nYour previous run exceeded ${Math.round(timeoutMs / 60000)} minutes without a handoff; continue from the files on disk and write the handoff first.`;
+}
+
+export function isRoleTimeout(error: unknown): error is ApiRoleTimeoutError {
+  return error instanceof ApiRoleTimeoutError;
+}
+
 export class ApiRoleTimeoutError extends Error {
   override readonly name = "ApiRoleTimeoutError";
 }

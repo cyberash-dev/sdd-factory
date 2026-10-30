@@ -941,6 +941,52 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-003
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:56:55.041Z
+    change_request: "run 10: role timeouts, architect scope, yaml-invalid lint"
+    scope: first-time-approval
+partition_id: design-stage
+title: the architect may read the scaffolded tooling files
+target_ids:
+  - design-stage:BEH-001
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The architect owns TD-TOOLING, yet its read scope covered only the
+  spec files and the source spec; in run 10 it asked for package.json,
+  was refused, and lost its thread. The architect's read scope gains
+  the files the bootstrap scaffolds: package.json, tsconfig.json and
+  vitest.config.ts. The context firewall is unchanged: design/
+  verification.md and src/ stay forbidden to it, and the
+  verification-designer's scope does not change.
+tests_old_behavior:
+  - the architect reading design/verification.md still blocks with context_firewall_violation
+tests_new_behavior:
+  - to:design-stage:BEH-001
+test_obligation:
+  predicate: |
+    The architect's read_file on package.json returns its content;
+    read_file on design/verification.md still produces the firewall
+    block.
+  test_template: integration
+  boundary_classes:
+    - tooling file
+    - the other role's file
+  failure_scenarios:
+    - src/ readable
+---
+```
+
 ---
 
 ## 16. Implementation bindings

@@ -3,6 +3,7 @@ import { rename } from "node:fs/promises";
 import type { TaskState } from "../../bus/domain/run-state.js";
 import { describeHandoffError, parseHandoff, type HandoffResult } from "../../bus/domain/handoff.js";
 import { ensureDir, readTextOrNull } from "../../shared/fs/text.js";
+import { isRoleTimeout, roleTimeoutNote } from "../../shared/llm/api-role-runner.js";
 import { listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../shared/llm/tools.js";
 import type { EffectHandler, SliceContext } from "../../shared/slice.js";
 import { isReworkTarget, type ReworkTarget } from "../domain/ledger.js";
@@ -137,25 +138,34 @@ export function triageEffect(runner: CommandRunner): EffectHandler {
     let parseError = "";
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const variables = { ...shared, attempt: String(attempt), parse_error: parseError };
-      const usage = await slice.apiRoles.run({
-        role: "triage",
-        instruction: slice.prompts.render(instructionTemplate, variables),
-        message: slice.prompts.render(TRIAGE_MESSAGE, variables),
-        model: slice.config.models.triage,
-        tools: [readFileTool(slice.paths.productDir, trace), listDirTool(slice.paths.productDir, trace), writeFileTool(slice.paths.runDir, trace)],
-        timeoutMs: slice.config.timeouts.apiRoleMs,
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-        toolTracePath: join(dirname(handoffPath), `tools-run${attempt}.jsonl`),
-      });
-      slice.log(`triage attempt ${attempt}: ${usage.inferenceCount} inferences, ${usage.inputTokens}/${usage.outputTokens} tokens, cost ${usage.costUsd === null ? "n/a" : String(usage.costUsd)}`);
+      let timedOut = false;
+      try {
+        const usage = await slice.apiRoles.run({
+          role: "triage",
+          instruction: slice.prompts.render(instructionTemplate, variables),
+          message: slice.prompts.render(TRIAGE_MESSAGE, variables),
+          model: slice.config.models.triage,
+          tools: [readFileTool(slice.paths.productDir, trace), listDirTool(slice.paths.productDir, trace), writeFileTool(slice.paths.runDir, trace)],
+          timeoutMs: slice.config.timeouts.apiRoleMs,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          toolTracePath: join(dirname(handoffPath), `tools-run${attempt}.jsonl`),
+        });
+        slice.log(`triage attempt ${attempt}: ${usage.inferenceCount} inferences, ${usage.inputTokens}/${usage.outputTokens} tokens, cost ${usage.costUsd === null ? "n/a" : String(usage.costUsd)}`);
+      } catch (error) {
+        if (!isRoleTimeout(error)) {
+          throw error;
+        }
+        /* factory:BEH-011: a handoff written before the budget ran out still counts; otherwise the timeout is a re-run. */
+        timedOut = true;
+      }
       const route = routeOf(parseHandoff("triage", await readTextOrNull(handoffPath)), context.state.tasks);
       if (route.ok) {
         context.publish({ type: "assembly.triaged", producer: "triage", payload: { taskId: route.taskId, target: route.target, reason: route.reason } });
         return;
       }
       await rejectHandoff(handoffPath, attempt);
-      parseError = `Your previous handoff was rejected: ${route.error}. Write the frontmatter exactly as specified.`;
-      slice.log(`triage attempt ${attempt} rejected: ${route.error}`);
+      parseError = timedOut ? `triage_timeout: ${roleTimeoutNote(slice.config.timeouts.apiRoleMs).trim()}` : `Your previous handoff was rejected: ${route.error}. Write the frontmatter exactly as specified.`;
+      slice.log(`triage attempt ${attempt} ${timedOut ? "timed out" : `rejected: ${route.error}`}`);
     }
     const detail = `triage: ${parseError}`;
     await writeFailedReport(slice.paths, { runDir: slice.paths.runDir, runId: slice.runId, slug: slice.slug }, `unparseable_handoff: ${detail}`);

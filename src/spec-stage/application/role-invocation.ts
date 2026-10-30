@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import type { Tool } from "@mozaik-ai/core";
 import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../bus/domain/handoff.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
+import { isRoleTimeout, roleTimeoutNote } from "../../shared/llm/api-role-runner.js";
 import type { SliceContext } from "../../shared/slice.js";
 
 export type HandoffVerdict<T> =
@@ -44,19 +45,28 @@ export async function invokeRole<T>(slice: SliceContext, invocation: RoleInvocat
   let lastError = "";
   const allowedRuns = slice.config.caps.handoffRerun + 1;
   for (let run = 1; run <= allowedRuns; run += 1) {
-    await slice.apiRoles.run({
-      role: invocation.role,
-      instruction: invocation.instruction,
-      message,
-      model: invocation.model,
-      tools: invocation.tools,
-      timeoutMs: slice.config.timeouts.apiRoleMs,
-      maxOutputTokens: invocation.maxOutputTokens,
-      toolTracePath: join(dirname(invocation.handoffPath), `tools-run${run}.jsonl`),
-    });
+    let timedOut = false;
+    try {
+      await slice.apiRoles.run({
+        role: invocation.role,
+        instruction: invocation.instruction,
+        message,
+        model: invocation.model,
+        tools: invocation.tools,
+        timeoutMs: slice.config.timeouts.apiRoleMs,
+        maxOutputTokens: invocation.maxOutputTokens,
+        toolTracePath: join(dirname(invocation.handoffPath), `tools-run${run}.jsonl`),
+      });
+    } catch (error) {
+      if (!isRoleTimeout(error)) {
+        throw error;
+      }
+      /* factory:BEH-011: a handoff written before the budget ran out still counts; otherwise the timeout is a re-run. */
+      timedOut = true;
+    }
     const text = await readTextOrNull(invocation.handoffPath);
     const parsed = parseHandoff(invocation.role, text);
-    const verdict: HandoffVerdict<T> = parsed.ok ? await invocation.verify(parsed.handoff) : { kind: "retry", error: describeHandoffError(parsed.error) };
+    const verdict: HandoffVerdict<T> = parsed.ok ? await invocation.verify(parsed.handoff) : { kind: "retry", error: timedOut ? `${invocation.role}_timeout: exceeded ${slice.config.timeouts.apiRoleMs} ms without a handoff` : describeHandoffError(parsed.error) };
     if (verdict.kind === "ok") {
       return { kind: "ok", value: verdict.value, reruns: run - 1 };
     }
@@ -68,7 +78,7 @@ export async function invokeRole<T>(slice: SliceContext, invocation: RoleInvocat
     if (text !== null) {
       await rename(invocation.handoffPath, `${invocation.handoffPath}.rejected-${run}`);
     }
-    message = rejectionNote(invocation, verdict.error);
+    message = timedOut ? `${invocation.message}${roleTimeoutNote(slice.config.timeouts.apiRoleMs)}` : rejectionNote(invocation, verdict.error);
   }
   return { kind: "unparseable", error: lastError, reruns: allowedRuns - 1 };
 }

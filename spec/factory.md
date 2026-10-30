@@ -838,6 +838,77 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:BEH-011
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:56:54.718Z
+    change_request: "run 10: role timeouts, architect scope, yaml-invalid lint"
+    scope: first-time-approval
+partition_id: factory
+title: an API role that exhausts its time budget is re-run once, then blocks its stage
+given: |
+  - an API role (spec-analyst, spec-critic, architect, verification-designer,
+    planner, reviewer, triage) is running inside a Mozaik loop
+  - `timeouts.apiRoleMs` from the factory configuration is its budget
+    for one invocation
+when: the invocation exceeds the budget before its handoff exists
+then: |
+  - the loop is stopped and the participant leaves; files the role wrote
+    so far stay on disk
+  - the invocation counts as a handoff re-run (same counter as an
+    unparseable handoff): the role is invoked again with its message
+    plus the note "your previous run exceeded <N> minutes without a
+    handoff; continue from the files on disk and write the handoff
+    first"
+  - when the re-run cap is exhausted, the stage ends the way a missing
+    handoff ends it: spec-stage => spec.blocked{reason: analyst_blocked,
+    detail: "<role>_timeout ..."}; design-stage => design.blocked{reason:
+    "<role>_timeout"}; build-stage reviewer => the task's review counts
+    as a missing handoff (build-stage rules); assembly triage => the
+    triage round counts as a missing handoff (assembly rules)
+  - the run never ends with run.failed{reason: "runtime_error"} because
+    of a role timeout
+negative_cases:
+  - "the role writes its handoff and the loop still runs past the budget => the loop is stopped and the handoff on disk is used as the result"
+  - "a lane subprocess timeout (cliRoleMs) is unchanged: build-stage:EXT-001"
+out_of_scope:
+  - adapting the budget to the model or the stage
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: single
+  read_consistency: strong
+  idempotency: none
+  time_source: wall_clock:1s
+data_scope: new_writes_only
+policy_refs:
+  - factory:POL-001
+test_obligation:
+  predicate: |
+    Given an API role runner whose first invocation rejects with the
+    timeout error and whose second writes a complete handoff, the stage
+    effect invokes the role twice, the second message carries the
+    timeout note, and the stage proceeds as on a first-try success;
+    given both invocations time out with handoffRerun 1, the stage
+    publishes its blocked event with a reason or detail naming
+    <role>_timeout and no run.failed{runtime_error} is published.
+  test_template: integration
+  boundary_classes:
+    - timeout then success (architect, spec-analyst)
+    - timeout twice (architect)
+    - handoff written before the timeout
+  failure_scenarios:
+    - the timeout surfacing as runtime_error
+    - the re-run counted against a different cap
+---
+```
+
 ---
 
 ## 7. Data contracts

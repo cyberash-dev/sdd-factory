@@ -6,6 +6,7 @@ import { readTextOrNull } from "../../../shared/fs/text.js";
 import type { ApiRoleUsage } from "../../../shared/llm/api-role-runner.js";
 import { reviewerModel } from "../../../shared/config.js";
 import { listDirTool, readFileTool } from "../../../shared/llm/tools.js";
+import { roleTimeoutNote } from "../../../shared/llm/api-role-runner.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { laneHandoffPath, reviewReportPath, taskHandoffDir } from "../../domain/handoff-paths.js";
 import { instructionVariables, reviewerMessage, type ArbitrationFinding } from "../../domain/lane-messages.js";
@@ -83,6 +84,7 @@ export async function runReviewer(slice: SliceContext, deps: LaneDeps, context: 
       role: "reviewer",
       handoffPath: worktreeHandoff,
       maxReruns: slice.config.caps.handoffRerun,
+      timeout: { note: roleTimeoutNote(slice.config.timeouts.apiRoleMs), run: { model: reviewerModel(slice.config.models), inputTokens: 0, outputTokens: 0, costUsd: null, inferenceCount: 0, durationMs: 0, answer: "" } },
       invoke: (text) =>
         slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model: reviewerModel(slice.config.models), tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), "tools.jsonl") }),
       parse: () => parseReviewOutputs(worktree, worktreeHandoff, run, implSha),

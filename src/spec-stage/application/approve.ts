@@ -8,6 +8,7 @@ import type { SliceContext } from "../../shared/slice.js";
 import { appendAssumptions, nextAssumptionNumber, renderDefaultAssumption } from "../domain/assumption-records.js";
 import { openQuestionsDecidableByDefault, parseSpecRecords, repairSurfaceMembers, specIntegrityProblems, specIntegrityWarnings } from "../domain/spec-records.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
+import { lintProductSpec } from "./spec-lint.js";
 
 const APPROVAL_MODE = "pre-authorized-at-launch";
 
@@ -47,7 +48,7 @@ export async function runApprove(_effect: Effect, context: EffectContext, slice:
   const blocked = (detail: string): void => concludeStage(deps, context, specBlocked("foreman", "analyst_blocked", detail));
   const specPath = join(productDir, "spec", "spec.md");
   const specText = await repairMembers(slice, specPath, await decideByDefault(slice, specPath));
-  const lintBefore = await deps.commands.run(["lint", "--format=json"], productDir);
+  const lintBefore = await lintProductSpec(deps.commands, productDir);
   if (lintBefore.exitCode !== 0) {
     blocked(`lint_failed: ${outputTail(lintBefore)}`);
     return;
@@ -81,7 +82,7 @@ export async function runApprove(_effect: Effect, context: EffectContext, slice:
     return;
   }
   const approvedIds = finalized.flipped.length;
-  const lintAfter = await deps.commands.run(["lint", "--format=json"], productDir);
+  const lintAfter = await lintProductSpec(deps.commands, productDir);
   if (lintAfter.exitCode !== 0) {
     blocked(`lint_failed_after_finalize: ${outputTail(lintAfter)}`);
     return;

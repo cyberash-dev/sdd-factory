@@ -1,0 +1,24 @@
+plan_id: 2026-10-30T175654Z-jvgi3
+created_at: 2026-10-30T17:56:54.720Z
+pending_attestations:
+  - id: factory:BEH-011
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:56:54.718Z
+    change_request: "run 10: role timeouts, architect scope, yaml-invalid lint"
+    scope: first-time-approval
+    target_status: approved
+  - id: design-stage:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:56:55.041Z
+    change_request: "run 10: role timeouts, architect scope, yaml-invalid lint"
+    scope: first-time-approval
+    target_status: approved
+  - id: spec-stage:DLT-005
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:56:55.356Z
+    change_request: "run 10: role timeouts, architect scope, yaml-invalid lint"
+    scope: first-time-approval
+    target_status: approved

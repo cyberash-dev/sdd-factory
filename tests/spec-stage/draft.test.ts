@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Tool } from "@mozaik-ai/core";
 import { DEFAULT_CONFIG } from "../../src/shared/config.js";
+import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { runDraft } from "../../src/spec-stage/application/draft.js";
 import { createStageClock } from "../../src/spec-stage/application/stage-clock.js";
 import { analystHandoff, CLI_SPEC, effectContext, exitZero, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type StageWorkspace } from "./harness.js";
@@ -121,6 +122,51 @@ describe("spec.draft effect", () => {
     await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands, clock: createStageClock() });
 
     expect(published).toEqual([{ type: "spec.blocked", producer: "spec-analyst", payload: { reason: "analyst_blocked", detail: 'lint_failed: {"diagnostics":[{"rule":"sdd:weasel-word"}]}' } }]);
+  });
+
+  // @covers spec-stage:DLT-005
+  // @covers spec-stage:BEH-001
+  it("appends yaml_invalid diagnostics with exit 1 to a lint sdd itself passed when a record fence does not parse", async () => {
+    const ws = await stageWorkspace(CLI_SPEC.replace("title: todo add <text>", "title: `todo add` stores: items"));
+    let lintResult = "";
+    const roles = scriptedRoles([
+      async (request) => {
+        lintResult = String(await toolNamed(request.tools, "run_sdd").invoke({ argv: "lint --format=json" }));
+        await writeText(handoffPath(ws), analystHandoff(1));
+      },
+    ]);
+    const { context } = effectContext(runStateAt("spec_drafting"));
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands: scriptedCommands(sddReplies({})), clock: createStageClock() });
+
+    expect([lintResult.startsWith("exit 1\n"), lintResult.includes("yaml_invalid todo-cli:CTR-001 (spec/spec.md")]).toEqual([true, true]);
+  });
+
+  // @covers spec-stage:DLT-005
+  it("blocks the draft with the yaml_invalid diagnostics when the analyst claims lint_exit 0 over an unparseable fence", async () => {
+    const ws = await stageWorkspace(CLI_SPEC.replace("title: todo add <text>", "title: `todo add` stores: items"));
+    const roles = scriptedRoles([() => writeText(handoffPath(ws), analystHandoff(1))]);
+    const { context, published } = effectContext(runStateAt("spec_drafting"));
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands: scriptedCommands(sddReplies({})), clock: createStageClock() });
+
+    expect([published[0]?.type, published[0]?.payload["reason"], String(published[0]?.payload["detail"]).includes("yaml_invalid todo-cli:CTR-001")]).toEqual(["spec.blocked", "analyst_blocked", true]);
+  });
+
+  // @covers factory:BEH-011
+  it("re-runs the analyst with the timeout note when its loop exceeds the budget, then publishes spec.drafted", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const roles = scriptedRoles([
+      () => {
+        throw new ApiRoleTimeoutError("spec-analyst exceeded 1200000 ms");
+      },
+      () => writeText(handoffPath(ws), analystHandoff(1)),
+    ]);
+    const { context, published } = effectContext(runStateAt("spec_drafting"));
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands: scriptedCommands(sddReplies({})), clock: createStageClock() });
+
+    expect([roles.requests.length, roles.requests[1]?.message.includes("without a handoff; continue from the files on disk and write the handoff first"), published.map((event) => event.type)]).toEqual([2, true, ["spec.drafted"]]);
   });
 
   it("blocks a handoff that claims complete with a non-zero lint_exit without re-running", async () => {

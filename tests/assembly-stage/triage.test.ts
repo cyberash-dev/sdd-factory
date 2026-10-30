@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { triageEffect } from "../../src/assembly-stage/application/triage.js";
+import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { writeTextAtomic } from "../../src/shared/fs/text.js";
 import { collectingContext, commitFiles, fakeCommandRunner, initRepo, runState, scriptedApiRoles, sliceContext, taskState, tempDir } from "./support.js";
 
@@ -72,6 +73,24 @@ describe("assembly.triage", () => {
       [["run.failed", "unparseable_handoff"]],
       ["handoff.md.rejected-1", "handoff.md.rejected-2"],
     ]);
+  });
+
+  // @covers factory:BEH-011
+  it("re-runs the role with the timeout note when its loop exceeds the budget and publishes the second route", async () => {
+    const { root, evidencePath, state } = await fixture();
+    let invocation = 0;
+    const apiRoles = scriptedApiRoles(async () => {
+      invocation += 1;
+      if (invocation === 1) {
+        throw new ApiRoleTimeoutError("triage exceeded 1200000 ms");
+      }
+      return handoff('  task_id: T-002\n  target: implementer\n  reason: "compile error in src/store/index.ts"');
+    });
+    const context = collectingContext(state);
+
+    await triageEffect(fakeCommandRunner(() => undefined))({ kind: "assembly.triage", round: 1, step: "typecheck", evidencePath }, context, sliceContext({ root, apiRoles }));
+
+    expect([apiRoles.requests.length, apiRoles.requests[1]?.message.includes("without a handoff; continue from the files on disk and write the handoff first"), context.published.map((event) => event.type)]).toEqual([2, true, ["assembly.triaged"]]);
   });
 
   // @covers assembly-stage:BEH-005

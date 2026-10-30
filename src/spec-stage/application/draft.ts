@@ -9,6 +9,7 @@ import { isRecord } from "../domain/guards.js";
 import { effectInteger, effectStringOrNull } from "./effect-fields.js";
 import { invokeRole, promptBody, type HandoffVerdict } from "./role-invocation.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
+import { lintProductSpec } from "./spec-lint.js";
 
 const ANALYST_MESSAGE = `Draft attempt {{attempt}} of the product spec for "{{slug}}".
 Source spec: {{spec_source_path}}
@@ -122,7 +123,7 @@ export async function runDraft(effect: Effect, context: EffectContext, slice: Sl
     concludeStage(deps, context, specBlocked("spec-analyst", reason, outcome.value.blockedReason));
     return;
   }
-  const lint = await deps.commands.run(["lint", "--format=json"], productDir);
+  const lint = await lintProductSpec(deps.commands, productDir);
   if (lint.exitCode !== 0) {
     concludeStage(deps, context, specBlocked("spec-analyst", "analyst_blocked", `lint_failed: ${outputTail(lint)}`));
     return;

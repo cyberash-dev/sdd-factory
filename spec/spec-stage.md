@@ -1098,6 +1098,70 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:56:55.356Z
+    change_request: "run 10: role timeouts, architect scope, yaml-invalid lint"
+    scope: first-time-approval
+partition_id: spec-stage
+title: a record fence the yaml parser rejects is a lint diagnostic, not an invisible record
+target_ids:
+  - spec-stage:BEH-001
+  - spec-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  `sdd lint` skips a record fence whose yaml has errors instead of
+  reporting it: in run 10 nine of 63 records (values starting with a
+  backtick, plain values containing ": ") were never linted, were
+  approved anyway, and were invisible to the foreman's integrity checks,
+  which then warned about assumptions whose Open-Q "did not exist". The
+  factory closes the gap on its side. The `sdd_lint` tool the analyst
+  calls (spec-stage:BEH-001) and the foreman's own lint after the
+  handoff parse every ```yaml fence of spec/spec.md and
+  spec/assumptions.md with the same yaml parser sdd uses; a fence with
+  errors yields one diagnostic `yaml_invalid <id or "fence at line N">:
+  <parser message> (line L, column C)` appended to sdd's output, and
+  the lint result counts as failed (exit code 1 when sdd itself exited
+  0). The analyst repairs it within the lint-cycle cap like any
+  diagnostic. spec-stage:CTR-001 gains the rule "every record fence
+  parses without yaml errors". The parser the factory uses for its own
+  record checks keeps rejecting such fences; once the lint loop enforces
+  validity it sees every record.
+tests_old_behavior:
+  - a spec whose fences all parse lints exactly as sdd reports
+tests_new_behavior:
+  - to:spec-stage:BEH-001
+  - to:spec-stage:CTR-001
+test_obligation:
+  predicate: |
+    Given sdd lint exiting 0 on a spec with one fence whose value starts
+    with a backtick and one whose plain value contains ": ", the
+    sdd_lint tool result names both records with yaml_invalid and a
+    line number and reports exit 1; with every fence valid the tool
+    returns sdd's result unchanged; the foreman's post-handoff lint
+    blocks with the same diagnostics when the analyst claims lint_exit 0
+    over an invalid fence.
+  test_template: integration
+  boundary_classes:
+    - backtick-leading value
+    - colon-space inside a plain value
+    - every fence valid
+  failure_scenarios:
+    - the diagnostic without the record id
+    - exit 0 despite an invalid fence
+---
+```
+
 ---
 
 ## 16. Implementation bindings

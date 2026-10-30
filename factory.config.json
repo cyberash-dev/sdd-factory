@@ -26,7 +26,7 @@
     "lane": null,
     "effort": {
       "spec-analyst": "high",
-      "architect": "high",
+      "architect": "medium",
       "verification-designer": "high",
       "planner": "high"
     }

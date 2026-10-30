@@ -2,6 +2,7 @@ import { rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../bus/domain/handoff.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
+import { isRoleTimeout, roleTimeoutNote } from "../../shared/llm/api-role-runner.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { fileTools } from "../adapters/outbound/role-tools.js";
 import { createFirewall } from "../domain/firewall.js";
@@ -53,8 +54,10 @@ function scopeFor(slice: SliceContext, role: StageRole): RoleScope {
     "verification-designer": [design("verification.md")],
     planner: [design("tasks.json"), design("plan.md")],
   };
+  /* design-stage:DLT-003: the architect owns TD-TOOLING, so it may read the files the bootstrap scaffolded. */
+  const toolingFiles = role === "architect" ? ["package.json", "tsconfig.json", "vitest.config.ts"].map((file) => join(productDir, file)) : [];
   return {
-    reads: [specSourcePath, join(productDir, "spec"), join(productDir, "design")],
+    reads: [specSourcePath, join(productDir, "spec"), join(productDir, "design"), ...toolingFiles],
     writes: [...ownFiles[role], join(handoffsDir, role)],
     lists: [productDir],
     deniedReads: forbiddenReadsFor(slice, role),
@@ -99,8 +102,17 @@ export async function runStageRole(slice: SliceContext, request: StageRoleReques
   let message = request.message;
   let reruns = 0;
   for (;;) {
-    const run = await slice.apiRoles.run({ role: request.role, instruction, message, model, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), `tools-run${reruns + 1}.jsonl`) });
-    usage = addUsage(usage, run);
+    let timedOut = false;
+    try {
+      const run = await slice.apiRoles.run({ role: request.role, instruction, message, model, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), `tools-run${reruns + 1}.jsonl`) });
+      usage = addUsage(usage, run);
+    } catch (error) {
+      if (!isRoleTimeout(error)) {
+        throw error;
+      }
+      /* factory:BEH-011: a handoff written before the budget ran out still counts; otherwise the timeout is a re-run. */
+      timedOut = true;
+    }
     const violations = firewall.violations();
     if (violations.length > 0) {
       return { kind: "blocked", reason: "context_firewall_violation", detail: `${request.role} read ${violations.join(", ")}`, usage, reruns };
@@ -112,13 +124,13 @@ export async function runStageRole(slice: SliceContext, request: StageRoleReques
       }
       return { kind: "complete", handoff: parsed.handoff, usage, reruns };
     }
-    const error = describeHandoffError(parsed.error);
+    const error = timedOut ? `${request.role}_timeout: exceeded ${slice.config.timeouts.apiRoleMs} ms without a handoff` : describeHandoffError(parsed.error);
     await keepRejected(handoffPath, reruns + 1);
-    slice.log(`design-stage: ${request.role} handoff unparseable (${error}), reruns so far ${reruns}`);
+    slice.log(`design-stage: ${request.role} ${timedOut ? "timed out" : `handoff unparseable (${error})`}, reruns so far ${reruns}`);
     if (reruns >= slice.config.caps.handoffRerun) {
-      return { kind: "blocked", reason: `${request.role}_unparseable_handoff`, detail: error, usage, reruns };
+      return { kind: "blocked", reason: timedOut ? `${request.role}_timeout` : `${request.role}_unparseable_handoff`, detail: error, usage, reruns };
     }
     reruns += 1;
-    message = request.message + slice.prompts.render(HANDOFF_RERUN_SUFFIX, { handoff_path: handoffPath, handoff_error: error });
+    message = request.message + (timedOut ? roleTimeoutNote(slice.config.timeouts.apiRoleMs) : slice.prompts.render(HANDOFF_RERUN_SUFFIX, { handoff_path: handoffPath, handoff_error: error }));
   }
 }

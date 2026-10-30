@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSpecRecords, repairSurfaceMembers, specIntegrityProblems, specIntegrityWarnings } from "./spec-records.js";
+import { parseSpecRecords, repairSurfaceMembers, specIntegrityProblems, specIntegrityWarnings, yamlInvalidDiagnostics } from "./spec-records.js";
 
 function record(id: string, type: string, body: string): string {
   return `\`\`\`yaml\n---\nid: ${id}\ntype: ${type}\nlifecycle: {status: proposed}\n${body}\n---\n\`\`\`\n`;
@@ -124,5 +124,29 @@ describe("surface membership repair", () => {
     ["two", SURFACE + SURFACE.replace("SUR-001", "SUR-002") + CONTRACTS],
   ])("declines to repair a spec with %s surfaces", (_count, spec) => {
     expect(repairSurfaceMembers(spec)).toBeNull();
+  });
+});
+
+describe("yaml validity of record fences", () => {
+  // @covers spec-stage:DLT-005
+  // @covers spec-stage:CTR-001
+  it("names the record whose plain value starts with a backtick and the one whose value holds a colon-space", () => {
+    const spec = SURFACE + record("todo-cli:CTR-001", "Contract", "title: `todo add` stores") + record("todo-cli:OQ-001", "Open-Q", "question: exit 2: usage error?");
+
+    const diagnostics = yamlInvalidDiagnostics(spec, "spec/spec.md");
+
+    expect([diagnostics.length, diagnostics[0]?.startsWith("yaml_invalid todo-cli:CTR-001 (spec/spec.md"), diagnostics[0]?.includes("line"), diagnostics[1]?.startsWith("yaml_invalid todo-cli:OQ-001 (spec/spec.md")]).toEqual([2, true, true, true]);
+  });
+
+  // @covers spec-stage:DLT-005
+  it("reports nothing when every fence parses", () => {
+    expect(yamlInvalidDiagnostics(SURFACE + CONTRACTS, "spec/spec.md")).toEqual([]);
+  });
+
+  // @covers spec-stage:DLT-005
+  it("names a fence without an id by its line in the file", () => {
+    const spec = SURFACE + "```yaml\n---\ntitle: `x`\n---\n```\n";
+
+    expect(yamlInvalidDiagnostics(spec, "spec/spec.md").map((line) => line.split(", record at line")[0])).toEqual(["yaml_invalid fence at line 11 (spec/spec.md"]);
   });
 });
