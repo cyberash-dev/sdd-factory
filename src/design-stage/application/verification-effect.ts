@@ -11,7 +11,7 @@ import { approvedRecordIds, VERIFICATION_BLOCK_TYPES } from "./eligible-ids.js";
 import { VERIFICATION_DESIGNER_MESSAGE } from "./messages.js";
 import { addUsage, handoffPathOf, runStageRole, zeroUsage, type StageRoleOutcome } from "./stage-role.js";
 
-type Problems = { readonly kind: "blocked"; readonly reason: string; readonly detail: string } | { readonly kind: "rework"; readonly detail: string } | { readonly kind: "ok" };
+type Problems = { readonly kind: "blocked"; readonly reason: string; readonly detail: string } | { readonly kind: "rework"; readonly reason: string; readonly detail: string } | { readonly kind: "ok" };
 
 async function inspectVerificationMd(slice: SliceContext, commands: CommandRunner): Promise<Problems> {
   const text = await readTextOrNull(join(slice.paths.productDir, VERIFICATION_MD));
@@ -23,7 +23,8 @@ async function inspectVerificationMd(slice: SliceContext, commands: CommandRunne
     design = parseVerificationMd(text);
   } catch (error) {
     if (error instanceof VerificationMdParseError) {
-      return { kind: "blocked", reason: "verification_md_invalid", detail: error.message };
+      /* design-stage:DLT-001: the parser message goes back to the designer once; a second unusable file blocks. */
+      return { kind: "rework", reason: "verification_md_invalid", detail: error.message };
     }
     throw error;
   }
@@ -35,7 +36,7 @@ async function inspectVerificationMd(slice: SliceContext, commands: CommandRunne
       findings.push(`block_references_file_path: ${block.id} (${references.join(", ")})`);
     }
   }
-  return findings.length === 0 ? { kind: "ok" } : { kind: "rework", detail: findings.join("; ") };
+  return findings.length === 0 ? { kind: "ok" } : { kind: "rework", reason: "verification_incomplete", detail: findings.join("; ") };
 }
 
 async function invoke(slice: SliceContext, attempt: number, reworkFinding: string): Promise<StageRoleOutcome> {
@@ -50,7 +51,7 @@ async function invoke(slice: SliceContext, attempt: number, reworkFinding: strin
   return runStageRole(slice, { role: "verification-designer", message });
 }
 
-/* design-stage:CTR-002: a missing block or a file-path reference re-runs the designer once inside this effect, then blocks. */
+/* design-stage:CTR-002 and DLT-001: a missing block, a file-path reference or a file the parser rejects re-runs the designer once inside this effect, then blocks. */
 export async function runVerificationEffect(effect: Effect, context: EffectContext, slice: SliceContext, commands: CommandRunner): Promise<void> {
   let attempt = effectInteger(effect, "attempt", 1);
   let reworkFinding = "";
@@ -70,7 +71,7 @@ export async function runVerificationEffect(effect: Effect, context: EffectConte
       return;
     }
     if (problems.kind === "blocked" || round === 1) {
-      publishBlocked(context, problems.kind === "blocked" ? problems.reason : "verification_incomplete", problems.detail, usage, reruns);
+      publishBlocked(context, problems.reason, problems.detail, usage, reruns);
       return;
     }
     slice.log(`design-stage: verification-designer rework: ${problems.detail}`);

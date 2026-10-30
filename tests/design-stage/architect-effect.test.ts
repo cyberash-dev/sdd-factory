@@ -95,14 +95,34 @@ describe("design.architect effect", () => {
   });
 
   // @covers design-stage:CTR-001
-  it("blocks the design with tech_md_invalid when TD-TOOLING is missing", async () => {
+  // @covers design-stage:DLT-001
+  it("routes a missing TD-TOOLING section to the architect as design.rework carrying the parser message", async () => {
     const h = await harness({ scripts: { architect: [architectWriting(techMdText({ withTooling: false }))] } });
 
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
-    expect(h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])).toEqual([["design.blocked", "tech_md_invalid", "missing section: ## TD-TOOLING"]]);
+    expect(h.published.map((event) => [event.type, event.payload["target"], event.payload["reason"]])).toEqual([["design.rework", "architect", "missing section: ## TD-TOOLING"]]);
   });
 
+  // @covers design-stage:DLT-001
+  it("routes an unparseable TD-TOOLING block to the architect as design.rework carrying the parser message", async () => {
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText({ tsconfig: "{ strict: [true" }))] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect(h.published.map((event) => [event.type, event.payload["target"], String(event.payload["reason"]).startsWith("TD-TOOLING yaml invalid:")])).toEqual([["design.rework", "architect", true]]);
+  });
+
+  // @covers design-stage:DLT-001
+  it("blocks the design with tech_md_invalid when a repair attempt's file does not parse either", async () => {
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText({ tsconfig: "{ strict: [true" }))] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 2, reworkFinding: "TD-TOOLING yaml invalid: earlier" }, h.context(stateIn("designing")), h.slice);
+
+    expect(h.published.map((event) => [event.type, event.payload["reason"], String(event.payload["detail"]).startsWith("TD-TOOLING yaml invalid:")])).toEqual([["design.blocked", "tech_md_invalid", true]]);
+  });
+
+  // @covers design-stage:DLT-001
   it("blocks the design with tech_md_invalid when the architect never wrote tech.md", async () => {
     const onlyHandoff: RoleScript = async (request) => {
       await writeVia(request, handoffPathIn(request), handoffText("architect", 1, ARCHITECT_HANDOFF_LINES));

@@ -34,15 +34,16 @@ export async function runArchitectEffect(effect: Effect, context: EffectContext,
   try {
     parseTechMd(text);
   } catch (error) {
-    if (error instanceof UnpinnedDependencyError) {
-      context.publish(pending("design.rework", { target: "architect", reason: error.message, attempt: designReworkAttempt(context.state), specIds, usage: outcome.usage, handoffReruns: outcome.reruns }));
-      return;
+    if (!(error instanceof UnpinnedDependencyError || error instanceof TechMdParseError)) {
+      throw error;
     }
-    if (error instanceof TechMdParseError) {
+    /* design-stage:DLT-001: a file the parser rejects goes back to the architect once; a repair attempt's unusable file blocks. */
+    if (error instanceof TechMdParseError && attempt > 1) {
       publishBlocked(context, "tech_md_invalid", error.message, outcome.usage, outcome.reruns);
       return;
     }
-    throw error;
+    context.publish(pending("design.rework", { target: "architect", reason: error.message, attempt: designReworkAttempt(context.state), specIds, usage: outcome.usage, handoffReruns: outcome.reruns }));
+    return;
   }
   context.publish(pending("design.tech.ready", { path: TECH_MD, specIds, usage: outcome.usage, handoffReruns: outcome.reruns }));
 }

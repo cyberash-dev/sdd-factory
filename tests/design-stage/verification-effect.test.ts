@@ -74,15 +74,49 @@ describe("design.verification effect", () => {
     expect([h.roleCalls[1]?.message.includes("block_references_file_path: todo-cli:CTR-001 (src/cli/parse.ts)"), h.published.map((event) => event.type)]).toEqual([true, ["design.verification.ready"]]);
   });
 
-  it("blocks the design with verification_md_invalid when the file has no blocks", async () => {
+  // @covers design-stage:DLT-001
+  // @covers design-stage:CTR-002
+  it("re-runs the designer once with the parser message when the file does not parse, then accepts a valid file", async () => {
+    const broken = designerWriting(verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"], "notes: 'it isn't yaml'"));
+    const h = await harness({ scripts: { "verification-designer": [broken, designerWriting(verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"]))] } });
+
+    await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
+
+    expect([h.roleCalls.length, h.roleCalls[1]?.message.includes("- rework_finding: block todo-cli:CTR-001: yaml invalid:"), h.published.map((event) => event.type)]).toEqual([2, true, ["design.verification.ready"]]);
+  });
+
+  // @covers design-stage:DLT-001
+  it("blocks the design with verification_md_invalid when the second file does not parse either", async () => {
+    const broken = designerWriting(verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"], "notes: 'it isn't yaml'"));
+    const h = await harness({ scripts: { "verification-designer": [broken, broken, broken] } });
+
+    await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
+
+    expect([h.roleCalls.length, h.published.map((event) => [event.type, event.payload["reason"], String(event.payload["detail"]).startsWith("block todo-cli:CTR-001: yaml invalid:")])]).toEqual([2, [["design.blocked", "verification_md_invalid", true]]]);
+  });
+
+  // @covers design-stage:DLT-001
+  it("blocks the design with verification_md_invalid when both files have no blocks", async () => {
     const empty: RoleScript = async (request) => {
       await writeVia(request, "design/verification.md", "# Verification design: todo-cli\n## 3. Blocks\nnone\n");
       await writeVia(request, handoffPathIn(request), handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
     };
-    const h = await harness({ scripts: { "verification-designer": [empty] } });
+    const h = await harness({ scripts: { "verification-designer": [empty, empty] } });
 
     await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
 
-    expect(h.published.map((event) => [event.type, event.payload["reason"]])).toEqual([["design.blocked", "verification_md_invalid"]]);
+    expect([h.roleCalls.length, h.published.map((event) => [event.type, event.payload["reason"]])]).toEqual([2, [["design.blocked", "verification_md_invalid"]]]);
+  });
+
+  // @covers design-stage:DLT-001
+  it("blocks the design at once when the designer never wrote the file", async () => {
+    const onlyHandoff: RoleScript = async (request) => {
+      await writeVia(request, handoffPathIn(request), handoffText("verification-designer", 1, VERIFICATION_HANDOFF_LINES));
+    };
+    const h = await harness({ scripts: { "verification-designer": [onlyHandoff, onlyHandoff] } });
+
+    await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
+
+    expect([h.roleCalls.length, h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])]).toEqual([1, [["design.blocked", "verification_md_invalid", "design/verification.md was not written"]]]);
   });
 });
