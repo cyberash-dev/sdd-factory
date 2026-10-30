@@ -107,4 +107,4 @@ obligations:
 ---
 ```
 
-`obligations` lists every block of `{{verification_md}}`; `input_classes` is the number of entries in that block's `input_classes`; `negative_oracle` is `true` when the block has ≥1 negative oracle entry. `status: blocked` only when `spec/spec.md` is missing, unparseable, or has no approved record. A missing or malformed frontmatter is treated as failure.
+`obligations` lists every block of `{{verification_md}}`; `input_classes` is the number of entries in that block's `input_classes`; `negative_oracle` is `true` when the block has ≥1 negative oracle entry. `status: blocked` only when `spec/spec.md` is missing, unparseable, or has no approved record. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

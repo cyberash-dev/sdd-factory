@@ -80,4 +80,4 @@ findings:
 ---
 ```
 
-`target` is `none` with `approve` and `advisory_only`; `findings` is `[]` with `approve`; `task_id`, `mode` and `impl_sha` repeat the values given in the first message. The body carries exactly these headings in this order: `## Scope checked`, `## Spec conformance` (one line per covered id), `## Findings`, `## Verdict rationale`. A missing or malformed frontmatter is treated as failure.
+`target` is `none` with `approve` and `advisory_only`; `findings` is `[]` with `approve`; `task_id`, `mode` and `impl_sha` repeat the values given in the first message. The body carries exactly these headings in this order: `## Scope checked`, `## Spec conformance` (one line per covered id), `## Findings`, `## Verdict rationale`. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

@@ -96,7 +96,8 @@ describe("handoff frontmatter protocol", () => {
     ["missing file", null, "missing_file"],
     ["no frontmatter", "role: triage\nattempt: 1\n", "missing_frontmatter"],
     ["unterminated frontmatter", "---\nrole: triage\nattempt: 1\n", "missing_frontmatter"],
-    ["yaml parse error", "---\nrole: triage\nattempt: [\n---\n", "yaml_parse_error"],
+    ["yaml parse error", "---\nrole: triage\nattempt: [\n---\n", "yaml_parse_error:Flow sequence in block collection must be sufficiently indented and end with a ] at line 2, column 11:"],
+    ["unquoted colon-space in a value", "---\nrole: triage\nattempt: 1\nreason: usage errors: add the trigger\n---\n", "yaml_parse_error:Nested mappings are not allowed in compact mappings at line 3, column 9:"],
     ["role mismatch", fileWith(COMPLETE_FRONTMATTER["planner"]), "invalid_enum_value:role"],
     ["attempt zero", "---\nrole: triage\nattempt: 0\nstatus: complete\nroute: {}\n---\n", "invalid_enum_value:attempt"],
   ] as const)("classifies %s", (_label, text, expected) => {

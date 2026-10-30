@@ -99,4 +99,4 @@ uncovered_ids: []
 ---
 ```
 
-`task_count` equals the length of `tasks` in `{{tasks_json}}`; `uncovered_ids` must be empty when `status: complete`. A missing or malformed frontmatter is treated as failure.
+`task_count` equals the length of `tasks` in `{{tasks_json}}`; `uncovered_ids` must be empty when `status: complete`. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

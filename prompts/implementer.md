@@ -80,4 +80,4 @@ finding:
 ---
 ```
 
-`finding` is present only with `status: finding`; `blocked` is reserved for unusable inputs (frozen test list empty, interface section absent) and takes the reason in the body. A missing or malformed frontmatter is treated as failure.
+`finding` is present only with `status: finding`; `blocked` is reserved for unusable inputs (frozen test list empty, interface section absent) and takes the reason in the body. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

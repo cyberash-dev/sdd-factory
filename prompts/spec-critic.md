@@ -108,10 +108,10 @@ findings:
   - id: GA-001
     kind: gap|conflict|weasel|untestable|missing_negative|unmodeled_term
     target_ids: []
-    required_change: <text>
+    required_change: "<edit instruction in record terms, one sentence>"
     resolution: decide|assume
 assumptions_added: [{{slug}}:ASM-NNN]
 ---
 ```
 
-`findings` and `assumptions_added` are `[]` on a clean spec; `assumptions_added` lists every ASSUMPTION body in ga.md, new or replacement. Body after the frontmatter: two sentences on the verdict. A missing or malformed frontmatter is treated as failure.
+`findings` and `assumptions_added` are `[]` on a clean spec; `assumptions_added` lists every ASSUMPTION body in ga.md, new or replacement. Body after the frontmatter: two sentences on the verdict. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

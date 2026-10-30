@@ -97,8 +97,8 @@ attempt: {{attempt}}
 status: complete|blocked
 lint_exit: <int>
 records: {behaviors: <int>, contracts: <int>, invariants: <int>, scenarios: <int>, constraints: <int>, policies: <int>, open_questions: <int>, assumptions: <int>}
-blocked_reason: <text, only when blocked>
+blocked_reason: "<text, only when blocked>"
 ---
 ```
 
-Body: choices the source did not fix; on rework the GA => records map. A missing or malformed frontmatter is treated as failure.
+Body: choices the source did not fix; on rework the GA => records map. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

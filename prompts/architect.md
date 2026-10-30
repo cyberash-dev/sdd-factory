@@ -121,4 +121,4 @@ tooling:
 ---
 ```
 
-`modules` lists every module of `{{tech_md}}`; `tooling` repeats TD-TOOLING. A missing or malformed frontmatter is treated as failure.
+`modules` lists every module of `{{tech_md}}`; `tooling` repeats TD-TOOLING. Every free-text value in the frontmatter is a double-quoted YAML string (for example `required_change: "..."`); a bare colon followed by a space inside an unquoted value breaks the parse. A missing or malformed frontmatter is treated as failure.

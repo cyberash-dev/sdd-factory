@@ -143,8 +143,8 @@ export function parseHandoff(role: HandoffRole, text: string | null): HandoffRes
   let parsed: unknown;
   try {
     parsed = YAML.parse(split.yamlText);
-  } catch {
-    return fail("yaml_parse_error", null);
+  } catch (error) {
+    return fail("yaml_parse_error", (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? null);
   }
   if (!isRecord(parsed)) {
     return fail("yaml_parse_error", null);
