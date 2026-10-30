@@ -47,9 +47,10 @@ describe("factory-cli surface after the member and provider-key deltas", () => {
   });
 
   // @covers factory:DLT-005
-  it("carries version 0.6.0 after termination signals joined the surface", async () => {
+  // @covers factory:DLT-011
+  it("carries version 0.7.0 after the replay subcommand joined the surface", async () => {
     const surface = await surfaceRecord("factory.md", "factory:SUR-001");
 
-    expect(surface.version).toBe("0.6.0");
+    expect(surface.version).toBe("0.7.0");
   });
 });

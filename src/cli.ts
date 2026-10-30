@@ -4,9 +4,10 @@ import { ExecCommandRunner } from "./factory/adapters/outbound/exec-command-runn
 import { startRun } from "./factory/application/compose.js";
 import { readRunManifest, ResumeError } from "./factory/application/resume.js";
 import { NudgeError, recordNudge } from "./factory/application/nudge.js";
+import { replayEvent, replayLine } from "./factory/application/replay.js";
 import { fileExists, preflight, PreflightError } from "./factory/application/preflight.js";
 import { failureReport, successSummary } from "./factory/application/terminal-report.js";
-import { parseArgv, type ResumeCommand, USAGE, UsageError } from "./factory/domain/argv.js";
+import { parseArgv, type ReplayCommand, type ResumeCommand, USAGE, UsageError } from "./factory/domain/argv.js";
 import { exitCodeOf } from "./factory/domain/run-manifest.js";
 import { loadConfig, mergeConfig } from "./shared/config.js";
 import { createRedactor } from "./shared/redaction.js";
@@ -54,6 +55,27 @@ async function resumeLaunch(repoRoot: string, command: ResumeCommand): Promise<L
   return { specPath: source.specPath, operatorFlag: source.operator, resume: { fromRunId: command.runId, note: command.note, force: command.force } };
 }
 
+/* factory:DLT-011: events go to stdout as JSON lines, effect logs to stderr; nothing is published. */
+async function replayCommand(repoRoot: string, command: ReplayCommand, env: Readonly<Record<string, string | undefined>>): Promise<number> {
+  const outcome = await replayEvent({
+    repoRoot,
+    runId: command.runId,
+    target: command.event,
+    config: await loadConfig(join(repoRoot, "factory.config.json")),
+    /* Without the project key the trace slice builds no cloud mirror, so a replay never opens a Mozaik cloud session. */
+    stageSlices: stageSlices({ ...env, MOZAIK_API_KEY: "" }),
+    commandRunner: new ExecCommandRunner(),
+    versions: await toolchainVersions(repoRoot),
+    now: () => new Date(),
+    log: (line) => process.stderr.write(`[factory] ${redactLog(line)}\n`),
+    env,
+  });
+  for (const event of outcome.events) {
+    process.stdout.write(replayLine(event));
+  }
+  return outcome.exitCode;
+}
+
 async function runCommand(argv: readonly string[]): Promise<number> {
   const command = parseArgv(argv);
   const repoRoot = process.cwd();
@@ -66,6 +88,9 @@ async function runCommand(argv: readonly string[]): Promise<number> {
   /* trace:EXT-001 keeps one cloud transport per runtime: Mozaik core would otherwise open a cloud session per agent loop. */
   process.env["MOZAIK_API_KEY"] = "";
   silenceCoreCloudWarning();
+  if (command.kind === "replay") {
+    return replayCommand(repoRoot, command, env);
+  }
   const baseConfig = await loadConfig(join(repoRoot, "factory.config.json"));
   const launch = command.kind === "resume" ? await resumeLaunch(repoRoot, command) : { specPath: command.specPath, operatorFlag: command.operator, resume: null };
   const checked = await preflight({

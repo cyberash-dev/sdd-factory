@@ -23,7 +23,15 @@ export interface ResumeCommand {
   readonly maxParallelLanes: number | null;
 }
 
-export type FactoryCommand = RunCommand | NudgeCommand | ResumeCommand;
+export type ReplayTarget = { readonly kind: "seq"; readonly seq: number } | { readonly kind: "last" };
+
+export interface ReplayCommand {
+  readonly kind: "replay";
+  readonly runId: string;
+  readonly event: ReplayTarget;
+}
+
+export type FactoryCommand = RunCommand | NudgeCommand | ResumeCommand | ReplayCommand;
 
 export class UsageError extends Error {
   override readonly name = "UsageError";
@@ -33,6 +41,7 @@ export const USAGE = [
   "usage: factory run <spec.md> [--operator <identity>] [--no-push] [--out <dir>] [--max-parallel-lanes <1..8>]",
   "       factory nudge <runId> --note <text>",
   "       factory resume <runId> [--note <text>] [--force] [--no-push] [--out <dir>] [--max-parallel-lanes <1..8>]",
+  "       factory replay <runId> (--event <seq> | --last)",
 ].join("\n");
 
 function takeValue(argv: readonly string[], index: number, flag: string): string {
@@ -160,6 +169,42 @@ function parseResume(argv: readonly string[]): ResumeCommand {
   return { kind: "resume", runId, note, force, push, outDir, maxParallelLanes };
 }
 
+function parseSeq(raw: string): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new UsageError(`--event must be a positive integer seq, got ${raw}`);
+  }
+  return parsed;
+}
+
+function parseReplay(argv: readonly string[]): ReplayCommand {
+  let runId: string | null = null;
+  let event: ReplayTarget | null = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index] ?? "";
+    if (argument === "--event" || argument === "--last") {
+      if (event !== null) {
+        throw new UsageError("--event and --last are mutually exclusive");
+      }
+      event = argument === "--last" ? { kind: "last" } : { kind: "seq", seq: parseSeq(takeValue(argv, index, argument)) };
+      index += argument === "--event" ? 1 : 0;
+    } else if (argument.startsWith("--")) {
+      throw new UsageError(`unknown flag ${argument}`);
+    } else if (runId === null) {
+      runId = argument;
+    } else {
+      throw new UsageError(`unexpected positional argument ${argument}`);
+    }
+  }
+  if (runId === null) {
+    throw new UsageError("missing <runId>");
+  }
+  if (event === null) {
+    throw new UsageError("one of --event <seq> or --last is required");
+  }
+  return { kind: "replay", runId, event };
+}
+
 export function parseArgv(argv: readonly string[]): FactoryCommand {
   const [subcommand, ...rest] = argv;
   switch (subcommand) {
@@ -169,6 +214,8 @@ export function parseArgv(argv: readonly string[]): FactoryCommand {
       return parseNudge(rest);
     case "resume":
       return parseResume(rest);
+    case "replay":
+      return parseReplay(rest);
     case undefined:
       throw new UsageError("missing subcommand");
     default:
