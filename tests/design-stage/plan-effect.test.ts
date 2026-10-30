@@ -56,6 +56,34 @@ describe("design.plan effect", () => {
     expect([h.published.map((event) => [event.type, event.payload["target"], event.payload["attempt"]]), String(h.published[0]?.payload["reason"]).startsWith("overlapping_writes: T-001, T-002: src/"), npmCalls(h)]).toEqual([[["design.rework", "planner", 1]], true, []]);
   });
 
+  // @covers design-stage:DLT-004
+  it("routes a four-task chain to the planner as design.rework naming graph_too_deep, the chain and the cap values", async () => {
+    const chain: TaskInput[] = [
+      { id: "T-001", covers: ["todo-cli:CTR-001", "todo-cli:BEH-002", "todo-cli:CST-001"], writes: ["src/cli/**", "tests/cli/**"] },
+      { id: "T-002", covers: [], writes: ["src/store/**", "tests/store/**"], dependsOn: ["T-001"] },
+      { id: "T-003", covers: [], writes: ["src/report/**", "tests/report/**"], dependsOn: ["T-002"] },
+      { id: "T-004", covers: [], writes: ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], dependsOn: ["T-003"], designRefs: ["M-02"] },
+    ];
+    const h = await harness({ scripts: { planner: [plannerWriting(chain)] }, caps: { graphDepth: 3, minCoversPerTask: 3 } });
+    await seedDesign(h.productDir, techMdText());
+
+    await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), h.slice, h.commandRunner);
+
+    expect(h.published.map((event) => [event.type, event.payload["target"], event.payload["reason"]])).toEqual([
+      ["design.rework", "planner", "graph_too_deep: T-001, T-002, T-003, T-004; task_too_small: T-002 (0 covers), T-003 (0 covers); caps: graphDepth 3, minCoversPerTask 3"],
+    ]);
+  });
+
+  // @covers design-stage:DLT-004
+  it("tells the planner the graphDepth and minCoversPerTask caps in its message", async () => {
+    const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS)] }, caps: { graphDepth: 4, minCoversPerTask: 2 } });
+    await seedDesign(h.productDir, techMdText());
+
+    await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), h.slice, h.commandRunner);
+
+    expect([h.roleCalls[0]?.message.includes("- graph_depth: 4"), h.roleCalls[0]?.message.includes("- min_covers_per_task: 2")]).toEqual([true, true]);
+  });
+
   // @covers design-stage:BEH-002
   it("passes the validator message as rework_finding on the second attempt and numbers the rework by the stage counters", async () => {
     const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS)] } });

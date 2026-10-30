@@ -7,7 +7,7 @@ import { readTextOrNull } from "../../shared/fs/text.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { anyGlobMatches } from "../domain/glob.js";
 import type { RoleUsage } from "../domain/payloads.js";
-import { describeViolations, validateTasks } from "../domain/tasks-validator.js";
+import { describeViolations, validateTasks, type TasksViolation } from "../domain/tasks-validator.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { designReworkAttempt, effectInteger, pending, publishBlocked, reworkFindingText, TASKS_JSON, TECH_MD, VERIFICATION_MD } from "./effect-support.js";
 import { approvedRecordIds, TASK_COVER_TYPES } from "./eligible-ids.js";
@@ -19,6 +19,7 @@ import { installTooling } from "./tooling-install.js";
 type Verdict = { readonly kind: "valid"; readonly tasks: TasksFile } | { readonly kind: "invalid"; readonly reason: string };
 
 const TASK_ID = /T-\d{3}/g;
+const CAP_RULES: readonly string[] = ["graph_too_deep", "task_too_small"];
 const PATH_TOKEN = /[\w.*-]+(?:\/[\w.*-]+)+/g;
 
 async function readPreviousTasks(slice: SliceContext, isRecut: boolean): Promise<TasksFile | null> {
@@ -63,6 +64,12 @@ function unrelatedChanges(previous: TasksFile | null, next: TasksFile, finding: 
   return changedTaskIds(previous, next).filter((id) => !affected.includes(id));
 }
 
+function reworkReason(violations: readonly TasksViolation[], slice: SliceContext): string {
+  const reason = describeViolations(violations);
+  const { graphDepth, minCoversPerTask } = slice.config.caps;
+  return violations.some((violation) => CAP_RULES.includes(violation.rule)) ? `${reason}; caps: graphDepth ${graphDepth}, minCoversPerTask ${minCoversPerTask}` : reason;
+}
+
 async function judgeTasks(slice: SliceContext, commands: CommandRunner, tech: TechDesign, previous: TasksFile | null, finding: string): Promise<Verdict> {
   const text = await readTextOrNull(join(slice.paths.productDir, TASKS_JSON));
   if (text === null) {
@@ -83,9 +90,11 @@ async function judgeTasks(slice: SliceContext, commands: CommandRunner, tech: Te
     moduleIds: tech.modules.map((module) => module.id),
     modulePaths: tech.modules.flatMap((module) => [...module.owns, module.entry]),
     existingPaths: await productPaths(slice.paths.productDir),
+    graphDepth: slice.config.caps.graphDepth,
+    minCoversPerTask: slice.config.caps.minCoversPerTask,
   });
   if (violations.length > 0) {
-    return { kind: "invalid", reason: describeViolations(violations) };
+    return { kind: "invalid", reason: reworkReason(violations, slice) };
   }
   const unrelated = unrelatedChanges(previous, tasks, finding);
   if (unrelated.length > 0) {
@@ -126,6 +135,8 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     handoff_path: handoffPathOf(slice, "planner"),
     attempt: String(attempt),
     rework_finding: finding,
+    graph_depth: String(slice.config.caps.graphDepth),
+    min_covers_per_task: String(slice.config.caps.minCoversPerTask),
   });
   const outcome = await runStageRole(slice, { role: "planner", message });
   if (outcome.kind === "blocked") {

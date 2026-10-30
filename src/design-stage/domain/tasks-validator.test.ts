@@ -14,6 +14,8 @@ function input(tasks: readonly TaskSpec[], overrides: Partial<TasksValidationInp
     moduleIds: ["M-01", "M-02"],
     modulePaths: ["src/cli/**", "src/cli/index.ts", "src/store/**", "src/store/index.ts", "src/index.ts"],
     existingPaths: ["package.json", "tsconfig.json"],
+    graphDepth: 3,
+    minCoversPerTask: 0,
     ...overrides,
   };
 }
@@ -135,6 +137,64 @@ describe("validateTasks", () => {
     const tasks = [valid[0], valid[1], task("T-003", ["todo-cli:BEH-003"], ["src/index.ts", "tests/e2e/**"])].filter((item): item is TaskSpec => item !== undefined);
 
     expect(validateTasks(input(tasks))).toEqual([{ rule: "shared_file_unowned", ids: ["package.json", "tsconfig.json"] }]);
+  });
+
+  // @covers design-stage:DLT-004
+  it("rejects a four-task chain over graphDepth 3 as graph_too_deep naming the chain in dependency order", () => {
+    const tasks = [
+      task("T-001", ["todo-cli:CTR-001"], ["src/cli/**", "tests/cli/**"]),
+      task("T-002", ["todo-cli:CTR-002"], ["src/store/**", "tests/store/**"], { dependsOn: ["T-001"] }),
+      task("T-003", [], ["src/report/**", "tests/report/**"], { dependsOn: ["T-002"] }),
+      task("T-004", ["todo-cli:BEH-003"], ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], { dependsOn: ["T-003"] }),
+    ];
+
+    expect(validateTasks(input(tasks, { graphDepth: 3 }))).toEqual([{ rule: "graph_too_deep", ids: ["T-001", "T-002", "T-003", "T-004"] }]);
+  });
+
+  // @covers design-stage:DLT-004
+  it("accepts a three-level graph of tasks covering three ids each at graphDepth 3", () => {
+    const eligibleIds = ["todo-cli:CTR-001", "todo-cli:CTR-002", "todo-cli:CTR-003", "todo-cli:BEH-001", "todo-cli:BEH-002", "todo-cli:BEH-003", "todo-cli:CST-001", "todo-cli:CST-002", "todo-cli:CST-003"];
+    const tasks = [
+      task("T-001", ["todo-cli:CTR-001", "todo-cli:CTR-002", "todo-cli:CTR-003"], ["src/cli/**", "tests/cli/**"]),
+      task("T-002", ["todo-cli:BEH-001", "todo-cli:BEH-002", "todo-cli:BEH-003"], ["src/store/**", "tests/store/**"], { dependsOn: ["T-001"] }),
+      task("T-003", ["todo-cli:CST-001", "todo-cli:CST-002", "todo-cli:CST-003"], ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], { dependsOn: ["T-002"] }),
+    ];
+
+    expect(validateTasks(input(tasks, { eligibleIds, graphDepth: 3, minCoversPerTask: 3 }))).toEqual([]);
+  });
+
+  // @covers design-stage:DLT-004
+  it("rejects a task covering one id while nine are eligible as task_too_small", () => {
+    const eligibleIds = ["todo-cli:CTR-001", "todo-cli:CTR-002", "todo-cli:CTR-003", "todo-cli:BEH-001", "todo-cli:BEH-002", "todo-cli:BEH-003", "todo-cli:CST-001", "todo-cli:CST-002", "todo-cli:CST-003"];
+    const tasks = [
+      task("T-001", ["todo-cli:CTR-001"], ["src/cli/**", "tests/cli/**"]),
+      task("T-002", ["todo-cli:CTR-002", "todo-cli:CTR-003", "todo-cli:BEH-001", "todo-cli:BEH-002"], ["src/store/**", "tests/store/**"], { designRefs: ["M-02"] }),
+      task("T-003", ["todo-cli:BEH-003", "todo-cli:CST-001", "todo-cli:CST-002", "todo-cli:CST-003"], ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], { dependsOn: ["T-001", "T-002"] }),
+    ];
+
+    expect(validateTasks(input(tasks, { eligibleIds, minCoversPerTask: 3 }))).toEqual([{ rule: "task_too_small", ids: ["T-001 (1 cover)"] }]);
+  });
+
+  // @covers design-stage:DLT-004
+  it("accepts a one-cover task that owns src/index.ts as the composition root", () => {
+    const eligibleIds = ["todo-cli:CTR-001", "todo-cli:CTR-002", "todo-cli:CTR-003", "todo-cli:BEH-001", "todo-cli:BEH-002", "todo-cli:BEH-003", "todo-cli:CST-001", "todo-cli:CST-002", "todo-cli:CST-003"];
+    const tasks = [
+      task("T-001", ["todo-cli:CTR-001", "todo-cli:CTR-002", "todo-cli:CTR-003", "todo-cli:BEH-001"], ["src/cli/**", "tests/cli/**"]),
+      task("T-002", ["todo-cli:BEH-002", "todo-cli:BEH-003", "todo-cli:CST-001", "todo-cli:CST-002"], ["src/store/**", "tests/store/**"], { designRefs: ["M-02"] }),
+      task("T-003", ["todo-cli:CST-003"], ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], { dependsOn: ["T-001", "T-002"] }),
+    ];
+
+    expect(validateTasks(input(tasks, { eligibleIds, minCoversPerTask: 3 }))).toEqual([]);
+  });
+
+  // @covers design-stage:DLT-004
+  it("accepts one-cover tasks when the whole cover set holds fewer ids than minCoversPerTask", () => {
+    const tasks = [
+      task("T-001", ["todo-cli:CTR-001"], ["src/cli/**", "tests/cli/**"]),
+      task("T-002", ["todo-cli:CTR-002"], ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], { dependsOn: ["T-001"] }),
+    ];
+
+    expect(validateTasks(input(tasks, { eligibleIds: ["todo-cli:CTR-001", "todo-cli:CTR-002"], minCoversPerTask: 3 }))).toEqual([]);
   });
 });
 

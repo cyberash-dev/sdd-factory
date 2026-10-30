@@ -9,7 +9,7 @@ import { createRunState, type RunState } from "../../src/bus/domain/run-state.js
 import type { PendingEvent } from "../../src/bus/domain/transition.js";
 import type { EffectContext } from "../../src/bus/ports/outbound/effect-runner.js";
 import type { CommandRequest, CommandResult, CommandRunner } from "../../src/design-stage/ports/outbound/command-runner.js";
-import { DEFAULT_CONFIG } from "../../src/shared/config.js";
+import { DEFAULT_CONFIG, type Caps } from "../../src/shared/config.js";
 import type { ApiRoleRequest, ApiRoleRunner, ApiRoleUsage } from "../../src/shared/llm/api-role-runner.js";
 import { renderTemplate } from "../../src/shared/prompts.js";
 import type { SliceContext } from "../../src/shared/slice.js";
@@ -37,6 +37,7 @@ export interface HarnessOptions {
   readonly scripts: Partial<Record<Producer, readonly RoleScript[]>>;
   readonly records?: readonly SpecRecord[];
   readonly command?: (request: CommandRequest) => CommandResult | null;
+  readonly caps?: Partial<Caps>;
 }
 
 export interface Harness {
@@ -146,7 +147,8 @@ export async function harness(options: HarnessOptions): Promise<Harness> {
   const log: string[] = [];
   const commandRunner = scriptedCommands(options, commands);
   const slice: SliceContext = {
-    config: DEFAULT_CONFIG,
+    /* The fixture spec holds three ids cut 2 + 1 so lanes stay distinguishable; DLT-004 size tests opt back in via caps. */
+    config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, minCoversPerTask: 1, ...options.caps } },
     runId: RUN_ID,
     slug: "todo-cli",
     operator: "cyberash",

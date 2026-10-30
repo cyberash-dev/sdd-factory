@@ -7,6 +7,8 @@ export interface TasksValidationInput {
   readonly moduleIds: readonly string[];
   readonly modulePaths: readonly string[];
   readonly existingPaths: readonly string[];
+  readonly graphDepth: number;
+  readonly minCoversPerTask: number;
 }
 
 export interface TasksViolation {
@@ -131,6 +133,41 @@ function dependencyViolations(tasks: readonly TaskSpec[]): TasksViolation[] {
   return violations;
 }
 
+function longestChain(tasks: readonly TaskSpec[]): readonly string[] {
+  const edges = new Map(tasks.map((task) => [task.id, task.dependsOn] as const));
+  const chains = new Map<string, readonly string[]>();
+  const chainTo = (id: string): readonly string[] => {
+    const known = chains.get(id);
+    if (known !== undefined) {
+      return known;
+    }
+    const prefixes = (edges.get(id) ?? []).filter((dependency) => edges.has(dependency)).map(chainTo);
+    const longest = prefixes.reduce<readonly string[]>((best, chain) => (chain.length > best.length ? chain : best), []);
+    const chain = [...longest, id];
+    chains.set(id, chain);
+    return chain;
+  };
+  return tasks.map((task) => chainTo(task.id)).reduce<readonly string[]>((best, chain) => (chain.length > best.length ? chain : best), []);
+}
+
+/* design-stage:DLT-004: depth counts tasks on the longest dependsOn chain; undefined on a cycle, which dependencyViolations reports. */
+function depthViolations(tasks: readonly TaskSpec[], graphDepth: number): TasksViolation[] {
+  if (findCycle(tasks) !== null) {
+    return [];
+  }
+  const chain = longestChain(tasks);
+  return chain.length > graphDepth ? [{ rule: "graph_too_deep", ids: chain }] : [];
+}
+
+/* design-stage:DLT-004: the composition root (owner of src/index.ts) wires rather than covers, so it is exempt. */
+function sizeViolations(tasks: readonly TaskSpec[], eligibleCount: number, minCoversPerTask: number): TasksViolation[] {
+  if (eligibleCount < minCoversPerTask) {
+    return [];
+  }
+  const small = tasks.filter((task) => task.covers.length < minCoversPerTask && !anyGlobMatches(task.writes, "src/index.ts"));
+  return small.length > 0 ? [{ rule: "task_too_small", ids: small.map((task) => `${task.id} (${task.covers.length} cover${task.covers.length === 1 ? "" : "s"})`) }] : [];
+}
+
 function designRefViolations(tasks: readonly TaskSpec[], moduleIds: readonly string[]): TasksViolation[] {
   const known = new Set(moduleIds);
   const unknown = tasks.flatMap((task) => task.designRefs.filter((ref) => !known.has(ref)).map((ref) => `${task.id} -> ${ref}`));
@@ -147,6 +184,8 @@ export function validateTasks(input: TasksValidationInput): readonly TasksViolat
     ...overlapViolations(tasks, candidates),
     ...sharedFileViolations(tasks, present),
     ...dependencyViolations(tasks),
+    ...depthViolations(tasks, input.graphDepth),
+    ...sizeViolations(tasks, input.eligibleIds.length, input.minCoversPerTask),
     ...designRefViolations(tasks, input.moduleIds),
   ];
 }

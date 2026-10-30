@@ -183,7 +183,7 @@ describe("the whole factory on a scripted spec", () => {
       operator: "cyberash",
       push: false,
       outDir: null,
-      config: { ...DEFAULT_CONFIG, timeouts: { ...DEFAULT_CONFIG.timeouts, verifierMs: 120_000, cliRoleMs: 60_000, apiRoleMs: 60_000 } },
+      config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, minCoversPerTask: 1 }, timeouts: { ...DEFAULT_CONFIG.timeouts, verifierMs: 120_000, cliRoleMs: 60_000, apiRoleMs: 60_000 } },
       stageSlices: [createTraceSlice({ env }), createSpecStageSlice({ commands: specCommands }), createDesignStageSlice({ commands: designCommands }), createBuildStageSlice({ commands: { run: async (command, args, options) => (command === "npm" ? { exitCode: 0, stdout: "", stderr: "" } : new ExecCommandRunner().run(command, args, options)) } }), createAssemblySlice({ commandRunner: assemblyCommands })],
       commandRunner: {
         async run(command, args, options) {
