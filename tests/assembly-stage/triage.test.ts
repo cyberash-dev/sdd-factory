@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { triageEffect } from "../../src/assembly-stage/application/triage.js";
 import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { writeTextAtomic } from "../../src/shared/fs/text.js";
+import { DEFAULT_CONFIG } from "../../src/shared/config.js";
 import { collectingContext, commitFiles, fakeCommandRunner, initRepo, runState, scriptedApiRoles, sliceContext, taskState, tempDir } from "./support.js";
 
 function handoff(route: string): string {
@@ -60,7 +61,7 @@ describe("assembly.triage", () => {
   });
 
   // @covers assembly-stage:BEH-005
-  it("re-runs the role once with the parse error when the route names an unknown task, then fails the run", async () => {
+  it("re-runs the role with the parse error when the route names an unknown task, then routes to the planner", async () => {
     const { root, evidencePath, state } = await fixture();
     const apiRoles = scriptedApiRoles(async () => handoff("  task_id: T-999\n  target: implementer\n  reason: guessed"));
     const context = collectingContext(state);
@@ -68,10 +69,10 @@ describe("assembly.triage", () => {
     await triageEffect(fakeCommandRunner(() => undefined))({ kind: "assembly.triage", round: 1, step: "typecheck", evidencePath }, context, sliceContext({ root, apiRoles }));
 
     expect([apiRoles.requests.length, apiRoles.requests[1]?.message.includes("rejected: invalid_enum_value:route.task_id:T-999"), context.published.map((event) => [event.type, event.payload["reason"]]), (await readdir(join(root, "run/handoffs/triage"))).sort()]).toEqual([
-      2,
+      3,
       true,
-      [["run.failed", "unparseable_handoff"]],
-      ["handoff.md.rejected-1", "handoff.md.rejected-2"],
+      [["assembly.triaged", "triage unavailable: invalid_enum_value:route.task_id:T-999"]],
+      ["handoff.md.rejected-1", "handoff.md.rejected-2", "handoff.md.rejected-3"],
     ]);
   });
 
@@ -101,6 +102,44 @@ describe("assembly.triage", () => {
 
     await triageEffect(fakeCommandRunner(() => undefined))({ kind: "assembly.triage", round: 1, step: "typecheck", evidencePath }, context, sliceContext({ root, apiRoles }));
 
-    expect([apiRoles.requests[1]?.message.includes("rejected: missing_file"), context.published.at(-1)?.payload["detail"]]).toEqual([true, "triage: Your previous handoff was rejected: missing_file. Write the frontmatter exactly as specified."]);
+    expect([apiRoles.requests[1]?.message.includes("rejected: missing_file"), context.published.at(-1)?.payload["reason"]]).toEqual([true, "triage unavailable: missing_file"]);
+  });
+
+  // @covers assembly-stage:DLT-002
+  it("falls back to the default model after the re-run and routes to the planner when no run writes a handoff", async () => {
+    const { root, evidencePath, state } = await fixture();
+    const apiRoles = scriptedApiRoles(async () => null);
+    const context = collectingContext(state);
+
+    await triageEffect(fakeCommandRunner(() => undefined))({ kind: "assembly.triage", round: 1, step: "typecheck", evidencePath }, context, sliceContext({ root, apiRoles }));
+
+    expect([apiRoles.requests.map((request) => request.model), apiRoles.requests[2]?.message.includes("rejected: missing_file"), context.published]).toEqual([
+      ["claude-haiku-4-5", "claude-haiku-4-5", "claude-sonnet-5-5"],
+      true,
+      [{ type: "assembly.triaged", producer: "assembler", payload: { taskId: null, target: "planner", reason: "triage unavailable: missing_file" } }],
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-002
+  it("routes to the planner right after the re-run when the triage model is the default model", async () => {
+    const { root, evidencePath, state } = await fixture();
+    const apiRoles = scriptedApiRoles(async () => null);
+    const context = collectingContext(state);
+    const config = { ...DEFAULT_CONFIG, models: { ...DEFAULT_CONFIG.models, triage: "claude-sonnet-5-5" } };
+
+    await triageEffect(fakeCommandRunner(() => undefined))({ kind: "assembly.triage", round: 1, step: "typecheck", evidencePath }, context, sliceContext({ root, apiRoles, config }));
+
+    expect([apiRoles.requests.length, context.published.map((event) => [event.type, event.payload["taskId"], event.payload["target"]])]).toEqual([2, [["assembly.triaged", null, "planner"]]]);
+  });
+
+  // @covers assembly-stage:DLT-002
+  it("publishes the route written by the fallback run on the default model", async () => {
+    const { root, evidencePath, state } = await fixture();
+    const apiRoles = scriptedApiRoles(async (request) => (request.model === "claude-sonnet-5-5" ? handoff('  task_id: T-002\n  target: test-writer\n  reason: "test imports a missing helper"') : null));
+    const context = collectingContext(state);
+
+    await triageEffect(fakeCommandRunner(() => undefined))({ kind: "assembly.triage", round: 1, step: "typecheck", evidencePath }, context, sliceContext({ root, apiRoles }));
+
+    expect(context.published).toEqual([{ type: "assembly.triaged", producer: "triage", payload: { taskId: "T-002", target: "test-writer", reason: "test imports a missing helper" } }]);
   });
 });

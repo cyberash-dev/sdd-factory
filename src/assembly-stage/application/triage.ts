@@ -13,7 +13,6 @@ import { parseVitestReport } from "../domain/vitest-report.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { tailOf } from "./evidence.js";
 import { gitIn } from "./git.js";
-import { writeFailedReport } from "./ledger-store.js";
 
 export const TRIAGE_HANDOFF = join("triage", "handoff.md");
 const OUTPUT_TAIL_LINES = 200;
@@ -134,9 +133,13 @@ export function triageEffect(runner: CommandRunner): EffectHandler {
       changed_files: await changedFilesPerTask(runner, slice, context.state.tasks),
     };
     const trace: ToolTrace = (entry) => slice.log(`triage tool ${entry.tool} ${entry.path ?? entry.argv?.join(" ") ?? ""}`);
-    const maxAttempts = 1 + slice.config.caps.handoffRerun;
+    const models = slice.config.models;
+    /* assembly-stage:DLT-002: after the re-runs, one more run on models.default when triage runs on another model. */
+    const attemptModels = [...Array.from({ length: 1 + slice.config.caps.handoffRerun }, () => models.triage), ...(models.triage === models.default ? [] : [models.default])];
     let parseError = "";
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let lastError = "";
+    for (const [index, model] of attemptModels.entries()) {
+      const attempt = index + 1;
       const variables = { ...shared, attempt: String(attempt), parse_error: parseError };
       let timedOut = false;
       try {
@@ -144,7 +147,7 @@ export function triageEffect(runner: CommandRunner): EffectHandler {
           role: "triage",
           instruction: slice.prompts.render(instructionTemplate, variables),
           message: slice.prompts.render(TRIAGE_MESSAGE, variables),
-          model: slice.config.models.triage,
+          model,
           tools: [readFileTool(slice.paths.productDir, trace), listDirTool(slice.paths.productDir, trace), writeFileTool(slice.paths.runDir, trace)],
           timeoutMs: slice.config.timeouts.apiRoleMs,
           maxOutputTokens: MAX_OUTPUT_TOKENS,
@@ -164,11 +167,10 @@ export function triageEffect(runner: CommandRunner): EffectHandler {
         return;
       }
       await rejectHandoff(handoffPath, attempt);
+      lastError = timedOut ? "triage_timeout" : route.error;
       parseError = timedOut ? `triage_timeout: ${roleTimeoutNote(slice.config.timeouts.apiRoleMs).trim()}` : `Your previous handoff was rejected: ${route.error}. Write the frontmatter exactly as specified.`;
       slice.log(`triage attempt ${attempt} ${timedOut ? "timed out" : `rejected: ${route.error}`}`);
     }
-    const detail = `triage: ${parseError}`;
-    await writeFailedReport(slice.paths, { runDir: slice.paths.runDir, runId: slice.runId, slug: slice.slug }, `unparseable_handoff: ${detail}`);
-    context.publish({ type: "run.failed", producer: "assembler", payload: { stage: "assembly", reason: "unparseable_handoff", detail } });
+    context.publish({ type: "assembly.triaged", producer: "assembler", payload: { taskId: null, target: "planner", reason: `triage unavailable: ${lastError}` } });
   };
 }
