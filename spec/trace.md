@@ -1551,7 +1551,13 @@ tests:
 id: trace:ASM-003
 type: ASSUMPTION
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:30:56.795Z
+    change_request: cloud transport and model registry
+    scope: first-time-approval
 partition_id: trace
 assumption: |
   Mozaik core 4.1.0 opens its own cloud session per agent loop whenever

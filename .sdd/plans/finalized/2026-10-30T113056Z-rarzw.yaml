@@ -1,0 +1,17 @@
+plan_id: 2026-10-30T113056Z-rarzw
+created_at: 2026-10-30T11:30:56.796Z
+pending_attestations:
+  - id: trace:ASM-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:30:56.795Z
+    change_request: "cloud transport and model registry"
+    scope: first-time-approval
+    target_status: approved
+  - id: factory:ASM-005
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:30:57.116Z
+    change_request: "cloud transport and model registry"
+    scope: first-time-approval
+    target_status: approved
