@@ -102,7 +102,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: design-stage
 name: design-files
-version: "0.1.0"
+version: "0.1.1"
 boundary_type: public_storage
 members:
   - design-stage:CTR-001
@@ -819,7 +819,13 @@ none
 id: design-stage:DLT-001
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:43:07.167Z
+    change_request: malformed design file is a rework finding
+    scope: first-time-approval
 partition_id: design-stage
 title: a malformed design file is a rework finding, not a blocker
 target_ids:
