@@ -38,11 +38,14 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     process.stdout.write(`nudge recorded: ${path}\n`);
     return 0;
   }
+  const env: Readonly<Record<string, string | undefined>> = { ...process.env };
+  /* trace:EXT-001 keeps one cloud transport per runtime: Mozaik core would otherwise open a cloud session per agent loop. */
+  process.env["MOZAIK_API_KEY"] = "";
   const baseConfig = await loadConfig(join(repoRoot, "factory.config.json"));
   const checked = await preflight({
     specPath: command.specPath,
     operatorFlag: command.operator,
-    env: process.env,
+    env,
     models: baseConfig.models,
     nodeMajor: Number(process.versions.node.split(".")[0]),
     fileExists,
@@ -56,12 +59,12 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     push: command.push,
     outDir: command.outDir === null ? null : resolve(command.outDir),
     config,
-    stageSlices: stageSlices(),
+    stageSlices: stageSlices(env),
     commandRunner: new ExecCommandRunner(),
     versions: await toolchainVersions(repoRoot),
     now: () => new Date(),
     log: (line) => process.stderr.write(`[factory] ${redactLog(line)}\n`),
-    env: process.env,
+    env,
   });
   process.stderr.write(`[factory] run ${running.runId} started; run dir ${running.paths.runDir}\n`);
   const outcome = await running.terminal;
