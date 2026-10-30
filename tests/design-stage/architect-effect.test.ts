@@ -47,6 +47,21 @@ describe("design.architect effect", () => {
     expect([sourceText, refusal.startsWith("ERROR: path src/index.ts is outside"), h.published.map((event) => event.type)]).toEqual(["# organisers spec\nintent only\n", true, ["design.tech.ready"]]);
   });
 
+  // @covers design-stage:DLT-003
+  it("lets the architect read the scaffolded tooling files", async () => {
+    let packageJson = "";
+    let tsconfig = "";
+    const peek: RoleScript = async (request) => {
+      packageJson = await readVia(request, "package.json");
+      tsconfig = await readVia(request, "tsconfig.json");
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek)] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([packageJson.includes('"name":"todo-cli"'), tsconfig.includes('"compilerOptions"'), h.published.map((event) => event.type)]).toEqual([true, true, ["design.tech.ready"]]);
+  });
+
   // @covers design-stage:BEH-001
   it("blocks the design with context_firewall_violation when the architect reads design/verification.md", async () => {
     const peek: RoleScript = async (request) => {
