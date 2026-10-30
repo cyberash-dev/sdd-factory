@@ -9,6 +9,39 @@ export interface SpecRecord {
 
 const YAML_FENCE = /^```ya?ml\s*\n([\s\S]*?)\n```/gm;
 
+const CANONICAL_TYPES = [
+  "Partition",
+  "BrownfieldBaseline",
+  "Surface",
+  "Behavior",
+  "Invariant",
+  "Contract",
+  "Scenario",
+  "NFR",
+  "Constraint",
+  "Policy",
+  "Migration",
+  "Delta",
+  "GeneratedArtifact",
+  "ExternalDependency",
+  "LocalizationContract",
+  "ImplementationBinding",
+  "Open-Q",
+  "ASSUMPTION",
+] as const;
+
+const TYPE_ALIASES: Readonly<Record<string, string>> = { openquestion: "Open-Q", openq: "Open-Q" };
+
+function typeKey(type: string): string {
+  return type.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/* sdd lint accepts alternative spellings of the template names; records are compared by their canonical type. */
+export function canonicalRecordType(type: string): string {
+  const key = typeKey(type);
+  return TYPE_ALIASES[key] ?? CANONICAL_TYPES.find((candidate) => typeKey(candidate) === key) ?? type;
+}
+
 function stripDocumentMarkers(body: string): string {
   return body
     .split("\n")
@@ -28,7 +61,7 @@ export function parseSpecRecords(specText: string): readonly SpecRecord[] {
     if (!isRecord(parsed) || typeof parsed["id"] !== "string" || typeof parsed["type"] !== "string") {
       continue;
     }
-    records.push({ id: parsed["id"], type: parsed["type"], fields: parsed });
+    records.push({ id: parsed["id"], type: canonicalRecordType(parsed["type"]), fields: parsed });
   }
   return records;
 }
@@ -65,14 +98,7 @@ export function openQuestionsDecidableByDefault(records: readonly SpecRecord[]):
 }
 
 function undecidedOpenQuestions(records: readonly SpecRecord[]): readonly string[] {
-  const openQuestionIds = idsOf(records, "Open-Q");
-  const referencedBy = new Map<string, number>();
-  for (const assumption of records.filter((record) => record.type === "ASSUMPTION")) {
-    const source = assumption.fields["source_open_q"];
-    if (typeof source === "string") {
-      referencedBy.set(source, (referencedBy.get(source) ?? 0) + 1);
-    }
-  }
+  const referencedBy = assumptionReferences(records);
   const problems: string[] = [];
   for (const record of records.filter((candidate) => candidate.type === "Open-Q")) {
     const blocking = record.fields["blocking"];
@@ -87,12 +113,17 @@ function undecidedOpenQuestions(records: readonly SpecRecord[]): readonly string
       problems.push(`${record.id} is referenced by ${references} ASSUMPTION records, expected 1`);
     }
   }
-  for (const source of referencedBy.keys()) {
-    if (!openQuestionIds.includes(source)) {
-      problems.push(`ASSUMPTION source_open_q ${source} names no Open-Q`);
-    }
-  }
   return problems;
+}
+
+function danglingAssumptionSources(records: readonly SpecRecord[]): readonly string[] {
+  const openQuestionIds = idsOf(records, "Open-Q");
+  return [...assumptionReferences(records).keys()].filter((source) => !openQuestionIds.includes(source)).map((source) => `ASSUMPTION source_open_q ${source} names no Open-Q`);
+}
+
+/* spec-stage:DLT-003: an assumption whose question vanished is inconsistent but harmless; it is reported, not blocking. */
+export function specIntegrityWarnings(specText: string): readonly string[] {
+  return danglingAssumptionSources(parseSpecRecords(specText));
 }
 
 function surfaceProblems(records: readonly SpecRecord[]): readonly string[] {

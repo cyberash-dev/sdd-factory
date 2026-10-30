@@ -6,7 +6,7 @@ import { readTextOrNull } from "../../shared/fs/text.js";
 import { parseFinalizeEnvelope } from "../../shared/sdd/envelope.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { appendAssumptions, nextAssumptionNumber, renderDefaultAssumption } from "../domain/assumption-records.js";
-import { openQuestionsDecidableByDefault, parseSpecRecords, specIntegrityProblems } from "../domain/spec-records.js";
+import { openQuestionsDecidableByDefault, parseSpecRecords, specIntegrityProblems, specIntegrityWarnings } from "../domain/spec-records.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
 
 const APPROVAL_MODE = "pre-authorized-at-launch";
@@ -39,6 +39,9 @@ export async function runApprove(_effect: Effect, context: EffectContext, slice:
   if (lintBefore.exitCode !== 0) {
     blocked(`lint_failed: ${outputTail(lintBefore)}`);
     return;
+  }
+  for (const warning of specIntegrityWarnings(specText)) {
+    slice.log(`warning: spec_integrity: ${warning}`);
   }
   const problems = specIntegrityProblems(specText);
   if (problems.length > 0) {

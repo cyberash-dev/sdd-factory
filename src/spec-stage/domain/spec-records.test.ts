@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSpecRecords, specIntegrityProblems } from "./spec-records.js";
+import { parseSpecRecords, specIntegrityProblems, specIntegrityWarnings } from "./spec-records.js";
 
 function record(id: string, type: string, body: string): string {
   return `\`\`\`yaml\n---\nid: ${id}\ntype: ${type}\nlifecycle: {status: proposed}\n${body}\n---\n\`\`\`\n`;
@@ -27,6 +27,27 @@ describe("product spec records", () => {
     ]);
   });
 
+  it.each([
+    ["OpenQuestion", "Open-Q"],
+    ["open-q", "Open-Q"],
+    ["Assumption", "ASSUMPTION"],
+    ["ExternalDependency", "ExternalDependency"],
+    ["Implementation binding", "ImplementationBinding"],
+    ["Widget", "Widget"],
+  ])("normalises the record type %s to %s as sdd does", (written, canonical) => {
+    const records = parseSpecRecords(record("todo-cli:X-001", written, "question: q"));
+
+    expect(records.map((item) => item.type)).toEqual([canonical]);
+  });
+
+  // @covers spec-stage:INV-001
+  // @covers spec-stage:DLT-003
+  it("recognises an open question written as OpenQuestion when pairing it with its assumption", () => {
+    const spec = SURFACE + CONTRACTS + record("todo-cli:OQ-001", "OpenQuestion", "question: q\nblocking: no\ndefault_if_unresolved: a") + record("todo-cli:ASM-001", "Assumption", "assumption: a\nsource_open_q: todo-cli:OQ-001");
+
+    expect(specIntegrityProblems(spec)).toEqual([]);
+  });
+
   // @covers spec-stage:INV-001
   it("accepts a spec with zero open questions", () => {
     expect(specIntegrityProblems(SURFACE + CONTRACTS)).toEqual([]);
@@ -52,10 +73,11 @@ describe("product spec records", () => {
     expect(specIntegrityProblems(spec)).toEqual(["todo-cli:OQ-001 is blocking"]);
   });
 
-  it("reports an assumption pointing at an unknown open question", () => {
+  // @covers spec-stage:DLT-003
+  it("warns about an assumption pointing at an unknown open question without blocking approval", () => {
     const spec = SURFACE + CONTRACTS + assumption(1, "todo-cli:OQ-009");
 
-    expect(specIntegrityProblems(spec)).toEqual(["ASSUMPTION source_open_q todo-cli:OQ-009 names no Open-Q"]);
+    expect([specIntegrityProblems(spec), specIntegrityWarnings(spec)]).toEqual([[], ["ASSUMPTION source_open_q todo-cli:OQ-009 names no Open-Q"]]);
   });
 
   // @covers spec-stage:CTR-001
