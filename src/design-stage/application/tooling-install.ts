@@ -38,7 +38,10 @@ async function overwriteCompilerOptions(request: ToolingInstallRequest, compiler
   if (rootDir !== undefined) {
     request.log("design-stage: tsconfig rootDir dropped");
   }
-  await writeTextAtomic(path, `${JSON.stringify({ ...base, compilerOptions: applied }, null, 2)}\n`);
+  /* design-stage:DLT-006: the product is nested in the factory repo; without these, ancestor node_modules/@types leak into its typecheck. */
+  const pinned = { ...applied, skipLibCheck: true, typeRoots: ["./node_modules/@types"] };
+  request.log("design-stage: tsconfig skipLibCheck and typeRoots pinned");
+  await writeTextAtomic(path, `${JSON.stringify({ ...base, compilerOptions: pinned }, null, 2)}\n`);
 }
 
 async function git(request: ToolingInstallRequest, args: readonly string[]): Promise<CommandResult> {

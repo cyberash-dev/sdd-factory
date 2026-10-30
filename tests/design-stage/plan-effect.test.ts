@@ -149,7 +149,7 @@ describe("design.plan effect", () => {
     const tsconfig: unknown = JSON.parse(await readFile(join(h.productDir, "tsconfig.json"), "utf8"));
     expect([npmCalls(h), tsconfig, h.published.map((event) => event.type), commandsBeforePublish]).toEqual([
       ["npm install --no-audit --no-fund --save-exact yaml@2.9.1", "npm install --no-audit --no-fund --save-dev --save-exact typescript@7.0.2 vitest@5.0.5", "git rev-parse --abbrev-ref HEAD", "git add -- package.json tsconfig.json", "git commit -m design: tooling"],
-      { compilerOptions: { module: "NodeNext", strict: true }, include: ["src"] },
+      { compilerOptions: { module: "NodeNext", strict: true, skipLibCheck: true, typeRoots: ["./node_modules/@types"] }, include: ["src"] },
       ["design.tasks.ready"],
       6,
     ]);
@@ -164,7 +164,32 @@ describe("design.plan effect", () => {
     await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), h.slice, h.commandRunner);
 
     const tsconfig: unknown = JSON.parse(await readFile(join(h.productDir, "tsconfig.json"), "utf8"));
-    expect([tsconfig, h.log.includes("design-stage: tsconfig rootDir dropped")]).toEqual([{ compilerOptions: { strict: true, outDir: "dist" }, include: ["src"] }, true]);
+    expect([tsconfig, h.log.includes("design-stage: tsconfig rootDir dropped")]).toEqual([{ compilerOptions: { strict: true, outDir: "dist", skipLibCheck: true, typeRoots: ["./node_modules/@types"] }, include: ["src"] }, true]);
+  });
+
+  // @covers design-stage:DLT-006
+  it("pins skipLibCheck and typeRoots next to the architect's compilerOptions and keeps include as scaffolded", async () => {
+    const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS)] } });
+    await seedDesign(h.productDir, techMdText({ tsconfig: "{ module: NodeNext, strict: true }" }));
+
+    await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), h.slice, h.commandRunner);
+
+    const tsconfig: unknown = JSON.parse(await readFile(join(h.productDir, "tsconfig.json"), "utf8"));
+    expect(tsconfig).toEqual({ compilerOptions: { module: "NodeNext", strict: true, skipLibCheck: true, typeRoots: ["./node_modules/@types"] }, include: ["src"] });
+  });
+
+  // @covers design-stage:DLT-006
+  it("overrides an architect skipLibCheck false with the pinned true and logs the pin", async () => {
+    const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS)] } });
+    await seedDesign(h.productDir, techMdText({ tsconfig: "{ strict: true, skipLibCheck: false }" }));
+
+    await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), h.slice, h.commandRunner);
+
+    const tsconfig: unknown = JSON.parse(await readFile(join(h.productDir, "tsconfig.json"), "utf8"));
+    expect([tsconfig, h.log.includes("design-stage: tsconfig skipLibCheck and typeRoots pinned")]).toEqual([
+      { compilerOptions: { strict: true, skipLibCheck: true, typeRoots: ["./node_modules/@types"] }, include: ["src"] },
+      true,
+    ]);
   });
 
   // @covers design-stage:BEH-003
