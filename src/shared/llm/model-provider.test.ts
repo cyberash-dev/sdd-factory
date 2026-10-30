@@ -21,6 +21,12 @@ describe("factory model registry", () => {
     ]).toEqual([["openrouter", "openrouter", "openrouter", "openrouter", "openrouter"], 1000000, ["max", "high", "medium", "low", "none"], ["max", "high", "low"]]);
   });
 
+  it("registers the throughput-sorted GLM variant as the same OpenRouter model", () => {
+    const nitro = FACTORY_MODELS.find((model) => model.specification.name === "z-ai/glm-5.3-flash:nitro");
+
+    expect([providerOf("z-ai/glm-5.3-flash:nitro"), nitro?.specification.supportedReasoningEfforts, nitro?.specification.supportsFunctionCalling]).toEqual(["openrouter", ["max", "high", "low"], true]);
+  });
+
   it("keeps every bundled Mozaik model and answers null for an unknown id", () => {
     expect([providerOf("claude-opus-5-5"), providerOf("gpt-6-luna"), providerOf("deepseek-flash"), providerOf("gpt-99")]).toEqual(["anthropic", "openai", "deepseek", null]);
   });

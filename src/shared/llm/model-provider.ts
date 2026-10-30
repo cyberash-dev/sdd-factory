@@ -24,6 +24,8 @@ const OPENAI_SIBLINGS: Readonly<Record<string, DerivedModel>> = {
 const OPENROUTER_SIBLINGS: Readonly<Record<string, DerivedModel>> = {
   "deepseek/deepseek-v4.1-flash-1017": { sibling: "deepseek-flash" },
   "z-ai/glm-5.3-flash": { sibling: "deepseek-flash", efforts: ["max", "high", "low"] },
+  /* OpenRouter routes the :nitro variant to the highest-throughput provider (provider.sort throughput). */
+  "z-ai/glm-5.3-flash:nitro": { sibling: "deepseek-flash", efforts: ["max", "high", "low"] },
   "anthropic/claude-opus-5.5": { sibling: "claude-opus-5-5" },
   "openai/gpt-6.1-terra": { sibling: "gpt-6.1-sol" },
   "openai/gpt-6-luna": { sibling: "gpt-6-luna" },

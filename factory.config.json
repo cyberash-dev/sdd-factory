@@ -23,9 +23,9 @@
   "maxParallelLanes": 4,
   "models": {
     "default": "deepseek/deepseek-v4.1-flash-1017",
-    "critic": "z-ai/glm-5.3-flash",
+    "critic": "z-ai/glm-5.3-flash:nitro",
     "triage": "deepseek/deepseek-v4.1-flash-1017",
-    "reviewer": "z-ai/glm-5.3-flash",
+    "reviewer": "z-ai/glm-5.3-flash:nitro",
     "lane": null,
     "lanes": {
       "test-writer": "claude-sonnet-5-5",
@@ -82,6 +82,10 @@
     },
     "gpt-6-luna": {
       "inputPerMillion": 0.1,
+      "outputPerMillion": 0.5
+    },
+    "z-ai/glm-5.3-flash:nitro": {
+      "inputPerMillion": 0.15,
       "outputPerMillion": 0.5
     }
   }

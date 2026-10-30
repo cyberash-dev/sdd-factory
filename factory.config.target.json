@@ -83,6 +83,10 @@
     "gpt-6-luna": {
       "inputPerMillion": 0.1,
       "outputPerMillion": 0.5
+    },
+    "z-ai/glm-5.3-flash:nitro": {
+      "inputPerMillion": 0.15,
+      "outputPerMillion": 0.5
     }
   }
 }
