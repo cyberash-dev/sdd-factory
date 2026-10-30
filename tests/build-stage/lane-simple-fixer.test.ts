@@ -160,4 +160,26 @@ describe("simple-fixer in front of the red and green failure paths", () => {
       ["task.verified", "red"],
     ]);
   });
+
+  // @covers factory:BEH-010
+  it("publishes nothing after a red-check fixer run that ended on a termination signal and starts no second run", async () => {
+    const { harness, lane, fixer } = await aFixerLane(() => ({ exitCode: null, signal: "SIGINT", result: null }));
+    const baseSha = await commitStub(lane, STUB_WITHOUT_IMPORT);
+    await writeProductFile(lane.worktree, "tests/greet.test.ts", RED_TEST);
+
+    const published = await runLaneEffect(harness, "build.red-check", { taskId: "T-001", attempt: 1, firewallViolations: [] }, laneState(lane, { baseSha }));
+
+    expect([fixer.requests.length, published]).toEqual([1, []]);
+  });
+
+  // @covers factory:BEH-010
+  it("publishes nothing after a green-check fixer run that ended on a termination signal and starts no second run", async () => {
+    const { harness, lane, fixer } = await aFixerLane(() => ({ exitCode: null, signal: "SIGTERM", result: null }));
+    const testsSha = await freezeTests(lane);
+    await writeProductFile(lane.worktree, "src/greet.ts", IMPL_WITH_TYPE_ERROR);
+
+    const published = await runLaneEffect(harness, "build.green-check", { taskId: "T-001", attempt: 1 }, verifyPending(lane, testsSha));
+
+    expect([fixer.requests.length, published]).toEqual([1, []]);
+  });
 });

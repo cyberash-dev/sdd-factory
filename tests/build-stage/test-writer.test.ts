@@ -185,4 +185,37 @@ describe("test-writer invocation", () => {
     const instruction = cliRoles.requests[0]?.prompt.split("\n\n---\n\n")[0] ?? "";
     expect([/\{\{[a-z_]+\}\}/.test(instruction), instruction.startsWith((await readFile(join(harness.context.paths.repoRoot, "prompts", "test-writer.md"), "utf8")).slice(0, 20))]).toEqual([false, true]);
   });
+
+  // @covers build-stage:BEH-016
+  it("publishes nothing and starts no re-run when the test-writer subprocess ended on a termination signal", async () => {
+    const cliRoles = scriptedCliRoles(() => ({ exitCode: null, signal: "SIGTERM", result: null }));
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
+    const lane = await provisionLane(harness);
+
+    const published = await runLaneEffect(harness, "build.test-writer", { taskId: "T-001", attempt: 1, reworkFinding: null }, laneState(lane));
+
+    expect([cliRoles.requests.length, published]).toEqual([1, []]);
+  });
+
+  // @covers build-stage:BEH-016
+  it("does not retry a rate-limited result whose subprocess ended on a termination signal", async () => {
+    const cliRoles = scriptedCliRoles(() => ({ exitCode: null, signal: "SIGTERM", result: { isError: true, costUsd: 0, inputTokens: 1, outputTokens: 1, durationMs: 10, resultText: "API Error: 429 rate_limit_error", dominantModel: null } }));
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
+    const lane = await provisionLane(harness);
+
+    await runLaneEffect(harness, "build.test-writer", { taskId: "T-001", attempt: 1, reworkFinding: null }, laneState(lane));
+
+    expect(cliRoles.requests.length).toBe(1);
+  });
+
+  // @covers build-stage:BEH-015
+  it("still re-runs a test-writer whose subprocess was killed by its own timeout", async () => {
+    const cliRoles = scriptedCliRoles(() => ({ exitCode: null, signal: "SIGTERM", timedOut: true, result: null }));
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
+    const lane = await provisionLane(harness);
+
+    const published = await runLaneEffect(harness, "build.test-writer", { taskId: "T-001", attempt: 1, reworkFinding: null }, laneState(lane));
+
+    expect([cliRoles.requests.length, published.map((event) => [event.type, event.payload["reason"]])]).toEqual([2, [["task.failed", "unparseable_handoff"]]]);
+  });
 });

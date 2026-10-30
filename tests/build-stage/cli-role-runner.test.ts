@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,12 +12,13 @@ import { claudeArgv, createCliRoleRunner, laneEnvironment, parseStreamJsonLine, 
 const RESULT_LINE = JSON.stringify({ type: "result", subtype: "success", is_error: false, total_cost_usd: 0.0421, duration_ms: 1234, usage: { input_tokens: 500, output_tokens: 120 }, modelUsage: { "claude-opus-5-5": { outputTokens: 120 }, "claude-haiku-4-5": { outputTokens: 10 } }, result: "done" });
 const TOOL_LINE = JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name: "Write", input: { file_path: "src/a.ts" } }] } });
 
-async function fakeClaude(lines: readonly string[], options: { readonly exitCode?: number; readonly sleepMs?: number } = {}): Promise<string> {
+async function fakeClaude(lines: readonly string[], options: { readonly exitCode?: number; readonly sleepMs?: number; readonly touch?: string } = {}): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "fake-claude-"));
   const script = join(directory, "claude");
   const body = [
     "#!/bin/sh",
     "cat >/dev/null",
+    options.touch === undefined ? "" : `touch '${options.touch}'`,
     ...lines.map((line) => `printf '%s\\n' '${line.replace(/'/g, `'"'"'`)}'`),
     options.sleepMs === undefined ? "" : `sleep ${options.sleepMs / 1000}`,
     `exit ${options.exitCode ?? 0}`,
@@ -126,5 +128,27 @@ describe("claude -p lane executor", () => {
     const env = laneEnvironment({ PATH: "/bin", HOME: "/home/x", ANTHROPIC_API_KEY: "sk-secret", MY_TOKEN: "t", LANG: "C" });
 
     expect(env).toEqual({ PATH: "/bin", HOME: "/home/x", LANG: "C" });
+  });
+
+  // @covers factory:BEH-010
+  it("starts no subprocess once the lanes were signalled and reports the signal without a result", async () => {
+    const marker = join(await mkdtemp(join(tmpdir(), "claude-marker-")), "started");
+    const binary = await fakeClaude([], { touch: marker });
+    const runner = createCliRoleRunner();
+    signalLanes("SIGINT");
+
+    const outcome = await runner.run(request(binary));
+
+    expect([outcome.signal, outcome.timedOut, outcome.result, existsSync(marker)]).toEqual(["SIGINT", false, null, false]);
+  });
+
+  // @covers factory:BEH-010
+  it("still starts subprocesses from a runner created after an earlier runner's lanes were signalled", async () => {
+    signalLanes("SIGTERM");
+    const binary = await fakeClaude([RESULT_LINE]);
+
+    const outcome = await createCliRoleRunner().run(request(binary));
+
+    expect([outcome.signal, outcome.result?.resultText]).toEqual([null, "done"]);
   });
 });

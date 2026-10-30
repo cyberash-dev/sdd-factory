@@ -25,6 +25,7 @@ interface ScenarioInput {
   readonly vitest: (productDir: string) => string;
   readonly install?: () => CommandResult;
   readonly fixerWrites: Readonly<Record<string, string>>;
+  readonly fixerOverrides?: Partial<CliRoleOutcome>;
 }
 
 function fixerOutcome(): CliRoleOutcome {
@@ -39,12 +40,12 @@ function fixerOutcome(): CliRoleOutcome {
   };
 }
 
-function scriptedFixer(writes: Readonly<Record<string, string>>, requests: CliRoleRequest[]): CliRoleRunner {
+function scriptedFixer(writes: Readonly<Record<string, string>>, requests: CliRoleRequest[], overrides: Partial<CliRoleOutcome>): CliRoleRunner {
   return {
     async run(request) {
       requests.push(request);
       await writeFiles(request.cwd, writes);
-      return fixerOutcome();
+      return { ...fixerOutcome(), ...overrides };
     },
   };
 }
@@ -87,7 +88,7 @@ async function runFixerScenario(input: ScenarioInput): Promise<FixerScenario> {
   });
   const fixerRequests: CliRoleRequest[] = [];
   const context = collectingContext(runState({ status: "assembling", assemblyRounds: 1, tasks: { "T-001": taskState({ implSha: baseSha }) } }));
-  const slice = sliceContext({ root, cliRoles: scriptedFixer(input.fixerWrites, fixerRequests), config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, simpleFixes: 2 } } });
+  const slice = sliceContext({ root, cliRoles: scriptedFixer(input.fixerWrites, fixerRequests, input.fixerOverrides ?? {}), config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, simpleFixes: 2 } } });
   await verifyEffect(runner)({ kind: "assembly.verify", round: 1, taskOrder: ["T-001"] }, context, slice);
   return { root, productDir, runner, fixerRequests, context };
 }
@@ -175,6 +176,13 @@ describe("assembly.verify simple-fixer on a mechanical red step", () => {
       "",
       "base",
     ]);
+  });
+
+  // @covers factory:BEH-010
+  it("publishes nothing after the step that a fixer run ended by a termination signal and starts no second run", async () => {
+    const scenario = await runFixerScenario({ ...neverRepairedTypecheck(), fixerOverrides: { exitCode: null, signal: "SIGINT", result: null } });
+
+    expect([eventsOf(scenario.context), scenario.fixerRequests.length]).toEqual([["assembly.verified install green"], 1]);
   });
 
   // @covers assembly-stage:DLT-001

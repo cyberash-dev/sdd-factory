@@ -15,11 +15,13 @@ export interface RoleInvocation<TRun, TParsed> {
   readonly timeout?: { readonly note: string; readonly run: TRun };
   /* build-stage:DLT-004: one more run after the re-runs, e.g. the reviewer on models.default. */
   readonly fallback?: (message: string) => Promise<TRun>;
+  /* factory:BEH-010, build-stage:BEH-016: a run ended by the factory's termination signal is final, never a missing handoff. */
+  readonly isTerminated?: (run: TRun) => boolean;
 }
 
 export type RoundtripResult<TRun, TParsed> =
   | { readonly ok: true; readonly run: TRun; readonly parsed: TParsed; readonly reruns: number }
-  | { readonly ok: false; readonly run: TRun | null; readonly error: string; readonly reruns: number };
+  | { readonly ok: false; readonly run: TRun | null; readonly error: string; readonly reruns: number; readonly terminated?: true };
 
 export function rejectedSuffix(rerun: number): string {
   return `.rejected-${rerun}`;
@@ -55,6 +57,9 @@ export async function runWithHandoffRetry<TRun, TParsed>(invocation: RoleInvocat
       run = invocation.timeout.run;
     }
     lastRun = run;
+    if (invocation.isTerminated?.(run) === true) {
+      return { ok: false, run, error: "terminated", reruns: rerun, terminated: true };
+    }
     const outcome = await invocation.parse();
     if (outcome.ok) {
       return { ok: true, run, parsed: outcome.value, reruns: rerun };

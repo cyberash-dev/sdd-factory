@@ -103,4 +103,14 @@ describe("implementer invocation", () => {
     const prompt = cliRoles.requests[0]?.prompt ?? "";
     expect([prompt.includes("role: implementer"), prompt.includes("TEST-WRITER for task"), prompt.includes("## Previous handoff")]).toEqual([true, false, false]);
   });
+
+  // @covers build-stage:BEH-016
+  it("publishes nothing and starts no re-run when the implementer subprocess ended on a termination signal", async () => {
+    const cliRoles = scriptedCliRoles(() => ({ exitCode: null, signal: "SIGINT", result: null }));
+    const { harness, state } = await frozenLane(cliRoles);
+
+    const published = await runLaneEffect(harness, "build.implementer", { taskId: "T-001", attempt: 1, reworkFinding: null }, state);
+
+    expect([cliRoles.requests.length, published]).toEqual([1, []]);
+  });
 });

@@ -1,7 +1,7 @@
 import { dirname } from "node:path";
 import type { LaneParticipant, LaneRole } from "../../bus/adapters/mozaik/roster.js";
 import type { SliceContext } from "../slice.js";
-import { laneEnvironment, type CliRoleOutcome } from "./cli-role-runner.js";
+import { isTerminatedOutcome, laneEnvironment, type CliRoleOutcome } from "./cli-role-runner.js";
 
 export const CLAUDE_BINARY = "claude";
 export const LANE_MODEL_FALLBACK = "claude-code";
@@ -72,7 +72,7 @@ export async function runCliLane(slice: SliceContext, deps: LaneClock, request: 
     return outcome;
   };
   const first = await run();
-  if (!isRateLimited(first)) {
+  if (!isRateLimited(first) || isTerminatedOutcome(first)) {
     return first;
   }
   slice.log(`lane rate-limited; retrying once after ${RATE_LIMIT_RETRY_DELAY_MS} ms`);

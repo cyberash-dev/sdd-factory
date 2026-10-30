@@ -106,7 +106,7 @@ async function greenCheck(slice: SliceContext, deps: LaneDeps, context: EffectCo
   const trigger = isFixerAllowed ? greenTriggerOf(commands) : null;
   if (trigger !== null) {
     const fix = await fixMechanicalFailure(slice, deps, context, task, run, commands, trigger);
-    if (!deps.lanes.isLive(token)) {
+    if (!deps.lanes.isLive(token) || fix.verdict === "terminated") {
       return;
     }
     if (fix.verdict === "fixed") {

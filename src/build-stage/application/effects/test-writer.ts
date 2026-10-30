@@ -1,7 +1,7 @@
 import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../../bus/domain/handoff.js";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../../shared/fs/text.js";
-import type { CliRoleOutcome } from "../../../shared/llm/cli-role-runner.js";
+import { isTerminatedOutcome, type CliRoleOutcome } from "../../../shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { firewallViolations } from "../../domain/context-firewall.js";
 import { laneHandoffPath } from "../../domain/handoff-paths.js";
@@ -62,12 +62,17 @@ export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context
           lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message }, lane);
           return lastRun;
         },
+        isTerminated: isTerminatedOutcome,
         parse: async () => parseLaneHandoff("test-writer", lastRun, await readTextOrNull(handoffPath)),
       },
       testWriterMessage(messageInput),
     );
     if (!deps.lanes.isLive(token)) {
       slice.log(`test-writer result dropped for cancelled lane ${run.taskId}`);
+      return;
+    }
+    if (!result.ok && result.terminated === true) {
+      slice.log(`test-writer ${run.taskId} ended by a termination signal; nothing published`);
       return;
     }
     if (!result.ok) {

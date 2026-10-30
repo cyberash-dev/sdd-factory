@@ -1,6 +1,6 @@
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../../shared/fs/text.js";
-import type { CliRoleOutcome } from "../../../shared/llm/cli-role-runner.js";
+import { isTerminatedOutcome, type CliRoleOutcome } from "../../../shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { laneHandoffPath } from "../../domain/handoff-paths.js";
 import { implementerMessage, instructionVariables } from "../../domain/lane-messages.js";
@@ -66,6 +66,7 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
           lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message }, lane);
           return lastRun;
         },
+        isTerminated: isTerminatedOutcome,
         parse: async () => {
           const parsed = parseLaneHandoff("implementer", lastRun, await readTextOrNull(handoffPath));
           return parsed.ok ? implementerHandoffOf(parsed.value.frontmatter) : parsed;
@@ -75,6 +76,10 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
     );
     if (!deps.lanes.isLive(token)) {
       slice.log(`implementer result dropped for cancelled lane ${run.taskId}`);
+      return;
+    }
+    if (!result.ok && result.terminated === true) {
+      slice.log(`implementer ${run.taskId} ended by a termination signal; nothing published`);
       return;
     }
     if (!result.ok) {

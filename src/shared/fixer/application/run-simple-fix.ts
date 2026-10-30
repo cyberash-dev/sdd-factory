@@ -5,7 +5,7 @@ import { simpleFixAttempts } from "../../../bus/domain/run-state.js";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../fs/text.js";
 import { costFieldsOf, runCliLane, withLaneParticipant, type CostFields } from "../../llm/cli-lane.js";
-import type { CliRoleOutcome } from "../../llm/cli-role-runner.js";
+import { isTerminatedOutcome, type CliRoleOutcome } from "../../llm/cli-role-runner.js";
 import type { SliceContext } from "../../slice.js";
 import { changedFilesOutside, type PathScope } from "../domain/fix-scope.js";
 import { fixerInstructionVariables, fixerMessage, type FixerPromptInput } from "../domain/fixer-prompt.js";
@@ -50,7 +50,7 @@ export interface SimpleFixRun {
 }
 
 export interface SimpleFixResult {
-  readonly verdict: "fixed" | "cap_reached";
+  readonly verdict: "fixed" | "cap_reached" | "terminated";
   readonly runs: readonly SimpleFixRun[];
   readonly lastFailureOutput: string;
 }
@@ -122,12 +122,17 @@ interface RunInput {
   readonly failureOutput: string;
 }
 
-async function fixOnce(slice: SliceContext, deps: SimpleFixDeps, context: EffectContext, request: SimpleFixRequest, input: RunInput): Promise<SimpleFixRun & { readonly nextOutput: string }> {
+/* null: the run was ended by the factory's termination signal; it is not an attempt and the worktree stays as the subprocess left it. */
+async function fixOnce(slice: SliceContext, deps: SimpleFixDeps, context: EffectContext, request: SimpleFixRequest, input: RunInput): Promise<(SimpleFixRun & { readonly nextOutput: string }) | null> {
   const prompt: FixerPromptInput = { ...request, attempt: input.attempt, cap: slice.config.caps.simpleFixes, formatOnlyPaths: request.formatOnly.map((file) => file.path), failureOutput: input.failureOutput };
   return withLaneParticipant(slice, "simple-fixer", request.unit, async (lane) => {
     const before = await parsedFiles(request.directory, request.formatOnly);
     const snapshot = await deps.tree.snapshot(request.directory);
     const outcome = await invokeFixer(slice, deps, lane, prompt);
+    if (isTerminatedOutcome(outcome)) {
+      slice.log(`simple-fixer ${request.owner}:${request.unit} run ${input.attempt}: ended by a termination signal`);
+      return null;
+    }
     const changes = await deps.tree.changesSince(request.directory, snapshot);
     const verdict = await verdictOf(deps, request, snapshot, changes, before, input.failureOutput);
     const answerPath = relative(slice.paths.runDir, await saveAnswer(join(slice.paths.handoffsDir, request.unit, "simple-fixer"), answerText(outcome)));
@@ -151,7 +156,11 @@ export async function runSimpleFix(slice: SliceContext, deps: SimpleFixDeps, con
   const runs: SimpleFixRun[] = [];
   let failureOutput = request.failureOutput;
   while (attemptsBefore + runs.length < slice.config.caps.simpleFixes) {
-    const { nextOutput, ...run } = await fixOnce(slice, deps, context, request, { attempt: attemptsBefore + runs.length + 1, failureOutput });
+    const fixRun = await fixOnce(slice, deps, context, request, { attempt: attemptsBefore + runs.length + 1, failureOutput });
+    if (fixRun === null) {
+      return { verdict: "terminated", runs, lastFailureOutput: failureOutput };
+    }
+    const { nextOutput, ...run } = fixRun;
     runs.push(run);
     if (run.outcome === "fixed") {
       return { verdict: "fixed", runs, lastFailureOutput: failureOutput };

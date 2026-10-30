@@ -52,7 +52,7 @@ async function commitFixerChanges(deps: LaneDeps, worktree: string, runs: readon
   return pending.length === 0 ? null : deps.git.commitPaths(worktree, pending, message);
 }
 
-async function fixSuiteError(slice: SliceContext, deps: LaneDeps, context: EffectContext, task: TaskState, run: RedCheckRun, failed: RedOutcome, rerun: () => Promise<VerifierCommands>): Promise<RedOutcome | null> {
+async function fixSuiteError(slice: SliceContext, deps: LaneDeps, context: EffectContext, task: TaskState, run: RedCheckRun, failed: RedOutcome, rerun: () => Promise<VerifierCommands>): Promise<RedOutcome | "terminated" | null> {
   let latest = failed.commands;
   const result = await runSimpleFix(slice, fixerDeps(deps), context, {
     trigger: "red_suite_error",
@@ -69,6 +69,9 @@ async function fixSuiteError(slice: SliceContext, deps: LaneDeps, context: Effec
     },
   });
   slice.log(`red check ${run.taskId}: simple-fixer ${result.verdict} after ${result.runs.length} run(s)`);
+  if (result.verdict === "terminated") {
+    return "terminated";
+  }
   const lastRun = result.runs.at(-1);
   if (result.verdict !== "fixed" || lastRun === undefined) {
     return null;
@@ -128,7 +131,7 @@ export async function runRedCheck(slice: SliceContext, deps: LaneDeps, context: 
   }
   const first: RedOutcome = { commands, judgement: await judgeRun(deps, task, run, commands), baseSha: requireSha(task.baseSha, "baseSha") };
   const fixed = isFixableSuiteError(first) ? await fixSuiteError(slice, deps, context, task, run, first, rerun) : null;
-  if (!deps.lanes.isLive(token)) {
+  if (!deps.lanes.isLive(token) || fixed === "terminated") {
     return;
   }
   await concludeRedCheck(slice, deps, context, task, run, fixed ?? first);

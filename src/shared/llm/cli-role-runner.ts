@@ -39,13 +39,29 @@ export interface CliRoleRunner {
   run(request: CliRoleRequest): Promise<CliRoleOutcome>;
 }
 
-const liveLanes = new Set<ChildProcess>();
+type LaneSignal = "SIGINT" | "SIGTERM";
 
-/* factory:BEH-010: a lane subprocess receives the signal that ends the factory process. */
-export function signalLanes(signal: "SIGINT" | "SIGTERM"): void {
+const liveLanes = new Set<ChildProcess>();
+/* Each runner remembers the generation it was created in: a later signalLanes terminates it, a runner created afterwards (the next run) starts fresh. */
+let signalGeneration = 0;
+let lastSignal: LaneSignal = "SIGTERM";
+
+/* factory:BEH-010: a lane subprocess receives the signal that ends the factory process; no subprocess starts after it. */
+export function signalLanes(signal: LaneSignal): void {
+  signalGeneration += 1;
+  lastSignal = signal;
   for (const lane of liveLanes) {
     lane.kill(signal);
   }
+}
+
+/* A timeout kills the subprocess with SIGTERM too, but that outcome stays an ordinary lane failure. */
+export function isTerminatedOutcome(outcome: CliRoleOutcome): boolean {
+  return outcome.signal !== null && !outcome.timedOut;
+}
+
+function terminatedOutcome(signal: LaneSignal): CliRoleOutcome {
+  return { exitCode: null, signal, timedOut: false, result: null, toolUses: [], stderrTail: "", durationMs: 0 };
 }
 
 export function claudeArgv(request: CliRoleRequest): string[] {
@@ -118,8 +134,12 @@ export function parseStreamJsonLine(line: string): { readonly kind: "tool_use"; 
 }
 
 export function createCliRoleRunner(): CliRoleRunner {
+  const createdInGeneration = signalGeneration;
   return {
     run(request: CliRoleRequest): Promise<CliRoleOutcome> {
+      if (signalGeneration !== createdInGeneration) {
+        return Promise.resolve(terminatedOutcome(lastSignal));
+      }
       return new Promise((resolvePromise, rejectPromise) => {
         const startedAt = Date.now();
         const toolUses: CliToolUse[] = [];

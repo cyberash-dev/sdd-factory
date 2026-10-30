@@ -248,8 +248,8 @@ function fixerContext(run: VerifyRun): EffectContext {
   return { state, publish: (pending) => run.context.publish(pending) };
 }
 
-/* factory:BEH-012 assembly row: null once the fixer's change is committed, else the step's last red outcome. */
-async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutcome, trigger: AssemblyTrigger): Promise<StepOutcome | null> {
+/* factory:BEH-012 assembly row: null once the fixer's change is committed, "terminated" after the factory's termination signal, else the step's last red outcome. */
+async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutcome, trigger: AssemblyTrigger): Promise<StepOutcome | "terminated" | null> {
   const directory = run.slice.paths.productDir;
   let latest = outcome;
   const snapshot = await run.fixer.tree.snapshot(directory);
@@ -267,6 +267,9 @@ async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutco
       return { passed: latest.fixTrigger === null, output: latest.failureOutput };
     },
   });
+  if (result.verdict === "terminated") {
+    return "terminated";
+  }
   run.fixer.runsInEffect += result.runs.length;
   const fixed = result.runs.find((fixRun) => fixRun.outcome === "fixed");
   const commitSha = fixed === undefined ? null : await commitFix(run, fixed);
@@ -279,13 +282,16 @@ async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutco
   return fixed === undefined ? latest : null;
 }
 
-async function runSequence(run: VerifyRun): Promise<"restart" | "done"> {
+async function runSequence(run: VerifyRun): Promise<"restart" | "terminated" | "done"> {
   for (const step of VERIFICATION_SEQUENCE) {
     let outcome = await runStep(run, step);
     if (outcome.fixTrigger !== null) {
       const unrepaired = await repairStep(run, step, outcome, outcome.fixTrigger);
       if (unrepaired === null) {
         return "restart";
+      }
+      if (unrepaired === "terminated") {
+        return "terminated";
       }
       outcome = unrepaired;
     }

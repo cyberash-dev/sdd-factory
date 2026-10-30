@@ -68,12 +68,12 @@ function cliOutcome(resultText: string): CliRoleOutcome {
   };
 }
 
-function scriptedFixer(script: FixerScript, requests: CliRoleRequest[]): CliRoleRunner {
+function scriptedFixer(script: FixerScript, requests: CliRoleRequest[], overrides: Partial<CliRoleOutcome>): CliRoleRunner {
   return {
     async run(request) {
       requests.push(request);
       await script(request.cwd, requests.length);
-      return cliOutcome(`run ${requests.length}: changed what the output named`);
+      return { ...cliOutcome(`run ${requests.length}: changed what the output named`), ...overrides };
     },
   };
 }
@@ -83,7 +83,7 @@ function aState(simpleFixes: Readonly<Record<string, number>> = {}): RunState {
   return { ...base, status: "building", simpleFixes, tasks: { "T-001": createTaskState({ worktree: "/wt", covers: [], writes: [], dependsOn: [] }) } };
 }
 
-async function aFixerHarness(files: Readonly<Record<string, string>>, script: FixerScript, initialState: RunState = aState()): Promise<FixerHarness> {
+async function aFixerHarness(files: Readonly<Record<string, string>>, script: FixerScript, initialState: RunState = aState(), outcomeOverrides: Partial<CliRoleOutcome> = {}): Promise<FixerHarness> {
   const directory = await aRepo(files);
   const runDir = await mkdtemp(join(tmpdir(), "fixer-run-"));
   const requests: CliRoleRequest[] = [];
@@ -116,7 +116,7 @@ async function aFixerHarness(files: Readonly<Record<string, string>>, script: Fi
     paths: { repoRoot: REPO_ROOT, runDir, productDir: directory, worktreesDir: join(runDir, "worktrees"), handoffsDir: join(runDir, "handoffs"), traceDir: join(runDir, "trace"), specSourcePath: join(REPO_ROOT, "spec.md"), outputDir: join(runDir, "out") },
     runtime,
     apiRoles: { run: async () => { throw new Error("no API role in fixer tests"); } },
-    cliRoles: scriptedFixer(script, requests),
+    cliRoles: scriptedFixer(script, requests, outcomeOverrides),
     prompts: createPromptLibrary(join(REPO_ROOT, "prompts")),
     log: () => undefined,
     now: () => new Date("2026-10-30T12:00:00.000Z"),
@@ -320,6 +320,15 @@ describe("simple-fixer engine", () => {
     await harness.fix(redSuiteRequest(harness.directory));
 
     expect(harness.events.map((event) => event.payload["attempt"])).toEqual([2]);
+  });
+
+  // @covers factory:BEH-010
+  it("ends the loop after a run whose subprocess ended on a termination signal, with no fix.attempted and no second run", async () => {
+    const harness = await aFixerHarness({ "src/greet.ts": STUB }, async () => undefined, aState(), { exitCode: null, signal: "SIGTERM", result: null });
+
+    const result = await harness.fix({ ...redSuiteRequest(harness.directory), check: async () => ({ passed: false, output: "still failing" }) });
+
+    expect([result.verdict, result.runs, harness.requests.length, harness.events.length]).toEqual(["terminated", [], 1, 0]);
   });
 });
 
