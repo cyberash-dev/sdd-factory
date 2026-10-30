@@ -154,7 +154,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: factory
 name: factory-cli
-version: "0.6.0"
+version: "0.7.0"
 boundary_type: cli
 members:
   - factory:CTR-001
@@ -2612,6 +2612,142 @@ test_obligation:
   failure_scenarios:
     - fixer still reading models.lane when a fixer entry exists
     - --effort passed for an absent entry
+---
+```
+
+```yaml
+---
+id: factory:DLT-011
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T21:42:32.673Z
+    change_request: replay one effect of a failed run; resume grants one more attempt after a cap failure
+    scope: first-time-approval
+partition_id: factory
+title: factory-cli 0.6.0 -> 0.7.0 - replay one recorded event's effect against a failed run without publishing
+target_ids:
+  - factory:SUR-001
+  - factory:CTR-001
+  - factory:CTR-002
+  - factory:BEH-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: factory:SUR-001
+    intended_version: "0.7.0"
+description: |
+  Every fix after runs 12, 13 and 14 was checked by launching a whole
+  run, twenty minutes and real lane cost before the repaired stage even
+  started, although the failed run's directory holds everything the
+  failing effect needs. factory:CTR-001 gains the subcommand
+  `replay <runId> (--event <seq> | --last)`: the foreman rebuilds the
+  state before the chosen event from the run's history (the trace chain
+  of DLT-009, cut per DLT-007), applies the event's transition rule and
+  executes the resulting effects in the run's own directories (product,
+  worktrees, handoffs of the first run of the chain) with every role
+  runner real, but publishes nothing: the events the effects would
+  publish are printed as JSON lines on stdout, the effect log lines on
+  stderr, and no trace, state.json, run.json or cloud session is
+  touched. `--last` selects the event resume would redo first. The
+  effects write where they always write, so a replay can change the
+  failed run's worktree; the operator reads the printed events and
+  decides whether to resume. factory:CTR-002 gains the exit codes of
+  replay: 0 when no printed event has a type ending in .failed,
+  .blocked or .rejected, 1 otherwise, 2 for an unknown run or seq.
+  Nothing changes for run, resume and nudge.
+tests_old_behavior:
+  - run, resume and nudge argv and exit codes are unchanged
+tests_new_behavior:
+  - to:factory:CTR-001
+  - to:factory:CTR-002
+test_obligation:
+  predicate: |
+    Given a failed run whose event <seq> is a task.tests_written with a
+    scripted verifier, `factory replay <runId> --event <seq>` prints the
+    task.tests_red (or task.tests_rejected) the red check would publish,
+    exits 0 or 1 accordingly, and leaves the run's trace.jsonl and
+    state.json byte-identical; `--last` picks the event planReplay would
+    redo first; an unknown seq exits 2 with a usage line.
+  test_template: integration
+  boundary_classes:
+    - explicit seq
+    - --last
+    - unknown seq
+  failure_scenarios:
+    - a replayed event reaching the bus or the trace
+    - exit 0 for a printed rejection
+---
+```
+
+```yaml
+---
+id: factory:DLT-012
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T21:42:32.992Z
+    change_request: replay one effect of a failed run; resume grants one more attempt after a cap failure
+    scope: first-time-approval
+partition_id: factory
+title: resume grants one more attempt to the role whose cap failed the run
+target_ids:
+  - factory:DLT-006
+  - factory:DLT-007
+  - build-stage:CST-001
+  - build-stage:CST-002
+  - build-stage:CST-003
+  - build-stage:CST-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Run 14 failed with task.failed{T-004, cap_exhausted: test-writer}
+  after two rejections that a fix between runs showed to be false; a
+  resume was pointless because the seeded task still carried the
+  exhausted counter and the redone entry event hit the same cap, so a
+  fresh run cost twenty more minutes. A resume is by definition preceded
+  by an operator's fix (factory:BEH-009 records it as fix_between_runs),
+  and that fix is the justification the caps' rationale asks for. When
+  the cut failure chain of DLT-007 starts with task.failed{reason:
+  cap_exhausted} or design.blocked{reason: planner_cap | architect_cap},
+  the seeded state carries the exhausted counter lowered by one: the
+  task's attempts for the role named in the detail (test-writer,
+  implementer), or the run-level plannerRecuts / architectRepairs, so
+  the redone entry event is allowed exactly one more attempt than the
+  cap in build-stage:CST-001..CST-004 and the configured cap stays as
+  it is. Other reasons seed the counters unchanged. The fix_between_runs
+  note names the granted attempt ("one more test-writer attempt for
+  T-004"). bus:INV-002 holds: counters only grow inside a run.
+tests_old_behavior:
+  - a resume after any other failure reason seeds the counters exactly as before
+tests_new_behavior:
+  - to:factory:DLT-007
+test_obligation:
+  predicate: |
+    Given a trace ending in task.tests_rejected{T-004} (second), task.failed{T-004,
+    cap_exhausted: test-writer}, run.failed with caps.testWriterRework 1,
+    the seeded T-004 has attempts.testWriter lowered by one, the redo
+    list holds the tests_rejected event, replaying it restarts the lane
+    instead of failing, and the note names the granted attempt; given
+    task.failed{unparseable_handoff} the counters are unchanged.
+  test_template: unit
+  boundary_classes:
+    - cap_exhausted test-writer
+    - cap_exhausted implementer
+    - planner_cap
+    - other reason (unchanged)
+  failure_scenarios:
+    - the cap fired again on the resumed run
+    - a counter lowered for a non-cap failure
 ---
 ```
 
