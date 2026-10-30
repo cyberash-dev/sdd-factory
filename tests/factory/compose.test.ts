@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { startRun } from "../../src/factory/application/compose.js";
 import { readResumeSource } from "../../src/factory/application/resume.js";
+import { createTaskState, type RunState, type TaskStatus } from "../../src/bus/domain/run-state.js";
 import type { RunManifest } from "../../src/factory/domain/run-manifest.js";
 import type { CommandRunner } from "../../src/factory/ports/outbound/command-runner.js";
 import { DEFAULT_CONFIG } from "../../src/shared/config.js";
@@ -84,6 +85,59 @@ function flakySpecStage(drafts: { count: number }): SliceFactory {
         context.publish({ type: "spec.drafted", producer: "spec-analyst", payload: { attempt: 1, lintExit: 0, recordCounts: {} } });
       },
       "spec.finish": async (_effect, context) => {
+        context.publish({ type: "run.published", producer: "foreman", payload: { commitSha: "ab".repeat(20), outputDir: "hidden/todo-cli", pushed: false } });
+      },
+    },
+    participants: () => [],
+  });
+}
+
+function withTaskStatus(state: RunState, taskId: string, status: TaskStatus): RunState {
+  const task = state.tasks[taskId];
+  return task === undefined ? state : { ...state, tasks: { ...state.tasks, [taskId]: { ...task, status } } };
+}
+
+function taskIdIn(payload: Readonly<Record<string, unknown>>): string {
+  return typeof payload["taskId"] === "string" ? payload["taskId"] : "";
+}
+
+/* Two lanes start together; in the first run T-001's lane is dropped silently and T-002's lane fails the run, after that every lane approves its task. */
+function twoLaneStage(launches: string[]): SliceFactory {
+  return () => ({
+    name: "two-lane-stage",
+    rules: [
+      {
+        name: "workspace.ready -> building",
+        eventType: "workspace.ready",
+        apply: ({ state }) => ({ state: { ...state, status: "building", tasks: Object.fromEntries(["T-001", "T-002"].map((taskId) => [taskId, createTaskState({ worktree: `worktrees/${taskId}`, covers: [], writes: [], dependsOn: [] })])) }, emits: [], effects: [{ kind: "lanes.start" }] }),
+      },
+      { name: "task.ready -> tests_pending", eventType: "task.ready", acceptsTaskStatus: ["ready"], apply: ({ state, event }) => ({ state: withTaskStatus(state, taskIdIn(event.payload), "tests_pending"), emits: [], effects: [{ kind: "lane.run", taskId: taskIdIn(event.payload) }] }) },
+      {
+        name: "task.approved -> approved",
+        eventType: "task.approved",
+        acceptsTaskStatus: ["tests_pending"],
+        apply: ({ state, event }) => {
+          const next = withTaskStatus(state, taskIdIn(event.payload), "approved");
+          return { state: next, emits: [], effects: Object.values(next.tasks).every((task) => task.status === "approved") ? [{ kind: "lanes.finish" }] : [] };
+        },
+      },
+    ],
+    effects: {
+      "lanes.start": async (_effect, context) => {
+        for (const taskId of ["T-001", "T-002"]) {
+          context.publish({ type: "task.ready", producer: "foreman", payload: { taskId, worktree: `worktrees/${taskId}`, baseSha: "ab".repeat(20), covers: [], writes: [] } });
+        }
+      },
+      "lane.run": async (effect, context) => {
+        const taskId = typeof effect["taskId"] === "string" ? effect["taskId"] : "";
+        launches.push(taskId);
+        if (launches.length > 2) {
+          context.publish({ type: "task.approved", producer: "foreman", payload: { taskId, implSha: "cd".repeat(20) } });
+        } else if (taskId === "T-002") {
+          throw new Error("provider_error:429");
+        }
+      },
+      "lanes.finish": async (_effect, context) => {
         context.publish({ type: "run.published", producer: "foreman", payload: { commitSha: "ab".repeat(20), outputDir: "hidden/todo-cli", pushed: false } });
       },
     },
@@ -223,6 +277,51 @@ describe("resumed run", () => {
     const lines = (await readFile(join(second.paths.runDir, "trace", "trace.jsonl"), "utf8")).split("\n").filter((line) => line.length > 0);
     const intervention = lines.map((line) => JSON.parse(line) as { type: string; payload: Record<string, unknown> }).find((record) => record.type === "human.intervention");
     expect(intervention?.payload).toEqual({ kind: "fix_between_runs", actor: "cyberash", note: `resume of ${first.runId} from workspace.ready seq 4; provider is back` });
+  });
+});
+
+describe("resumed run with several lanes in flight", () => {
+  async function resumedTwoLaneRun(): Promise<{ firstRunId: string; secondRunDir: string; secondStatus: string; launches: readonly string[] }> {
+    const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
+    const launches: string[] = [];
+    const input = { repoRoot, specPath: join(repoRoot, "todo-cli.md"), slug: "todo-cli", operator: "cyberash", push: false, outDir: null, config: DEFAULT_CONFIG, stageSlices: [createTraceSlice({ env: {} }), twoLaneStage(launches)], commandRunner: fakeCommands, versions: { typescript: "7.0.2", vitest: "5.0.5", typesNode: "26.6.6", agentSdd: "2.1.1" }, log: () => undefined, env: {} };
+    const first = await startRun({ ...input, now: () => new Date("2026-10-30T16:00:00.000Z") });
+    await first.terminal;
+    await first.shutdown();
+    const second = await startRun({ ...input, now: () => new Date("2026-10-30T17:00:00.000Z"), resume: { fromRunId: first.runId, note: "provider is back", force: false } });
+    const secondOutcome = await second.terminal;
+    await second.shutdown();
+    return { firstRunId: first.runId, secondRunDir: second.paths.runDir, secondStatus: secondOutcome.manifest.status, launches };
+  }
+
+  async function busRecords(runDir: string): Promise<readonly { type: string; producer: string; payload: Record<string, unknown> }[]> {
+    const lines = (await readFile(join(runDir, "trace", "trace.jsonl"), "utf8")).split("\n").filter((line) => line.length > 0);
+    return lines.map((line) => JSON.parse(line) as { type: string; producer: string; payload: Record<string, unknown> }).filter((record) => record.producer !== "runtime");
+  }
+
+  // @covers factory:DLT-006
+  it("restarts both lanes that were in flight and publishes the run", async () => {
+    const { secondRunDir, secondStatus, launches } = await resumedTwoLaneRun();
+
+    const head = (await busRecords(secondRunDir)).slice(0, 4).map((record) => [record.type, taskIdIn(record.payload)]);
+    expect({ secondStatus, launches, head }).toEqual({
+      secondStatus: "published",
+      launches: ["T-001", "T-002", "T-001", "T-002"],
+      head: [
+        ["run.started", ""],
+        ["human.intervention", ""],
+        ["task.ready", "T-001"],
+        ["task.ready", "T-002"],
+      ],
+    });
+  });
+
+  // @covers factory:DLT-006
+  it("names every redone event in the fix_between_runs note", async () => {
+    const { firstRunId, secondRunDir } = await resumedTwoLaneRun();
+
+    const intervention = (await busRecords(secondRunDir)).find((record) => record.type === "human.intervention");
+    expect(intervention?.payload["note"]).toBe(`resume of ${firstRunId} from task.ready seq 5, task.ready seq 6; provider is back`);
   });
 });
 

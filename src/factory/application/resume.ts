@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { isEventType, type EventType } from "../../bus/domain/catalogue.js";
 import { isProducer, type DeliveredEvent } from "../../bus/domain/envelope.js";
-import type { RunState } from "../../bus/domain/run-state.js";
+import type { RunState, TaskState, TaskStatus } from "../../bus/domain/run-state.js";
 import { dedupeKey, reduce, type TransitionRule } from "../../bus/domain/transition.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 
@@ -26,8 +26,20 @@ export interface ResumeSource {
 
 export interface ReplayPlan {
   readonly state: RunState;
-  readonly redo: DeliveredEvent<EventType>;
+  readonly redo: readonly DeliveredEvent<EventType>[];
 }
+
+interface ReplayPoint {
+  readonly state: RunState;
+  readonly event: DeliveredEvent<EventType>;
+}
+
+interface LaneEntry {
+  readonly event: DeliveredEvent<EventType>;
+  readonly taskBefore: TaskState | undefined;
+}
+
+const IN_FLIGHT_TASK_STATUSES: readonly TaskStatus[] = ["tests_pending", "impl_pending", "verify_pending", "review_pending"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -111,11 +123,38 @@ export async function readResumeSource(repoRoot: string, runId: string, force: b
   return { runDir, manifest, events: busEventsOf(traceText) };
 }
 
-/* Replays the bus events through the pure rules; the redo event is the last one whose transition produced an effect. */
+function taskIdOf(event: DeliveredEvent<EventType>): string | null {
+  const taskId = event.payload["taskId"];
+  return typeof taskId === "string" ? taskId : null;
+}
+
+function withTaskRolledBack(state: RunState, taskId: string, taskBefore: TaskState | undefined): RunState {
+  const { [taskId]: _dropped, ...otherTasks } = state.tasks;
+  return { ...state, tasks: taskBefore === undefined ? otherTasks : { ...otherTasks, [taskId]: taskBefore } };
+}
+
+/* factory:DLT-006: every other task still in flight before the latest event gets its lane entry redone from the state before it. */
+function withInFlightLanes(latest: ReplayPoint, laneEntries: ReadonlyMap<string, LaneEntry>): ReplayPlan {
+  const latestTaskId = taskIdOf(latest.event);
+  let state = latest.state;
+  const redo: DeliveredEvent<EventType>[] = [latest.event];
+  for (const [taskId, entry] of laneEntries) {
+    const task = latest.state.tasks[taskId];
+    if (taskId === latestTaskId || task === undefined || !IN_FLIGHT_TASK_STATUSES.includes(task.status)) {
+      continue;
+    }
+    state = withTaskRolledBack(state, taskId, entry.taskBefore);
+    redo.push(entry.event);
+  }
+  return { state, redo: redo.sort((left, right) => left.seq - right.seq) };
+}
+
+/* Replays the bus events through the pure rules; the latest event whose transition produced an effect is redone with the in-flight lanes. */
 export function planReplay(rules: readonly TransitionRule[], initialState: RunState, events: readonly DeliveredEvent<EventType>[]): ReplayPlan {
   let state = initialState;
   const consumed = new Set<string>();
-  let plan: ReplayPlan | null = null;
+  let latest: ReplayPoint | null = null;
+  const laneEntries = new Map<string, LaneEntry>();
   for (const event of events) {
     if (event.type === "run.failed" || event.type === "run.published") {
       break;
@@ -129,12 +168,16 @@ export function planReplay(rules: readonly TransitionRule[], initialState: RunSt
       continue;
     }
     if (outcome.result.effects.length > 0) {
-      plan = { state, redo: event };
+      latest = { state, event };
+      const taskId = taskIdOf(event);
+      if (taskId !== null) {
+        laneEntries.set(taskId, { event, taskBefore: state.tasks[taskId] });
+      }
     }
     state = outcome.result.state;
   }
-  if (plan === null) {
+  if (latest === null) {
     throw new ResumeError("nothing to resume: no replayed event produced an effect");
   }
-  return plan;
+  return withInFlightLanes(latest, laneEntries);
 }

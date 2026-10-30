@@ -178,9 +178,12 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
 
   runtime.publisher.publish({ type: "run.started", producer: "foreman", payload: { specPath: input.specPath, slug: input.slug, operator: input.operator, mode: "autonomous" } });
   if (input.resume !== undefined && replay !== null) {
-    const note = `resume of ${input.resume.fromRunId} from ${replay.redo.type} seq ${replay.redo.seq}${input.resume.note === null ? "" : `; ${input.resume.note}`}`;
+    const redone = replay.redo.map((event) => `${event.type} seq ${event.seq}`).join(", ");
+    const note = `resume of ${input.resume.fromRunId} from ${redone}${input.resume.note === null ? "" : `; ${input.resume.note}`}`;
     runtime.publisher.publish({ type: "human.intervention", producer: "foreman", payload: { kind: "fix_between_runs", note, actor: input.operator } });
-    republish(runtime, replay.redo);
+    for (const event of replay.redo) {
+      republish(runtime, event);
+    }
   }
 
   return {

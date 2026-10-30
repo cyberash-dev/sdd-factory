@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { EventType } from "../../bus/domain/catalogue.js";
 import type { DeliveredEvent, Producer } from "../../bus/domain/envelope.js";
-import { createRunState } from "../../bus/domain/run-state.js";
+import { createRunState, createTaskState, type RunState, type TaskState } from "../../bus/domain/run-state.js";
 import type { TransitionRule } from "../../bus/domain/transition.js";
 import { planReplay, readResumeSource, ResumeError } from "./resume.js";
 
@@ -43,7 +43,7 @@ describe("resume replay plan", () => {
 
     const plan = planReplay(RULES, initial(), events);
 
-    expect([plan.state.status, plan.redo.type, plan.redo.seq, plan.redo.producer]).toEqual(["spec_drafting", "spec.drafted", 4, "spec-analyst"]);
+    expect([plan.state.status, plan.redo.map((event) => [event.type, event.seq, event.producer])]).toEqual(["spec_drafting", [["spec.drafted", 4, "spec-analyst"]]]);
   });
 
   // @covers factory:BEH-009
@@ -52,7 +52,7 @@ describe("resume replay plan", () => {
 
     const plan = planReplay(RULES, initial(), events);
 
-    expect([plan.state.status, plan.redo.type]).toEqual(["workspace", "workspace.ready"]);
+    expect([plan.state.status, plan.redo.map((event) => event.type)]).toEqual(["workspace", ["workspace.ready"]]);
   });
 
   // @covers factory:BEH-009
@@ -60,6 +60,98 @@ describe("resume replay plan", () => {
     const events = [delivered(1, "human.intervention", "foreman", { kind: "launch" }), delivered(2, "run.failed", "foreman")];
 
     expect(() => planReplay(RULES, initial(), events)).toThrow(new ResumeError("nothing to resume: no replayed event produced an effect"));
+  });
+});
+
+function taskIdOf(payload: Readonly<Record<string, unknown>>): string {
+  return typeof payload["taskId"] === "string" ? payload["taskId"] : "";
+}
+
+function withTaskChange(state: RunState, taskId: string, change: (task: TaskState) => TaskState): RunState {
+  const task = state.tasks[taskId];
+  return task === undefined ? state : { ...state, tasks: { ...state.tasks, [taskId]: change(task) } };
+}
+
+const TASK_RULES: readonly TransitionRule[] = [
+  {
+    name: "ready",
+    eventType: "task.ready",
+    acceptsTaskStatus: ["ready"],
+    apply: ({ state, event }) => ({ state: withTaskChange(state, taskIdOf(event.payload), (task) => ({ ...task, status: "tests_pending", attempts: { implementer: 0, testWriter: 1 } })), emits: [], effects: [{ kind: "build.test-writer" }] }),
+  },
+  {
+    name: "rejected",
+    eventType: "task.tests_rejected",
+    acceptsTaskStatus: ["tests_pending"],
+    apply: ({ state, event }) => ({ state: withTaskChange(state, taskIdOf(event.payload), (task) => ({ ...task, attempts: { implementer: 0, testWriter: task.attempts.testWriter + 1 } })), emits: [], effects: [{ kind: "build.restart-lane" }] }),
+  },
+  {
+    name: "approved",
+    eventType: "task.approved",
+    acceptsTaskStatus: ["tests_pending"],
+    apply: ({ state, event }) => ({ state: withTaskChange(state, taskIdOf(event.payload), (task) => ({ ...task, status: "approved" })), emits: [], effects: [{ kind: "build.schedule" }] }),
+  },
+  { name: "spec approved", eventType: "spec.approved", apply: ({ state }) => ({ state: { ...state, status: "designing" }, emits: [], effects: [{ kind: "design.start" }] }) },
+];
+
+function buildingWith(taskIds: readonly string[]): RunState {
+  const tasks = Object.fromEntries(taskIds.map((taskId) => [taskId, createTaskState({ worktree: `worktrees/${taskId}`, covers: [], writes: [], dependsOn: [] })]));
+  return { ...initial(), status: "building", tasks };
+}
+
+function taskSummary(state: RunState, taskId: string): readonly [string | undefined, number | undefined] {
+  const task = state.tasks[taskId];
+  return [task?.status, task?.attempts.testWriter];
+}
+
+describe("multi-lane resume replay plan", () => {
+  const twoLanesInFlight = [
+    delivered(1, "task.ready", "foreman", { taskId: "T-001" }),
+    delivered(2, "task.approved", "foreman", { taskId: "T-001" }),
+    delivered(3, "task.ready", "foreman", { taskId: "T-002" }),
+    delivered(4, "task.ready", "foreman", { taskId: "T-003" }),
+    delivered(5, "task.tests_rejected", "foreman", { taskId: "T-003" }),
+    delivered(6, "run.failed", "foreman"),
+  ];
+
+  // @covers factory:DLT-006
+  it("redoes the lane entry of every other in-flight task and then the latest effectful event, in seq order", () => {
+    const plan = planReplay(TASK_RULES, buildingWith(["T-001", "T-002", "T-003"]), twoLanesInFlight);
+
+    expect(plan.redo.map((event) => [event.type, taskIdOf(event.payload), event.seq])).toEqual([
+      ["task.ready", "T-002", 3],
+      ["task.tests_rejected", "T-003", 5],
+    ]);
+  });
+
+  // @covers factory:DLT-006
+  it("rolls each other in-flight task back to its state before its lane entry and leaves approved tasks alone", () => {
+    const plan = planReplay(TASK_RULES, buildingWith(["T-001", "T-002", "T-003"]), twoLanesInFlight);
+
+    expect([taskSummary(plan.state, "T-001"), taskSummary(plan.state, "T-002"), taskSummary(plan.state, "T-003"), plan.state.status]).toEqual([
+      ["approved", 1],
+      ["ready", 0],
+      ["tests_pending", 1],
+      "building",
+    ]);
+  });
+
+  // @covers factory:DLT-006
+  it("redoes the latest event once when its task is the only one in flight", () => {
+    const events = [delivered(1, "task.ready", "foreman", { taskId: "T-001" }), delivered(2, "task.tests_rejected", "foreman", { taskId: "T-001" }), delivered(3, "run.failed", "foreman")];
+
+    const plan = planReplay(TASK_RULES, buildingWith(["T-001"]), events);
+
+    expect([plan.redo.map((event) => [event.type, event.seq]), taskSummary(plan.state, "T-001")]).toEqual([[["task.tests_rejected", 2]], ["tests_pending", 1]]);
+  });
+
+  // @covers factory:DLT-006
+  it("redoes a single event when no lane is in flight", () => {
+    const events = [delivered(1, "spec.approved", "foreman"), delivered(2, "run.failed", "foreman")];
+
+    const plan = planReplay(TASK_RULES, initial(), events);
+
+    expect(plan.redo.map((event) => [event.type, event.seq])).toEqual([["spec.approved", 1]]);
   });
 });
 
