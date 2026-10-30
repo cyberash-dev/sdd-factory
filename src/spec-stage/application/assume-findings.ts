@@ -10,7 +10,7 @@ import { SPEC_EFFECT_KINDS } from "../effect-kinds.js";
 import { runApprove } from "./approve.js";
 import { effectInteger, effectString } from "./effect-fields.js";
 import { outputTail, type StageDeps } from "./stage-deps.js";
-import { lintProductSpec } from "./spec-lint.js";
+import { lintProductSpecWithFix } from "./spec-lint.js";
 
 const ASSUMPTIONS_PATH = "spec/assumptions.md";
 
@@ -37,7 +37,7 @@ export async function runAssumeFindings(effect: Effect, context: EffectContext, 
   const rendered = findings.map((finding, index) => renderCriticAssumption({ slug: slice.slug, number: first + index, finding, round, reviewBy }));
   if (rendered.length > 0) {
     await writeFile(assumptionsPath, appendAssumptions(existing, slice.slug, rendered.map((assumption) => assumption.block)), "utf8");
-    const lint = await lintProductSpec(deps.commands, productDir);
+    const lint = await lintProductSpecWithFix(slice, deps, context);
     if (lint.exitCode !== 0) {
       slice.log(`warning: ${ASSUMPTIONS_PATH} lint exit ${lint.exitCode} after recording critic findings: ${outputTail(lint)}`);
     }

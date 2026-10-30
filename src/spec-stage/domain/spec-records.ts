@@ -204,3 +204,33 @@ export function specIntegrityProblems(specText: string): readonly string[] {
   const records = parseSpecRecords(specText);
   return [...surfaceProblems(records), ...undecidedOpenQuestions(records)];
 }
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  if (isRecord(value)) {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/* factory:BEH-012 format-only check: id -> key-order-independent JSON of every fence that parses; unparseable fences are absent. */
+export function canonicalRecordsById(specText: string): ReadonlyMap<string, string> {
+  const records = new Map<string, string>();
+  for (const match of specText.matchAll(YAML_FENCE)) {
+    let parsed: unknown;
+    try {
+      parsed = YAML.parse(stripDocumentMarkers(match[1] ?? ""));
+    } catch {
+      continue;
+    }
+    if (isRecord(parsed) && typeof parsed["id"] === "string") {
+      records.set(parsed["id"], canonicalJson(parsed));
+    }
+  }
+  return records;
+}

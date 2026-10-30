@@ -1,15 +1,17 @@
 import { join, relative } from "node:path";
 import type { ParsedHandoff } from "../../bus/domain/handoff.js";
-import type { Effect } from "../../bus/domain/transition.js";
+import type { Effect, PendingEvent } from "../../bus/domain/transition.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
+import { readTextOrNull } from "../../shared/fs/text.js";
 import type { ToolTraceEntry } from "../../shared/llm/tools.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { fileTools, sddTool } from "../adapters/role-tools.js";
 import { isRecord } from "../domain/guards.js";
+import { parseSpecRecords } from "../domain/spec-records.js";
 import { effectInteger, effectStringOrNull } from "./effect-fields.js";
 import { invokeRole, promptBody, type HandoffVerdict } from "./role-invocation.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
-import { lintProductSpec } from "./spec-lint.js";
+import { hasYamlInvalidRecords, lintProductSpecWithFix } from "./spec-lint.js";
 
 const ANALYST_MESSAGE = `Draft attempt {{attempt}} of the product spec for "{{slug}}".
 Source spec: {{spec_source_path}}
@@ -22,6 +24,17 @@ Relative paths given to read_file, write_file and list_dir resolve against the p
 const ANALYST_MAX_OUTPUT_TOKENS = 32000;
 
 const RECORD_COUNT_KEYS = ["behaviors", "contracts", "invariants", "scenarios", "constraints", "policies", "open_questions", "assumptions"] as const;
+
+const RECORD_TYPE_BY_COUNT_KEY: Readonly<Record<(typeof RECORD_COUNT_KEYS)[number], string>> = {
+  behaviors: "Behavior",
+  contracts: "Contract",
+  invariants: "Invariant",
+  scenarios: "Scenario",
+  constraints: "Constraint",
+  policies: "Policy",
+  open_questions: "Open-Q",
+  assumptions: "ASSUMPTION",
+};
 
 type RecordCounts = Readonly<Record<string, number>>;
 
@@ -57,6 +70,28 @@ async function verifyAnalystHandoff(handoff: ParsedHandoff): Promise<HandoffVerd
   }
   const recordCounts = recordCountsOf(frontmatter["records"]);
   return typeof recordCounts === "string" ? { kind: "retry", error: recordCounts } : { kind: "ok", value: { kind: "complete", recordCounts } };
+}
+
+async function specRecordCounts(productDir: string): Promise<RecordCounts> {
+  const records = parseSpecRecords((await readTextOrNull(join(productDir, "spec", "spec.md"))) ?? "");
+  return Object.fromEntries(RECORD_COUNT_KEYS.map((key) => [key, records.filter((record) => record.type === RECORD_TYPE_BY_COUNT_KEY[key]).length]));
+}
+
+function specDrafted(attempt: number, recordCounts: RecordCounts): PendingEvent {
+  return { type: "spec.drafted", producer: "spec-analyst", payload: { attempt, lintExit: 0, recordCounts } };
+}
+
+/* spec-stage:DLT-006: a lint_cap handoff over a yaml_invalid fence the simple-fixer repairs continues as a draft. */
+async function concludeBlockedHandoff(context: EffectContext, slice: SliceContext, deps: StageDeps, attempt: number, blockedReason: string): Promise<void> {
+  const isLintCap = blockedReason.startsWith("lint_cap");
+  if (isLintCap && (await hasYamlInvalidRecords(slice.paths.productDir))) {
+    const lint = await lintProductSpecWithFix(slice, deps, context);
+    if (lint.exitCode === 0) {
+      context.publish(specDrafted(attempt, await specRecordCounts(slice.paths.productDir)));
+      return;
+    }
+  }
+  concludeStage(deps, context, specBlocked("spec-analyst", isLintCap ? "lint_cap" : "analyst_blocked", blockedReason));
 }
 
 function assertSourceInsideRepo(slice: SliceContext): void {
@@ -119,14 +154,13 @@ export async function runDraft(effect: Effect, context: EffectContext, slice: Sl
     return;
   }
   if (outcome.value.kind === "blocked") {
-    const reason = outcome.value.blockedReason.startsWith("lint_cap") ? "lint_cap" : "analyst_blocked";
-    concludeStage(deps, context, specBlocked("spec-analyst", reason, outcome.value.blockedReason));
+    await concludeBlockedHandoff(context, slice, deps, attempt, outcome.value.blockedReason);
     return;
   }
-  const lint = await lintProductSpec(deps.commands, productDir);
+  const lint = await lintProductSpecWithFix(slice, deps, context);
   if (lint.exitCode !== 0) {
     concludeStage(deps, context, specBlocked("spec-analyst", "analyst_blocked", `lint_failed: ${outputTail(lint)}`));
     return;
   }
-  context.publish({ type: "spec.drafted", producer: "spec-analyst", payload: { attempt, lintExit: 0, recordCounts: outcome.value.recordCounts } });
+  context.publish(specDrafted(attempt, outcome.value.recordCounts));
 }

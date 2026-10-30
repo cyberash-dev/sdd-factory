@@ -1,5 +1,8 @@
+import { setTimeout as sleep } from "node:timers/promises";
+import { createGitWorkingTree, type SimpleFixDeps } from "../shared/fixer/index.js";
 import type { EffectHandler, SliceFactory } from "../shared/slice.js";
 import { createExecFileCommandRunner } from "./adapters/exec-file-command-runner.js";
+import { createExecFileProcessRunner } from "./adapters/exec-file-process-runner.js";
 import { runApprove } from "./application/approve.js";
 import { runAssume } from "./application/assume.js";
 import { runAssumeFindings } from "./application/assume-findings.js";
@@ -26,8 +29,9 @@ function withDeps(handler: StageHandler, deps: StageDeps): EffectHandler {
 
 export function createSpecStageSlice(options: SpecStageOptions = {}): SliceFactory {
   const commands = options.commands ?? createExecFileCommandRunner();
+  const fixer: SimpleFixDeps = { tree: createGitWorkingTree(createExecFileProcessRunner()), delay: (ms) => sleep(ms) };
   return (context) => {
-    const deps: StageDeps = { commands, clock: createStageClock() };
+    const deps: StageDeps = { commands, clock: createStageClock(), fixer };
     return {
       name: "spec-stage",
       rules: specStageRules(context.config.caps),
