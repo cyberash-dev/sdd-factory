@@ -1,4 +1,6 @@
 import type { GaFinding } from "./ga-review.js";
+import { isRecord } from "./guards.js";
+import type { SpecRecord } from "./spec-records.js";
 
 const SECTION_TITLES = [
   "Context",
@@ -77,6 +79,56 @@ export function renderCriticAssumption(input: CriticAssumptionInput): RenderedAs
     "assumption: |",
     assumption,
     "source_open_q: not_applicable",
+    "blocking: no",
+    `review_by: "${input.reviewBy}"`,
+    "default_if_unresolved: keep_assumption",
+    "tests: []",
+    `notes: ${notes}`,
+    "---",
+    "```",
+  ].join("\n");
+  return { id, block };
+}
+
+export interface DefaultAssumptionInput {
+  readonly slug: string;
+  readonly number: number;
+  readonly openQuestion: SpecRecord;
+  readonly reviewBy: string;
+}
+
+function defaultOptionText(openQuestion: SpecRecord): string {
+  const chosen = String(openQuestion.fields["default_if_unresolved"]);
+  const options = openQuestion.fields["options"];
+  const option = Array.isArray(options) ? options.find((candidate) => isRecord(candidate) && candidate["id"] === chosen) : undefined;
+  if (!isRecord(option)) {
+    return `resolved by its default option \`${chosen}\``;
+  }
+  const label = typeof option["label"] === "string" ? option["label"] : chosen;
+  const consequence = typeof option["consequence"] === "string" ? ` ${option["consequence"]}` : "";
+  return `resolved by its default option \`${chosen}\`: ${label}.${consequence}`;
+}
+
+/* spec-stage:DLT-003: an undecided Open-Q with a default, decided by the foreman at approval. */
+export function renderDefaultAssumption(input: DefaultAssumptionInput): RenderedAssumption {
+  const id = `${input.slug}:ASM-${String(input.number).padStart(3, "0")}`;
+  const title = typeof input.openQuestion.fields["title"] === "string" ? input.openQuestion.fields["title"] : input.openQuestion.id;
+  const assumption = `${title}: ${defaultOptionText(input.openQuestion)}`
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
+  const notes = JSON.stringify(`default_if_unresolved of ${input.openQuestion.id} materialised by the foreman at approval (spec-stage:INV-001)`);
+  const block = [
+    "```yaml",
+    "---",
+    `id: ${id}`,
+    "type: ASSUMPTION",
+    "lifecycle:",
+    "  status: proposed",
+    `partition_id: ${input.slug}`,
+    "assumption: |",
+    assumption,
+    `source_open_q: ${input.openQuestion.id}`,
     "blocking: no",
     `review_by: "${input.reviewBy}"`,
     "default_if_unresolved: keep_assumption",

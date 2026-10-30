@@ -1,10 +1,12 @@
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Effect } from "../../bus/domain/transition.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 import { parseFinalizeEnvelope } from "../../shared/sdd/envelope.js";
 import type { SliceContext } from "../../shared/slice.js";
-import { specIntegrityProblems } from "../domain/spec-records.js";
+import { appendAssumptions, nextAssumptionNumber, renderDefaultAssumption } from "../domain/assumption-records.js";
+import { openQuestionsDecidableByDefault, parseSpecRecords, specIntegrityProblems } from "../domain/spec-records.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
 
 const APPROVAL_MODE = "pre-authorized-at-launch";
@@ -13,15 +15,32 @@ function approveArgv(slice: SliceContext, id: string): readonly string[] {
   return ["approve", "--id", id, "--approver", slice.operator, "--owner-role", "product-owner", "--change-request", `${slice.runId}: pre-authorised at launch`, "--scope", "first-time-approval", "--format=json"];
 }
 
+/* spec-stage:DLT-003: an Open-Q the critic left undecided is decided by its own default before approval. */
+async function decideByDefault(slice: SliceContext, specPath: string): Promise<string> {
+  const specText = (await readTextOrNull(specPath)) ?? "";
+  const undecided = openQuestionsDecidableByDefault(parseSpecRecords(specText));
+  if (undecided.length === 0) {
+    return specText;
+  }
+  const first = nextAssumptionNumber(slice.slug, [specText]);
+  const reviewBy = slice.now().toISOString().slice(0, 10);
+  const rendered = undecided.map((openQuestion, index) => renderDefaultAssumption({ slug: slice.slug, number: first + index, openQuestion, reviewBy }));
+  const next = appendAssumptions(specText, slice.slug, rendered.map((assumption) => assumption.block));
+  await writeFile(specPath, next, "utf8");
+  slice.log(`spec.approve: ${undecided.map((openQuestion) => openQuestion.id).join(", ")} decided by default_if_unresolved as ${rendered.map((assumption) => assumption.id).join(", ")}`);
+  return next;
+}
+
 export async function runApprove(_effect: Effect, context: EffectContext, slice: SliceContext, deps: StageDeps): Promise<void> {
   const productDir = slice.paths.productDir;
   const blocked = (detail: string): void => concludeStage(deps, context, specBlocked("foreman", "analyst_blocked", detail));
+  const specText = await decideByDefault(slice, join(productDir, "spec", "spec.md"));
   const lintBefore = await deps.commands.run(["lint", "--format=json"], productDir);
   if (lintBefore.exitCode !== 0) {
     blocked(`lint_failed: ${outputTail(lintBefore)}`);
     return;
   }
-  const problems = specIntegrityProblems((await readTextOrNull(join(productDir, "spec", "spec.md"))) ?? "");
+  const problems = specIntegrityProblems(specText);
   if (problems.length > 0) {
     blocked(`spec_integrity: ${problems.join("; ")}`);
     return;

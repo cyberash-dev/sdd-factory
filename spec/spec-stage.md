@@ -987,6 +987,56 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-003
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: spec-stage
+title: approval materialises the default of every undecided Open-Q instead of blocking
+target_ids:
+  - spec-stage:INV-001
+  - spec-stage:BEH-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  INV-001 still holds at `spec.approved`, but the way an undecided
+  `Open-Q` is handled changes. Before the integrity check of `spec.approve`
+  the foreman finds every Open-Q of spec/spec.md with `blocking: no`, a
+  `default_if_unresolved` and no ASSUMPTION naming it in `source_open_q`,
+  and appends one ASSUMPTION record to section 18 of spec/spec.md without
+  a model call: id continuing the numbering, `assumption` stating the
+  default option (its id, label and consequence) as the reading taken,
+  `source_open_q` the Open-Q id, `blocking: no`, `tests: []`, `notes`
+  naming the Open-Q and this rule. `sdd lint` runs afterwards as before.
+  Only an Open-Q with `blocking: yes` or without `default_if_unresolved`,
+  and the Surface membership problems, still block approval. The critic
+  (BEH-002) keeps deciding Open-Qs in its rounds; this rule is the
+  deterministic floor under a critic that misses one, which is what the
+  SDD methodology prescribes for blocking: no questions.
+tests_old_behavior:
+  - a decided Open-Q is approved unchanged; Surface membership problems still block (spec-stage:CTR-001 test)
+tests_new_behavior:
+  - to:spec-stage:INV-001
+test_obligation:
+  predicate: |
+    A spec whose Open-Q has no ASSUMPTION naming it is approved with a new
+    ASSUMPTION in section 18 whose source_open_q is that Open-Q and whose
+    assumption names the default option; an Open-Q with blocking yes still
+    blocks with analyst_blocked.
+  test_template: integration
+  boundary_classes:
+    - one undecided Open-Q with a default
+    - blocking Open-Q
+  failure_scenarios:
+    - approval blocked by a decidable Open-Q
+    - ASSUMPTION added for an Open-Q that already has one
+---
+```
+
 ---
 
 ## 16. Implementation bindings

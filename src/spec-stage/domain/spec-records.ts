@@ -37,6 +37,33 @@ function idsOf(records: readonly SpecRecord[], type: string): readonly string[] 
   return records.filter((record) => record.type === type).map((record) => record.id);
 }
 
+function assumptionReferences(records: readonly SpecRecord[]): ReadonlyMap<string, number> {
+  const referencedBy = new Map<string, number>();
+  for (const assumption of records.filter((record) => record.type === "ASSUMPTION")) {
+    const source = assumption.fields["source_open_q"];
+    if (typeof source === "string") {
+      referencedBy.set(source, (referencedBy.get(source) ?? 0) + 1);
+    }
+  }
+  return referencedBy;
+}
+
+function isBlocking(record: SpecRecord): boolean {
+  const blocking = record.fields["blocking"];
+  return blocking === true || blocking === "yes";
+}
+
+function hasDefault(record: SpecRecord): boolean {
+  const value = record.fields["default_if_unresolved"];
+  return value !== undefined && value !== null;
+}
+
+/* spec-stage:DLT-003: Open-Q records the foreman can decide by their own default before approval. */
+export function openQuestionsDecidableByDefault(records: readonly SpecRecord[]): readonly SpecRecord[] {
+  const referencedBy = assumptionReferences(records);
+  return records.filter((record) => record.type === "Open-Q" && !isBlocking(record) && hasDefault(record) && (referencedBy.get(record.id) ?? 0) === 0);
+}
+
 function undecidedOpenQuestions(records: readonly SpecRecord[]): readonly string[] {
   const openQuestionIds = idsOf(records, "Open-Q");
   const referencedBy = new Map<string, number>();

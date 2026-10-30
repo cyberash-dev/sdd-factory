@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { runApprove } from "../../src/spec-stage/application/approve.js";
 import { createStageClock } from "../../src/spec-stage/application/stage-clock.js";
@@ -64,14 +65,33 @@ describe("spec.approve effect", () => {
   });
 
   // @covers spec-stage:INV-001
-  it("never approves a spec whose open question has no deciding assumption", async () => {
+  // @covers spec-stage:DLT-003
+  it("decides an open question nobody decided by its default before approving, so no undecided question reaches approval", async () => {
     const ws = await stageWorkspace(CLI_SPEC.replace("source_open_q: todo-cli:OQ-001", "source_open_q: null"));
     const commands = scriptedCommands(sddReplies({ finalize: FINALIZED }));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
 
-    expect([commands.calls.map((argv) => argv[0]), published]).toEqual([["lint"], [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: "spec_integrity: todo-cli:OQ-001 is referenced by 0 ASSUMPTION records, expected 1" } }]]);
+    const spec = await readFile(ws.specPath, "utf8");
+    expect([
+      published.map((event) => event.type),
+      spec.includes("id: todo-cli:ASM-002"),
+      spec.includes("source_open_q: todo-cli:OQ-001"),
+      spec.includes("todo-cli:OQ-001: resolved by its default option `a`"),
+      spec.includes("default_if_unresolved of todo-cli:OQ-001 materialised by the foreman at approval"),
+    ]).toEqual([["spec.approved"], true, true, true, true]);
+  });
+
+  // @covers spec-stage:DLT-003
+  it("still blocks approval on a blocking open question", async () => {
+    const ws = await stageWorkspace(CLI_SPEC.replace("blocking: no\ndefault_if_unresolved: a", "blocking: yes\ndefault_if_unresolved: a"));
+    const commands = scriptedCommands(sddReplies({ finalize: FINALIZED }));
+    const { context, published } = effectContext(runStateAt("spec_review"));
+
+    await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
+
+    expect([commands.calls.map((argv) => argv[0]), published[0]?.type, String(published[0]?.payload["detail"]).startsWith("spec_integrity: todo-cli:OQ-001 is blocking")]).toEqual([["lint"], "spec.blocked", true]);
   });
 
   // @covers spec-stage:CTR-001
