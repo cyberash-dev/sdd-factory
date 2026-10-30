@@ -2,6 +2,10 @@ import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { greeterDesign } from "./support/design.js";
+import { aLaneHarness } from "./support/harness.js";
+import { aProductRepo } from "./support/product.js";
+import { buildingState } from "./support/state.js";
 import { claudeArgv, createCliRoleRunner, laneEnvironment, parseStreamJsonLine, signalLanes, type CliRoleRequest } from "../../src/shared/llm/cli-role-runner.js";
 
 const RESULT_LINE = JSON.stringify({ type: "result", subtype: "success", is_error: false, total_cost_usd: 0.0421, duration_ms: 1234, usage: { input_tokens: 500, output_tokens: 120 }, modelUsage: { "claude-opus-5-5": { outputTokens: 120 }, "claude-haiku-4-5": { outputTokens: 10 } }, result: "done" });
@@ -72,6 +76,18 @@ describe("claude -p lane executor", () => {
     const outcome = await running;
 
     expect([outcome.signal, outcome.timedOut]).toEqual(["SIGTERM", false]);
+  });
+
+  // @covers build-stage:BEH-016
+  it("sends SIGTERM to a running lane subprocess when the lanes are terminated", async () => {
+    const binary = await fakeClaude([], { sleepMs: 2000 });
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign() });
+    const running = createCliRoleRunner().run(request(binary, 20000));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 200));
+
+    await harness.slice.effects["build.terminate-lanes"]?.({ kind: "build.terminate-lanes" }, { state: buildingState({}), publish: () => undefined }, harness.context);
+
+    expect((await running).signal).toBe("SIGTERM");
   });
 
   it("rejects when the binary does not exist", async () => {
