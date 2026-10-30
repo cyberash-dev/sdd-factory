@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { isLaneRole } from "../../bus/adapters/mozaik/roster.js";
+import { isLaneRole, laneUnitOf } from "../../bus/adapters/mozaik/roster.js";
 import { createFactoryRuntime, createReactor, type FactoryRuntime } from "../../bus/adapters/mozaik/runtime.js";
 import { AtomicJsonStore } from "../../bus/adapters/outbound/atomic-json-store.js";
 import { RunEngine } from "../../bus/application/run-engine.js";
@@ -49,20 +49,15 @@ export interface RunningFactory {
   shutdown(): Promise<void>;
 }
 
-function taskIdOf(payload: Readonly<Record<string, unknown>>): string | null {
-  const taskId = payload["taskId"];
-  return typeof taskId === "string" ? taskId : null;
-}
-
 /* The redo event keeps its original producer; a lane producer needs its lane participant around the publication (bus:BEH-007). */
 function republish(runtime: FactoryRuntime, redo: DeliveredEvent<EventType>): void {
   const pending: PendingEvent = { type: redo.type, producer: redo.producer, payload: redo.payload };
-  const taskId = taskIdOf(redo.payload);
-  if (!isLaneRole(redo.producer) || taskId === null) {
+  const unit = isLaneRole(redo.producer) ? laneUnitOf(redo.producer, redo.payload) : null;
+  if (!isLaneRole(redo.producer) || unit === null) {
     runtime.publisher.publish(pending);
     return;
   }
-  const lane = runtime.joinLane(redo.producer, taskId);
+  const lane = runtime.joinLane(redo.producer, unit);
   try {
     runtime.publisher.publish(pending);
   } finally {

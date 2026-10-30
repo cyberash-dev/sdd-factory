@@ -145,6 +145,39 @@ function twoLaneStage(launches: string[]): SliceFactory {
   });
 }
 
+/* The test-writer lane publishes task.tests_written; the red check it triggers fails in the first run and publishes the run after that. */
+function laneProducedRedoStage(redChecks: { count: number }): SliceFactory {
+  return () => ({
+    name: "lane-produced-redo-stage",
+    rules: [
+      {
+        name: "workspace.ready -> building",
+        eventType: "workspace.ready",
+        apply: ({ state }) => ({ state: { ...state, status: "building", tasks: { "T-001": { ...createTaskState({ worktree: "worktrees/T-001", covers: [], writes: [], dependsOn: [] }), status: "tests_pending" } } }, emits: [], effects: [{ kind: "lane.write" }] }),
+      },
+      { name: "task.tests_written -> red check", eventType: "task.tests_written", acceptsTaskStatus: ["tests_pending"], apply: ({ state }) => ({ state, emits: [], effects: [{ kind: "red.check" }] }) },
+    ],
+    effects: {
+      "lane.write": async (_effect, context, slice) => {
+        const lane = slice.runtime.joinLane("test-writer", "T-001");
+        try {
+          context.publish({ type: "task.tests_written", producer: "test-writer", payload: { taskId: "T-001", attempt: 1, handoffPath: "handoffs/T-001.md", costUsd: null, inputTokens: 0, outputTokens: 0, durationMs: 0 } });
+        } finally {
+          slice.runtime.leaveLane(lane);
+        }
+      },
+      "red.check": async (_effect, context) => {
+        redChecks.count += 1;
+        if (redChecks.count === 1) {
+          throw new Error("provider_error:429");
+        }
+        context.publish({ type: "run.published", producer: "foreman", payload: { commitSha: "ab".repeat(20), outputDir: "hidden/todo-cli", pushed: false } });
+      },
+    },
+    participants: () => [],
+  });
+}
+
 async function traceTypes(runDir: string): Promise<readonly (readonly [string, string])[]> {
   const lines = (await readFile(join(runDir, "trace", "trace.jsonl"), "utf8")).split("\n").filter((line) => line.length > 0);
   return lines
@@ -322,6 +355,24 @@ describe("resumed run with several lanes in flight", () => {
 
     const intervention = (await busRecords(secondRunDir)).find((record) => record.type === "human.intervention");
     expect(intervention?.payload["note"]).toBe(`resume of ${firstRunId} from task.ready seq 5, task.ready seq 6; provider is back`);
+  });
+});
+
+describe("resumed run with a lane-produced redo event", () => {
+  // @covers factory:BEH-009
+  it("republishes task.tests_written from the test-writer lane and publishes the run", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
+    const redChecks = { count: 0 };
+    const input = { repoRoot, specPath: join(repoRoot, "todo-cli.md"), slug: "todo-cli", operator: "cyberash", push: false, outDir: null, config: DEFAULT_CONFIG, stageSlices: [createTraceSlice({ env: {} }), laneProducedRedoStage(redChecks)], commandRunner: fakeCommands, versions: { typescript: "7.0.2", vitest: "5.0.5", typesNode: "26.6.6", agentSdd: "2.1.1" }, log: () => undefined, env: {} };
+    const first = await startRun({ ...input, now: () => new Date("2026-10-30T16:00:00.000Z") });
+    await first.terminal;
+    await first.shutdown();
+
+    const second = await startRun({ ...input, now: () => new Date("2026-10-30T17:00:00.000Z"), resume: { fromRunId: first.runId, note: null, force: false } });
+    const secondOutcome = await second.terminal;
+    await second.shutdown();
+
+    expect([secondOutcome.manifest.status, secondOutcome.failureDetail, redChecks.count]).toEqual(["published", null, 2]);
   });
 });
 
