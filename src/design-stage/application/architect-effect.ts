@@ -52,7 +52,7 @@ export async function runArchitectEffect(effect: Effect, context: EffectContext,
     attempt: String(attempt),
     rework_finding: reworkFinding,
   });
-  const outcome = await runStageRole(slice, { role: "architect", message });
+  const outcome = await runStageRole(slice, { role: "architect", message, mode: context.state.status === "building" ? "repair" : "first_pass" });
   if (outcome.kind === "blocked") {
     publishBlocked(context, outcome.reason, outcome.detail, outcome.usage, outcome.reruns);
     return;

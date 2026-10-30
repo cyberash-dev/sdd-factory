@@ -4,16 +4,20 @@ import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../bu
 import { readTextOrNull } from "../../shared/fs/text.js";
 import { isRoleTimeout, roleTimeoutNote } from "../../shared/llm/api-role-runner.js";
 import type { SliceContext } from "../../shared/slice.js";
-import { fileTools } from "../adapters/outbound/role-tools.js";
+import { canonicalPath, fileTools } from "../adapters/outbound/role-tools.js";
 import { createFirewall } from "../domain/firewall.js";
 import type { RoleUsage } from "../domain/payloads.js";
-import { HANDOFF_RERUN_SUFFIX } from "./messages.js";
+import { FIREWALL_RERUN_SUFFIX, HANDOFF_RERUN_SUFFIX } from "./messages.js";
 
 export type StageRole = "architect" | "verification-designer" | "planner";
+
+/* design-stage:DLT-007: a repair runs while the run is building, after the planner has cut the design. */
+export type StageRoleMode = "first_pass" | "repair";
 
 export interface StageRoleRequest {
   readonly role: StageRole;
   readonly message: string;
+  readonly mode?: StageRoleMode;
 }
 
 export type StageRoleOutcome =
@@ -34,19 +38,19 @@ export function handoffPathOf(slice: SliceContext, role: StageRole): string {
 }
 
 /* Absolute prefixes a role must never read (design-stage:BEH-001); also the deny-list of its tools. */
-export function forbiddenReadsFor(slice: SliceContext, role: StageRole): readonly string[] {
+export function forbiddenReadsFor(slice: SliceContext, role: StageRole, mode: StageRoleMode = "first_pass"): readonly string[] {
   const { productDir, specSourcePath, handoffsDir } = slice.paths;
   const design = (file: string) => join(productDir, "design", file);
   const common = [join(productDir, "src"), join(productDir, "tests"), join(productDir, "reviews"), join(productDir, "node_modules"), handoffsDir];
   const byRole: Readonly<Record<StageRole, readonly string[]>> = {
-    architect: [design("verification.md"), design("tasks.json"), design("plan.md")],
+    architect: mode === "repair" ? [design("verification.md")] : [design("verification.md"), design("tasks.json"), design("plan.md")],
     "verification-designer": [design("tech.md"), design("tasks.json"), design("plan.md"), specSourcePath],
     planner: [specSourcePath],
   };
   return [...common, ...byRole[role]];
 }
 
-function scopeFor(slice: SliceContext, role: StageRole): RoleScope {
+function scopeFor(slice: SliceContext, role: StageRole, mode: StageRoleMode): RoleScope {
   const { productDir, specSourcePath, handoffsDir } = slice.paths;
   const design = (file: string) => join(productDir, "design", file);
   const ownFiles: Readonly<Record<StageRole, readonly string[]>> = {
@@ -60,7 +64,7 @@ function scopeFor(slice: SliceContext, role: StageRole): RoleScope {
     reads: [specSourcePath, join(productDir, "spec"), join(productDir, "design"), ...toolingFiles],
     writes: [...ownFiles[role], join(handoffsDir, role)],
     lists: [productDir],
-    deniedReads: forbiddenReadsFor(slice, role),
+    deniedReads: forbiddenReadsFor(slice, role, mode),
   };
 }
 
@@ -94,14 +98,15 @@ function blockedReason(handoff: ParsedHandoff): string {
 export async function runStageRole(slice: SliceContext, request: StageRoleRequest): Promise<StageRoleOutcome> {
   const handoffPath = handoffPathOf(slice, request.role);
   const instruction = await slice.prompts.load(request.role);
-  const scope = scopeFor(slice, request.role);
-  const firewall = createFirewall(slice.paths.productDir, scope.deniedReads);
-  const tools = fileTools({ repoRoot: slice.paths.repoRoot, productDir: slice.paths.productDir, ...scope, trace: firewall.trace });
+  const scope = scopeFor(slice, request.role, request.mode ?? "first_pass");
   const model = slice.config.models.default;
   let usage = zeroUsage(model);
   let message = request.message;
   let reruns = 0;
+  let firewallReruns = 0;
   for (;;) {
+    const firewall = createFirewall(canonicalPath(slice.paths.productDir), scope.deniedReads.map(canonicalPath));
+    const tools = fileTools({ repoRoot: slice.paths.repoRoot, productDir: slice.paths.productDir, ...scope, trace: firewall.trace });
     let timedOut = false;
     try {
       const run = await slice.apiRoles.run({ role: request.role, instruction, message, model, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), `tools-run${reruns + 1}.jsonl`) });
@@ -115,7 +120,17 @@ export async function runStageRole(slice: SliceContext, request: StageRoleReques
     }
     const violations = firewall.violations();
     if (violations.length > 0) {
-      return { kind: "blocked", reason: "context_firewall_violation", detail: `${request.role} read ${violations.join(", ")}`, usage, reruns };
+      const files = violations.join(", ");
+      /* design-stage:DLT-007: the first forbidden read re-runs the role from its first message, without the file it read. */
+      if (firewallReruns > 0 || reruns >= slice.config.caps.handoffRerun) {
+        return { kind: "blocked", reason: "context_firewall_violation", detail: `${request.role} read ${files}`, usage, reruns };
+      }
+      await keepRejected(handoffPath, reruns + 1);
+      slice.log(`design-stage: ${request.role} read ${files}, re-running once`);
+      firewallReruns += 1;
+      reruns += 1;
+      message = request.message + slice.prompts.render(FIREWALL_RERUN_SUFFIX, { files });
+      continue;
     }
     const parsed = parseHandoff(request.role, await readTextOrNull(handoffPath));
     if (parsed.ok) {

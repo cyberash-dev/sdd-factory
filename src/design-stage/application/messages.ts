@@ -39,3 +39,7 @@ Write tasks_json, design/plan.md, then handoff_path, then stop.`;
 export const HANDOFF_RERUN_SUFFIX = `
 
 Your previous handoff at {{handoff_path}} was unparseable ({{handoff_error}}). Redo the work with the same inputs and finish by writing a handoff whose frontmatter carries every required key.`;
+
+export const FIREWALL_RERUN_SUFFIX = `
+
+Note: you read {{files}}, which this role never reads; continue without it.`;

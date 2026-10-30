@@ -1,3 +1,5 @@
+import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runVerificationEffect } from "../../src/design-stage/application/verification-effect.js";
 import { handoffPathIn, handoffText, harness, readVia, stateIn, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type RoleScript } from "./harness.js";
@@ -23,26 +25,46 @@ describe("design.verification effect", () => {
   });
 
   // @covers design-stage:BEH-001
-  it("blocks the design with context_firewall_violation when the designer reads design/tech.md", async () => {
+  // @covers design-stage:DLT-007
+  it("refuses the designer's read of design/tech.md without counting it as a violation", async () => {
+    let refusal = "";
     const peek: RoleScript = async (request) => {
-      await readVia(request, "design/tech.md");
+      refusal = await readVia(request, "design/tech.md");
     };
     const h = await harness({ scripts: { "verification-designer": [designerWriting(verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"]), peek)] } });
 
     await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
 
-    expect(h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])).toEqual([["design.blocked", "context_firewall_violation", "verification-designer read design/tech.md"]]);
+    expect([refusal, h.roleCalls.length, h.published.map((event) => event.type)]).toEqual(["ERROR: path design/tech.md is outside what this role is allowed to read", 1, ["design.verification.ready"]]);
   });
 
-  it("blocks the design with context_firewall_violation when the designer reads the source spec", async () => {
+  // @covers design-stage:DLT-007
+  it("refuses the designer's read of the source spec", async () => {
+    let refusal = "";
     const peek: RoleScript = async (request) => {
-      await readVia(request, h.slice.paths.specSourcePath);
+      refusal = await readVia(request, h.slice.paths.specSourcePath);
     };
     const h = await harness({ scripts: { "verification-designer": [designerWriting(verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"]), peek)] } });
 
     await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
 
-    expect(h.published.map((event) => event.payload["reason"])).toEqual(["context_firewall_violation"]);
+    expect(refusal).toBe(`ERROR: path ${h.slice.paths.specSourcePath} is outside what this role is allowed to read`);
+  });
+
+  // @covers design-stage:DLT-007
+  it("re-runs the designer once with the firewall note after it read design/tech.md content, then accepts a clean run", async () => {
+    const peek: RoleScript = async (request) => {
+      await readVia(request, "design/notes.md");
+    };
+    const complete = verificationMdText(["todo-cli:CTR-001", "todo-cli:BEH-002"]);
+    const h = await harness({ scripts: { "verification-designer": [designerWriting(complete, peek), designerWriting(complete)] } });
+    await mkdir(join(h.productDir, "design"), { recursive: true });
+    await writeFile(join(h.productDir, "design", "tech.md"), "# tech\n", "utf8");
+    await symlink("tech.md", join(h.productDir, "design", "notes.md"));
+
+    await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), h.slice, h.commandRunner);
+
+    expect([h.roleCalls.length, h.roleCalls[1]?.message.includes("you read design/tech.md, which this role never reads; continue without it"), h.published.map((event) => [event.type, event.payload["handoffReruns"]])]).toEqual([2, true, [["design.verification.ready", 1]]]);
   });
 
   // @covers design-stage:CTR-002

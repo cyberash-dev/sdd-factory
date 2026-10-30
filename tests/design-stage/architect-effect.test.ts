@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runArchitectEffect } from "../../src/design-stage/application/architect-effect.js";
@@ -12,6 +12,13 @@ function architectWriting(techMd: string, handoffLines: readonly string[] = ARCH
     await writeVia(request, "design/tech.md", techMd);
     await writeVia(request, handoffPathIn(request), handoffText("architect", 1, handoffLines));
   };
+}
+
+/* The deny-list refuses a forbidden path, so a forbidden read can only get content through a link to it. */
+async function linkInDesign(productDir: string, link: string, target: string, content: string): Promise<void> {
+  await mkdir(join(productDir, "design"), { recursive: true });
+  await writeFile(join(productDir, "design", target), content, "utf8");
+  await symlink(target, join(productDir, "design", link));
 }
 
 describe("design.architect effect", () => {
@@ -63,31 +70,115 @@ describe("design.architect effect", () => {
   });
 
   // @covers design-stage:BEH-001
-  it("blocks the design with context_firewall_violation when the architect reads design/verification.md", async () => {
+  // @covers design-stage:DLT-007
+  it("refuses a first-pass architect's read of design/verification.md without counting it as a violation", async () => {
+    let refusal = "";
     const peek: RoleScript = async (request) => {
-      await readVia(request, "./design/verification.md");
+      refusal = await readVia(request, "./design/verification.md");
     };
     const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek)] } });
 
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
-    expect(h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])).toEqual([["design.blocked", "context_firewall_violation", "architect read design/verification.md"]]);
+    expect([refusal, h.roleCalls.length, h.published.map((event) => event.type)]).toEqual(["ERROR: path ./design/verification.md is outside what this role is allowed to read", 1, ["design.tech.ready"]]);
   });
 
-  it("blocks the design with context_firewall_violation when the architect lists src/", async () => {
-    const h = await harness({
-      scripts: {
-        architect: [
-          architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, async (request) => {
-            await request.tools.find((candidate) => candidate.name === "list_dir")?.invoke({ path: "src" });
-          }),
-        ],
-      },
-    });
+  // @covers design-stage:DLT-007
+  it("publishes design.tech.ready without a rerun when the architect's list_dir of src was refused", async () => {
+    let refusal = "";
+    const listing: RoleScript = async (request) => {
+      refusal = String(await request.tools.find((candidate) => candidate.name === "list_dir")?.invoke({ path: "src" }));
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, listing)] } });
 
     await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
 
-    expect(h.published.map((event) => event.payload["reason"])).toEqual(["context_firewall_violation"]);
+    expect([refusal, h.roleCalls.length, h.published.map((event) => event.type)]).toEqual(["ERROR: path src is outside what this role is allowed to list", 1, ["design.tech.ready"]]);
+  });
+
+  // @covers design-stage:DLT-007
+  it("lets a repairing architect in building read design/plan.md and design/tasks.json and publishes design.tech.ready", async () => {
+    let planText = "";
+    let tasksText = "";
+    const peek: RoleScript = async (request) => {
+      planText = await readVia(request, "design/plan.md");
+      tasksText = await readVia(request, "design/tasks.json");
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek)] } });
+    await mkdir(join(h.productDir, "design"), { recursive: true });
+    await writeFile(join(h.productDir, "design", "plan.md"), "# plan\n", "utf8");
+    await writeFile(join(h.productDir, "design", "tasks.json"), "{}\n", "utf8");
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 2, specIds: ["todo-cli:BEH-002"], reworkFinding: "VD-INFEASIBLE" }, h.context(stateIn("building")), h.slice);
+
+    expect([planText, tasksText, h.roleCalls.length, h.published.map((event) => event.type)]).toEqual(["# plan\n", "{}\n", 1, ["design.tech.ready"]]);
+  });
+
+  // @covers design-stage:DLT-007
+  it("still refuses design/verification.md to a repairing architect in building", async () => {
+    let refusal = "";
+    const peek: RoleScript = async (request) => {
+      refusal = await readVia(request, "design/verification.md");
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek)] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 2, reworkFinding: "VD-INFEASIBLE" }, h.context(stateIn("building")), h.slice);
+
+    expect(refusal).toBe("ERROR: path design/verification.md is outside what this role is allowed to read");
+  });
+
+  // @covers design-stage:DLT-007
+  it("still refuses design/plan.md to a first-pass architect", async () => {
+    let refusal = "";
+    const peek: RoleScript = async (request) => {
+      refusal = await readVia(request, "design/plan.md");
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek)] } });
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect(refusal).toBe("ERROR: path design/plan.md is outside what this role is allowed to read");
+  });
+
+  // @covers design-stage:DLT-007
+  it("re-runs a first-pass architect once with the firewall note after it read design/verification.md content, then accepts a clean run", async () => {
+    const peek: RoleScript = async (request) => {
+      await readVia(request, "design/notes.md");
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek), architectWriting(techMdText())] } });
+    await linkInDesign(h.productDir, "notes.md", "verification.md", "# verification\n");
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([h.roleCalls.length, h.roleCalls[1]?.message.includes("you read design/verification.md, which this role never reads; continue without it"), h.published.map((event) => [event.type, event.payload["handoffReruns"]])]).toEqual([2, true, [["design.tech.ready", 1]]]);
+  });
+
+  // @covers design-stage:DLT-007
+  it("keeps the forbidden file's content out of the architect's rerun message", async () => {
+    let readText = "";
+    const peek: RoleScript = async (request) => {
+      readText = await readVia(request, "design/notes.md");
+    };
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek), architectWriting(techMdText())] } });
+    await linkInDesign(h.productDir, "notes.md", "verification.md", "VERIFICATION-ONLY-ORACLE\n");
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([readText, h.roleCalls.length, h.roleCalls[1]?.message.includes("VERIFICATION-ONLY-ORACLE")]).toEqual(["VERIFICATION-ONLY-ORACLE\n", 2, false]);
+  });
+
+  // @covers design-stage:DLT-007
+  it("blocks the design with context_firewall_violation when the architect's rerun reads design/verification.md content again", async () => {
+    const peek: RoleScript = async (request) => {
+      await readVia(request, "design/notes.md");
+    };
+    const peeking = architectWriting(techMdText(), ARCHITECT_HANDOFF_LINES, peek);
+    const h = await harness({ scripts: { architect: [peeking, peeking, peeking] } });
+    await linkInDesign(h.productDir, "notes.md", "verification.md", "# verification\n");
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), h.slice);
+
+    expect([h.roleCalls.length, h.published.map((event) => [event.type, event.payload["reason"], event.payload["detail"]])]).toEqual([2, [["design.blocked", "context_firewall_violation", "architect read design/verification.md"]]]);
   });
 
   // @covers design-stage:BEH-001

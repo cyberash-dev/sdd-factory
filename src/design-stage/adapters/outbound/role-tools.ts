@@ -1,4 +1,5 @@
-import { relative, resolve, sep } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { Tool } from "@mozaik-ai/core";
 import { editFileTool, listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../../shared/llm/tools.js";
 
@@ -27,8 +28,19 @@ export function isInside(prefix: string, candidate: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !rel.startsWith(sep));
 }
 
-/* Paths resolve against productDir; a refused access is still traced so the firewall sees the attempt. */
-function scopedTool(inner: Tool, scope: PathScope, verb: string, trace: ToolTrace): Tool {
+/* design-stage:DLT-007: symlinks resolved, so a link to a forbidden file is still seen by the firewall. */
+export function canonicalPath(path: string): string {
+  const tail: string[] = [];
+  let existing = path;
+  while (!existsSync(existing) && dirname(existing) !== existing) {
+    tail.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  return join(realpathSync(existing), ...tail);
+}
+
+/* Paths resolve against productDir; a refused access returned no content, so it is not traced (design-stage:DLT-007). */
+function scopedTool(inner: Tool, scope: PathScope, verb: string): Tool {
   return {
     ...inner,
     invoke: async (args: unknown): Promise<unknown> => {
@@ -37,11 +49,9 @@ function scopedTool(inner: Tool, scope: PathScope, verb: string, trace: ToolTrac
       }
       const absolute = resolve(scope.base, args["path"]);
       if (scope.denied.some((prefix) => isInside(prefix, absolute))) {
-        trace({ tool: inner.name, path: absolute, argv: null });
         return `ERROR: path ${args["path"]} is outside what this role is allowed to ${verb}`;
       }
       if (!scope.allowed.some((prefix) => isInside(prefix, absolute))) {
-        trace({ tool: inner.name, path: absolute, argv: null });
         return `ERROR: path ${args["path"]} is outside what this role is allowed to ${verb}`;
       }
       return inner.invoke({ ...args, path: absolute });
@@ -51,10 +61,13 @@ function scopedTool(inner: Tool, scope: PathScope, verb: string, trace: ToolTrac
 
 export function fileTools(options: RoleToolOptions): readonly Tool[] {
   const base = options.productDir;
+  const trace: ToolTrace = (entry) => {
+    options.trace({ ...entry, path: entry.path === null ? null : canonicalPath(entry.path) });
+  };
   return [
-    scopedTool(readFileTool(options.repoRoot, options.trace), { base, allowed: options.reads, denied: options.deniedReads }, "read", options.trace),
-    scopedTool(writeFileTool(options.repoRoot, options.trace), { base, allowed: options.writes, denied: [] }, "write", options.trace),
-    scopedTool(editFileTool(options.repoRoot, options.trace), { base, allowed: options.writes, denied: [] }, "write", options.trace),
-    scopedTool(listDirTool(options.repoRoot, options.trace), { base, allowed: options.lists, denied: options.deniedReads }, "list", options.trace),
+    scopedTool(readFileTool(options.repoRoot, trace), { base, allowed: options.reads, denied: options.deniedReads }, "read"),
+    scopedTool(writeFileTool(options.repoRoot, trace), { base, allowed: options.writes, denied: [] }, "write"),
+    scopedTool(editFileTool(options.repoRoot, trace), { base, allowed: options.writes, denied: [] }, "write"),
+    scopedTool(listDirTool(options.repoRoot, trace), { base, allowed: options.lists, denied: options.deniedReads }, "list"),
   ];
 }
