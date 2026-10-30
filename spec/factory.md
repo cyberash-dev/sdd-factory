@@ -2543,6 +2543,78 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-010
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T20:18:42.957Z
+    change_request: "per-role lane models and effort: sonnet lanes, opus fixer, medium analyst and triage"
+    scope: first-time-approval
+partition_id: factory
+title: per-role models and reasoning effort for the Claude Code lanes
+target_ids:
+  - factory:DLT-002
+  - factory:DLT-003
+  - factory:BEH-012
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  `models.lane` names one Claude Code model for every lane role and
+  null means the CLI default, which on the operator's subscription is
+  the newest and most expensive model; `models.effort` reaches API
+  roles only. The operator wants the test-writer and the implementer on
+  claude-sonnet-5-5 at medium effort, the simple-fixer on claude-opus-5-5
+  at medium effort, and medium effort for the spec-analyst and triage.
+  Changes:
+  - factory config gains `models.lanes`, a map from lane role
+    (test-writer, implementer, simple-fixer) to a Claude Code model id;
+    a role absent from the map falls back to `models.lane`, and null
+    there keeps the CLI default as today. The simple-fixer of
+    factory:BEH-012 runs on `models.lanes["simple-fixer"]` resolved the
+    same way instead of `models.lane`.
+  - `models.effort[role]` applies to lane roles as well: the lane runner
+    passes it to the CLI as `--effort <level>` for the levels low,
+    medium, high, xhigh and max (build-stage:DLT-006); none or an absent
+    entry passes no flag.
+  - the shipped factory.config.json sets lanes test-writer and
+    implementer to claude-sonnet-5-5, simple-fixer to claude-opus-5-5,
+    and effort medium for spec-analyst, triage, test-writer, implementer
+    and simple-fixer; the target profile mirrors the lane entries.
+  - the inference.started event of a lane carries the resolved model id
+    rather than the placeholder claude-code when a model is configured
+    (build-stage:DLT-001 unchanged otherwise).
+  The preflight of factory:DLT-002 still excludes lane models from the
+  API-key resolution.
+tests_old_behavior:
+  - a configuration without models.lanes behaves exactly as before: every lane role uses models.lane and no --effort flag is passed
+tests_new_behavior:
+  - to:factory:BEH-012
+test_obligation:
+  predicate: |
+    mergeConfig reads models.lanes per role and keeps models.lane as the
+    fallback; with lanes {"test-writer": "claude-sonnet-5-5"} and effort
+    {"test-writer": "medium"} the test-writer lane argv carries --model
+    claude-sonnet-5-5 and --effort medium while the implementer lane
+    carries neither; the fixer lane uses models.lanes["simple-fixer"];
+    the shipped factory.config.json parses to the values listed above.
+  test_template: unit
+  boundary_classes:
+    - role in lanes map
+    - role absent from the map with models.lane null
+    - effort none
+  failure_scenarios:
+    - fixer still reading models.lane when a fixer entry exists
+    - --effort passed for an absent entry
+---
+```
+
 ---
 
 ## 16. Implementation bindings

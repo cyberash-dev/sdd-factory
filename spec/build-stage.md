@@ -2467,6 +2467,52 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-006
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T20:18:43.282Z
+    change_request: "per-role lane models and effort: sonnet lanes, opus fixer, medium analyst and triage"
+    scope: first-time-approval
+partition_id: build-stage
+title: lane argv carries the configured reasoning effort
+target_ids:
+  - build-stage:EXT-001
+  - build-stage:DLT-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The argv of build-stage:EXT-001 gains `--effort <level>` after the
+  optional `--model` when factory:DLT-010 resolves a reasoning effort
+  for the lane role; the level is one of low, medium, high, xhigh, max
+  as documented by `claude --help` on 2.1.312. No flag is passed when
+  the role has no effort entry or the entry is none. The prompt, cwd,
+  add-dirs, safe mode and stream handling are unchanged.
+tests_old_behavior:
+  - the argv without an effort entry equals the DLT-002 argv byte for byte
+tests_new_behavior:
+  - to:factory:DLT-010
+test_obligation:
+  predicate: |
+    claudeArgv with effort medium ends in --model <id> --effort medium;
+    with effort none or absent it ends as before.
+  test_template: unit
+  boundary_classes:
+    - effort set
+    - effort none
+    - effort absent
+  failure_scenarios:
+    - --effort emitted for none
+---
+```
+
 ---
 
 ## 16. Implementation bindings
