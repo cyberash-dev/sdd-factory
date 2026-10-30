@@ -74,7 +74,7 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     const durationMs = Date.parse(outcome.manifest.endedAt ?? outcome.manifest.startedAt) - Date.parse(outcome.manifest.startedAt);
     process.stdout.write(successSummary({ manifest: outcome.manifest, tracePath: join(running.paths.traceDir, "trace.md"), totalCostUsd: costs.totalUsd, durationMs, midRunInterventions: costs.midRunInterventions }));
   } else {
-    process.stderr.write(failureReport({ stage: outcome.manifest.stage, reason: outcome.manifest.reason ?? "unknown", detail: outcome.manifest.reason ?? "", runDir: running.paths.runDir, evidencePath: outcome.evidencePath }));
+    process.stderr.write(failureReport({ stage: outcome.manifest.stage, reason: outcome.manifest.reason ?? "unknown", detail: outcome.failureDetail ?? "", runDir: running.paths.runDir, evidencePath: outcome.evidencePath }));
   }
   return exitCodeOf(outcome.manifest.status);
 }

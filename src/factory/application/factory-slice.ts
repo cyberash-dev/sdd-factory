@@ -12,6 +12,7 @@ import type { ToolchainVersions } from "./product-scaffold.js";
 export interface TerminalOutcome {
   readonly manifest: RunManifest;
   readonly evidencePath: string;
+  readonly failureDetail: string | null;
 }
 
 export interface FactorySliceOptions {
@@ -125,7 +126,7 @@ export function createFactorySlice(options: FactorySliceOptions): SliceFactory {
             ? { ...manifest, status: "published", stage: "publish", endedAt, commitSha: stringField(effect, "commitSha"), outputDir: stringField(effect, "outputDir"), pushed: effect["pushed"] === true, counters }
             : { ...manifest, status: "failed", stage: stageOf(state.status, state.failure), endedAt, reason: stringField(effect, "reason"), counters };
         await persistManifest(next);
-        options.onTerminal({ manifest: next, evidencePath: join(context.paths.runDir, "state.json") });
+        options.onTerminal({ manifest: next, evidencePath: join(context.paths.runDir, "state.json"), failureDetail: state.failure === null ? null : state.failure.detail });
       },
     };
 

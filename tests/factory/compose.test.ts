@@ -43,7 +43,7 @@ const stallingSpecStage: SliceFactory = () => ({
   participants: () => [],
 });
 
-async function runWith(stage: SliceFactory): Promise<{ manifest: RunManifest; stateText: string; runDir: string }> {
+async function runWith(stage: SliceFactory): Promise<{ manifest: RunManifest; stateText: string; runDir: string; failureDetail: string | null }> {
   const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
   const running = await startRun({
     repoRoot,
@@ -62,7 +62,7 @@ async function runWith(stage: SliceFactory): Promise<{ manifest: RunManifest; st
   });
   const outcome = await running.terminal;
   await running.shutdown();
-  return { manifest: outcome.manifest, stateText: await readFile(join(running.paths.runDir, "state.json"), "utf8"), runDir: running.paths.runDir };
+  return { manifest: outcome.manifest, stateText: await readFile(join(running.paths.runDir, "state.json"), "utf8"), runDir: running.paths.runDir, failureDetail: outcome.failureDetail };
 }
 
 describe("composed run", () => {
@@ -72,6 +72,13 @@ describe("composed run", () => {
 
     const state: { status: string; failure: { reason: string; stage: string } } = JSON.parse(stateText);
     expect([manifest.status, manifest.reason, state.status, state.failure.reason, state.failure.stage]).toEqual(["failed", "runtime_error", "failed", "runtime_error", "workspace"]);
+  });
+
+  // @covers factory:CTR-002
+  it("hands the failure detail to the terminal outcome so the report can print it", async () => {
+    const { failureDetail } = await runWith(stallingSpecStage);
+
+    expect(failureDetail?.includes("provider_error:429")).toBe(true);
   });
 
   it("turns a rejected effect into a failed run at the stage the run was in", async () => {
