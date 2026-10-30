@@ -2479,6 +2479,70 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-009
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:50:28.286Z
+    change_request: resume of a resumed run replays the trace chain
+    scope: first-time-approval
+partition_id: factory
+title: resuming a resumed run replays the whole chain of traces
+target_ids:
+  - factory:BEH-009
+  - factory:DLT-007
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Run 11 was a resume of run 10, so its trace.jsonl starts at the
+  seeded state and holds only its own events; replaying that file from
+  an empty state drops every event as out of order and `factory resume`
+  exits 2 with "nothing to resume", although the run has a well-defined
+  history. factory:BEH-009 replays "the bus events of R0": for a run
+  whose run.json carries resumedFrom, R0's history is the chain. The
+  replay input is built recursively: the events of the ancestor named
+  by resumedFrom, cut at the ancestor's own failure chain the way
+  DLT-007 cuts them, followed by the run's own events (its run.started
+  and fix_between_runs intervention included, both applied, neither a
+  redo candidate per DLT-008). The chain is read from the run
+  directories under .factory/runs; a missing ancestor directory or
+  trace fails readResumeSource with exit 2 naming the ancestor. Redo
+  events keep the run id they came from, and the fix_between_runs note
+  names each as "<type> seq <n> of <runId>" when the chain holds more
+  than one run. Product, worktrees and handoffs directories stay those
+  of the first run of the chain, which every descendant already shares.
+tests_old_behavior:
+  - a resume of a run that was not itself resumed replays exactly as before (BEH-009, DLT-006, DLT-007 and DLT-008 tests stay green)
+tests_new_behavior:
+  - to:factory:BEH-009
+test_obligation:
+  predicate: |
+    Given run A failed at the design stage, run B resumed A (its trace
+    holds run.started, human.intervention and the events after the redo)
+    and failed in the build stage with lanes in flight, resuming B yields
+    the redo list DLT-006 and DLT-007 define over the concatenated
+    history, the seeded state carries the tasks created in B, the note
+    names each redone event with its run id, and the paths are those of
+    A; a resume of B whose ancestor directory was deleted exits 2 naming
+    A.
+  test_template: integration
+  boundary_classes:
+    - chain of two runs
+    - ancestor missing
+    - single run (unchanged)
+  failure_scenarios:
+    - events of the resumed run dropped as out of order
+    - redo note without the run id in a chain
+---
+```
+
 ---
 
 ## 16. Implementation bindings
