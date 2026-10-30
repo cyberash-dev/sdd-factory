@@ -49,7 +49,7 @@ describe("report regeneration", () => {
 
     const parsed: { tasks: { taskId: string; outcome: string }[] } = JSON.parse(costs);
     const taskRow = traceMd.split("\n").find((line) => line.startsWith("| T-001 |")) ?? "";
-    expect([/^\| T-001 \| Domain model \| 1 \| 1 \| \d+ \| 0\.5260 \| 1200 \| 220 \| approved \|$/.test(taskRow), parsed.tasks.map((task) => [task.taskId, task.outcome])]).toEqual([
+    expect([/^\| T-001 \| Domain model \| 1 \| 1 \| \d+ \| 0\.5260 \| 1200 \| 220 \| approved \| 0 \|$/.test(taskRow), parsed.tasks.map((task) => [task.taskId, task.outcome])]).toEqual([
       true,
       [
         ["T-001", "approved"],

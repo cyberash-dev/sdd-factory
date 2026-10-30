@@ -19,6 +19,8 @@ function fixtureReport(overrides: Partial<TraceReport> = {}): TraceReport {
     participants: [],
     entries: [],
     totals: { durationMs: 720000, costUsd: 0.4521, inputTokens: 1200, outputTokens: 300, unknownCostEntries: 0 },
+    fixes: [],
+    advisories: [],
     assumptions: [{ id: "todo-cli:ASM-001", text: "Tasks are stored in a JSON file." }],
     midRunInterventions: 1,
     warnings: [],
@@ -41,7 +43,7 @@ describe("trace.md rendering", () => {
     const offsets = sectionOffsets(text);
     expect([
       offsets.every((offset, index) => offset >= 0 && (index === 0 || offset > (offsets[index - 1] ?? 0))),
-      text.includes("| T-001 | Domain model | 2 | 1 | 390000 | 0.4321 | 1000 | 250 | approved |\n| T-002 | CLI entry | 1 | 1 | 60000 | 0.0200 | 200 | 50 | approved |"),
+      text.includes("| T-001 | Domain model | 2 | 1 | 390000 | 0.4321 | 1000 | 250 | approved | 0 |\n| T-002 | CLI entry | 1 | 1 | 60000 | 0.0200 | 200 | 50 | approved | 0 |"),
       text.includes("| stage | startedAt | endedAt | durationMs | costUsd |\n|---|---|---|---|---|\n| build | 2026-10-29T12:07:00.000Z | 2026-10-29T12:10:00.000Z | 180000 | 0.4521 |"),
       text.includes("- durationMs: 720000\n- costUsd: 0.4521\n- inputTokens: 1200\n- outputTokens: 300\n- unknown-cost entries: 0"),
       text.includes("- todo-cli:ASM-001: Tasks are stored in a JSON file."),
@@ -69,7 +71,7 @@ describe("trace.md rendering", () => {
       }),
     );
 
-    expect([text.includes("| T-001 | Domain model | 1 | 1 | 390000 | n/a | 1000 | 250 | approved |"), text.includes("| 180000 | n/a |"), text.includes("- costUsd: 0.0000"), text.includes("- unknown-cost entries: 2")]).toEqual([true, true, true, true]);
+    expect([text.includes("| T-001 | Domain model | 1 | 1 | 390000 | n/a | 1000 | 250 | approved | 0 |"), text.includes("| 180000 | n/a |"), text.includes("- costUsd: 0.0000"), text.includes("- unknown-cost entries: 2")]).toEqual([true, true, true, true]);
   });
 
   // @covers trace:CTR-002

@@ -31,9 +31,10 @@ describe("trace-files surface after the member and cloud deltas", () => {
   });
 
   // @covers trace:DLT-003
-  it("carries version 0.3.1 after lane inference events joined the trace unpriced", async () => {
+  // @covers trace:DLT-004
+  it("carries version 0.4.0 after fixer runs joined the cost ledger and the report", async () => {
     const surface = await surfaceRecord("trace.md", "trace:SUR-001");
 
-    expect(surface.version).toBe("0.3.1");
+    expect(surface.version).toBe("0.4.0");
   });
 });

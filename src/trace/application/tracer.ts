@@ -11,7 +11,7 @@ import { integerOf, numberOrNull, stringOf } from "../domain/guards.js";
 import { interventionLine, isInterventionKind, LAUNCH_NOTE, midRunCountLine } from "../domain/interventions.js";
 import type { TraceCostEntry } from "../domain/ledger.js";
 import { buildReport, type TraceReport } from "../domain/report.js";
-import { stageOpenedBy } from "../domain/stage.js";
+import { isRunStage, stageOpenedBy } from "../domain/stage.js";
 import { renderTraceMd } from "../domain/trace-md.js";
 import { RUNTIME_PRODUCER, serializeRecord, type RuntimeEventType, type TraceRecord } from "../domain/trace-record.js";
 import type { ProductTextReader, TraceStore } from "../ports/outbound/trace-store.js";
@@ -60,7 +60,7 @@ const REPORT_TRIGGERS: ReadonlySet<EventType> = new Set<EventType>([
   "run.failed",
 ]);
 
-const LANE_ROLE_BY_EVENT: Partial<Record<EventType, string>> = { "task.tests_written": "test-writer", "task.impl_done": "implementer" };
+const LANE_ROLE_BY_EVENT: Partial<Record<EventType, string>> = { "task.tests_written": "test-writer", "task.impl_done": "implementer", "fix.attempted": "simple-fixer" };
 
 const ASSUMPTION_FILES = ["spec/spec.md", "spec/assumptions.md"] as const;
 
@@ -207,10 +207,11 @@ export class Tracer {
       return;
     }
     this.ledgerKeys.add(key);
+    const payloadStage = event.payload["stage"];
     this.entries.push({
       participant: role,
       taskId: stringOf(event.payload["taskId"]),
-      stage: "build",
+      stage: isRunStage(payloadStage) ? payloadStage : "build",
       costUsd: numberOrNull(event.payload["costUsd"]),
       inputTokens: integerOf(event.payload["inputTokens"]),
       outputTokens: integerOf(event.payload["outputTokens"]),

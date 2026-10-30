@@ -2,7 +2,7 @@ import { isEventType, RUN_STAGES, type EventType } from "../../bus/domain/catalo
 import type { RunStage } from "../../bus/domain/run-state.js";
 import type { ModelPricing } from "../../shared/config.js";
 import type { AssumptionNote } from "./assumptions.js";
-import { integerOf, millisOf, stringOf } from "./guards.js";
+import { integerOf, millisOf, numberOrNull, stringOf } from "./guards.js";
 import { aggregateCost, type TraceCostEntry } from "./ledger.js";
 import { stageOfEvent } from "./stage.js";
 import type { TraceRecord } from "./trace-record.js";
@@ -44,6 +44,21 @@ export interface ParticipantRow {
   readonly outputTokens: number;
 }
 
+export interface FixNote {
+  readonly stage: string;
+  readonly taskId: string | null;
+  readonly attempt: number;
+  readonly trigger: string;
+  readonly outcome: string;
+  readonly filesChanged: number;
+  readonly costUsd: number | null;
+}
+
+export interface AdvisoryNote {
+  readonly taskId: string;
+  readonly findingText: string;
+}
+
 export interface ReportTotals {
   readonly durationMs: number;
   readonly costUsd: number;
@@ -65,6 +80,8 @@ export interface TraceReport {
   readonly participants: readonly ParticipantRow[];
   readonly entries: readonly TraceCostEntry[];
   readonly totals: ReportTotals;
+  readonly fixes: readonly FixNote[];
+  readonly advisories: readonly AdvisoryNote[];
   readonly assumptions: readonly AssumptionNote[];
   readonly midRunInterventions: number;
   readonly warnings: readonly string[];
@@ -223,6 +240,39 @@ function participantRows(entries: readonly TraceCostEntry[]): readonly Participa
   });
 }
 
+/* One note per fixer run: a redelivered fix.attempted carries the same (owner, unit, attempt) key (bus:CTR-009). */
+function fixNotes(bus: readonly BusRecord[]): readonly FixNote[] {
+  const byKey = new Map<string, FixNote>();
+  for (const record of bus) {
+    if (record.type !== "fix.attempted") {
+      continue;
+    }
+    const { payload } = record;
+    const attempt = integerOf(payload["attempt"]);
+    const key = `${stringOf(payload["owner"]) ?? ""}|${stringOf(payload["unit"]) ?? ""}|${attempt}`;
+    const filesChanged = payload["filesChanged"];
+    byKey.set(key, {
+      stage: stringOf(payload["stage"]) ?? "",
+      taskId: stringOf(payload["taskId"]),
+      attempt,
+      trigger: stringOf(payload["trigger"]) ?? "",
+      outcome: stringOf(payload["outcome"]) ?? "",
+      filesChanged: Array.isArray(filesChanged) ? filesChanged.length : 0,
+      costUsd: numberOrNull(payload["costUsd"]),
+    });
+  }
+  return [...byKey.values()];
+}
+
+function advisoryNotes(bus: readonly BusRecord[]): readonly AdvisoryNote[] {
+  return bus.flatMap((record) => {
+    const taskId = stringOf(record.payload["taskId"]);
+    const findingText = stringOf(record.payload["findingText"]);
+    const isAdvisory = record.type === "task.reviewed" && record.payload["decision"] === "advisory_only";
+    return isAdvisory && taskId !== null && findingText !== null ? [{ taskId, findingText }] : [];
+  });
+}
+
 export function buildReport(input: ReportInput): TraceReport {
   const bus = input.records.filter(isBusRecord);
   const started = bus.find((record) => record.type === "run.started");
@@ -252,6 +302,8 @@ export function buildReport(input: ReportInput): TraceReport {
       outputTokens: cost.outputTokens,
       unknownCostEntries: cost.unknownCostEntries,
     },
+    fixes: fixNotes(bus),
+    advisories: advisoryNotes(bus),
     assumptions: input.assumptions,
     midRunInterventions: input.midRunInterventions,
     warnings: input.warnings,
