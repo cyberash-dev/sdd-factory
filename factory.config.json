@@ -25,7 +25,7 @@
     "default": "deepseek/deepseek-v4.1-flash-1017",
     "critic": "z-ai/glm-5.3-flash:nitro",
     "triage": "deepseek/deepseek-v4.1-flash-1017",
-    "reviewer": "z-ai/glm-5.3-flash:nitro",
+    "reviewer": "deepseek/deepseek-v4.1-flash-1017",
     "lane": null,
     "lanes": {
       "test-writer": "claude-sonnet-5-5",
