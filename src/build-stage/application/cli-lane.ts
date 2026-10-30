@@ -1,4 +1,5 @@
 import { dirname } from "node:path";
+import type { LaneRole } from "../../bus/adapters/mozaik/roster.js";
 import { laneEnvironment, type CliRoleOutcome } from "../../shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../shared/slice.js";
 import type { LaneDeps } from "./lane-deps.js";
@@ -30,6 +31,16 @@ export function costFieldsOf(outcome: CliRoleOutcome): CostFields {
     return { costUsd: null, inputTokens: 0, outputTokens: 0, durationMs: outcome.durationMs };
   }
   return { costUsd: outcome.result.costUsd, inputTokens: outcome.result.inputTokens, outputTokens: outcome.result.outputTokens, durationMs: outcome.result.durationMs };
+}
+
+/* build-stage:BEH-017: the lane participant lives from before the subprocess starts to after the last event. */
+export async function withLaneParticipant<T>(slice: SliceContext, role: LaneRole, taskId: string, body: () => Promise<T>): Promise<T> {
+  const lane = slice.runtime.joinLane(role, taskId);
+  try {
+    return await body();
+  } finally {
+    slice.runtime.leaveLane(lane);
+  }
 }
 
 /* build-stage:EXT-001: one retry after a rate-limited result, without counting an attempt. */

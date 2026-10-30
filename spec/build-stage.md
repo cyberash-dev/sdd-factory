@@ -1094,6 +1094,71 @@ test_obligation:
 
 ```yaml
 ---
+id: build-stage:BEH-017
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T10:53:11.919Z
+    change_request: participant roster
+    scope: first-time-approval
+partition_id: build-stage
+title: lane participants join and leave with the lane
+given: |
+  - lane state for T allows a test-writer or implementer invocation
+    (BEH-002, BEH-005)
+when: the foreman invokes the test-writer or the implementer for T
+then: |
+  - before the `claude -p` subprocess starts, a Mozaik agent participant
+    named after the role joins the runtime with capabilities
+    [`lane`, `task:<T.id>`]
+  - every event this invocation publishes (task.tests_written,
+    task.impl_done, task.finding, task.failed{reason: blocked}) is sent by
+    that participant (bus:BEH-007)
+  - after the last event of the invocation the participant leaves the
+    runtime; a handoff re-run (BEH-015) happens inside the same
+    participant lifetime
+  - lanes of independent tasks that run concurrently are represented by
+    concurrently joined participants
+negative_cases:
+  - "the lane is cancelled while the subprocess runs (restart or termination) => the participant leaves without publishing"
+  - "the subprocess fails without a handoff => task.failed{reason: unparseable_handoff} is sent by the foreman, then the participant leaves"
+out_of_scope:
+  - the reviewer, which is an API role with a roster participant
+  - participants for the verifier runs (deterministic, foreman effects)
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: multi_global
+  read_consistency: strong
+  idempotency: none
+  time_source: none
+data_scope: not_applicable
+policy_refs:
+  - factory:POL-001
+test_obligation:
+  predicate: |
+    With a fake subprocess runner that records the runtime roster while it
+    runs, the roster contains a participant named test-writer with
+    capability task:T-001 during the invocation and not after it; the
+    published task.tests_written carries that participant's id as its
+    Mozaik producerId; two concurrently scheduled independent lanes yield
+    two simultaneously joined lane participants.
+  test_template: integration
+  boundary_classes:
+    - single lane
+    - two concurrent lanes
+    - cancelled lane
+  failure_scenarios:
+    - lane participant joined once per run instead of per invocation
+    - participant left before the final event was sent
+---
+```
+
+```yaml
+---
 id: build-stage:SCN-001
 type: Scenario
 lifecycle:

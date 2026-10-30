@@ -7,7 +7,7 @@ import { firewallViolations } from "../../domain/context-firewall.js";
 import { laneHandoffPath } from "../../domain/handoff-paths.js";
 import { instructionVariables, testWriterMessage, techExcerptOf, type LaneMessageInput } from "../../domain/lane-messages.js";
 import type { ReworkFinding } from "../../domain/rules/support.js";
-import { costFieldsOf, runCliLane } from "../cli-lane.js";
+import { costFieldsOf, runCliLane, withLaneParticipant } from "../cli-lane.js";
 import { runWithHandoffRetry, type ParseOutcome } from "../handoff-roundtrip.js";
 import type { LaneDeps } from "../lane-deps.js";
 import { laneInputs, reworkFindingText, type LaneInputs } from "../lane-inputs.js";
@@ -52,32 +52,34 @@ export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context
   const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding));
   const instruction = slice.prompts.render(await slice.prompts.load("test-writer"), instructionVariables(messageInput));
   let lastRun: CliRoleOutcome | null = null;
-  const result = await runWithHandoffRetry(
-    {
-      role: "test-writer",
-      handoffPath,
-      maxReruns: slice.config.caps.handoffRerun,
-      invoke: async (message) => {
-        lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message });
-        return lastRun;
+  await withLaneParticipant(slice, "test-writer", run.taskId, async () => {
+    const result = await runWithHandoffRetry(
+      {
+        role: "test-writer",
+        handoffPath,
+        maxReruns: slice.config.caps.handoffRerun,
+        invoke: async (message) => {
+          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message });
+          return lastRun;
+        },
+        parse: async () => parseLaneHandoff("test-writer", lastRun, await readTextOrNull(handoffPath)),
       },
-      parse: async () => parseLaneHandoff("test-writer", lastRun, await readTextOrNull(handoffPath)),
-    },
-    testWriterMessage(messageInput),
-  );
-  if (!deps.lanes.isLive(token)) {
-    slice.log(`test-writer result dropped for cancelled lane ${run.taskId}`);
-    return;
-  }
-  if (!result.ok) {
-    context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "unparseable_handoff", detail: `test-writer: ${result.error}` } });
-    return;
-  }
-  const frontmatter = result.parsed.frontmatter;
-  if (frontmatter["status"] === "blocked") {
-    context.publish({ type: "task.failed", producer: "test-writer", payload: { taskId: run.taskId, reason: "blocked", detail: `test-writer: ${String(frontmatter["blocked_reason"] ?? "")}` } });
-    return;
-  }
-  const violations = firewallViolations(result.run.toolUses, inputs.task.worktree, inputs.stubPaths);
-  context.publish({ type: "task.tests_written", producer: "test-writer", payload: { taskId: run.taskId, attempt: run.attempt, handoffPath, ...costFieldsOf(result.run), firewallViolations: violations } });
+      testWriterMessage(messageInput),
+    );
+    if (!deps.lanes.isLive(token)) {
+      slice.log(`test-writer result dropped for cancelled lane ${run.taskId}`);
+      return;
+    }
+    if (!result.ok) {
+      context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "unparseable_handoff", detail: `test-writer: ${result.error}` } });
+      return;
+    }
+    const frontmatter = result.parsed.frontmatter;
+    if (frontmatter["status"] === "blocked") {
+      context.publish({ type: "task.failed", producer: "test-writer", payload: { taskId: run.taskId, reason: "blocked", detail: `test-writer: ${String(frontmatter["blocked_reason"] ?? "")}` } });
+      return;
+    }
+    const violations = firewallViolations(result.run.toolUses, inputs.task.worktree, inputs.stubPaths);
+    context.publish({ type: "task.tests_written", producer: "test-writer", payload: { taskId: run.taskId, attempt: run.attempt, handoffPath, ...costFieldsOf(result.run), firewallViolations: violations } });
+  });
 }

@@ -36,6 +36,7 @@ export type BusErrorCode =
   | "envelope_invalid"
   | "unknown_event_type"
   | "terminal_event_duplicate"
+  | "producer_not_joined"
   | "state_write_failed";
 
 export class BusError extends Error {

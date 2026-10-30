@@ -5,7 +5,7 @@ import { createFactoryRuntime, createReactor } from "../../bus/adapters/mozaik/r
 import { AtomicJsonStore } from "../../bus/adapters/outbound/atomic-json-store.js";
 import { RunEngine } from "../../bus/application/run-engine.js";
 import { EVENT_TYPES, type EventType } from "../../bus/domain/catalogue.js";
-import type { DeliveredEvent } from "../../bus/domain/envelope.js";
+import { type DeliveredEvent, isProducer } from "../../bus/domain/envelope.js";
 import { createRunState } from "../../bus/domain/run-state.js";
 import type { FactoryConfig } from "../../shared/config.js";
 import { createApiRoleRunner, type ApiRoleRunner } from "../../shared/llm/api-role-runner.js";
@@ -122,10 +122,14 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
     });
   };
   const foreman = createReactor("foreman", Object.fromEntries(EVENT_TYPES.map((type) => [type, consume])));
-  runtime.join(foreman);
+  runtime.adopt(foreman);
   for (const slice of slices) {
     for (const participant of slice.participants(context)) {
-      runtime.join(participant);
+      if (isProducer(participant.getManifest().name)) {
+        runtime.adopt(participant);
+      } else {
+        runtime.join(participant);
+      }
     }
   }
   const onUnhandled = (error: unknown): void => {

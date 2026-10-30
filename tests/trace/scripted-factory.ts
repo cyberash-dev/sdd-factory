@@ -2,6 +2,7 @@ import { InputTokenDetails, ModelMessageItem, OutputTokenDetails, TokenUsage, ty
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { LaneRole } from "../../src/bus/adapters/mozaik/roster.js";
 import { createFactoryRuntime, createReactor, type FactoryRuntime } from "../../src/bus/adapters/mozaik/runtime.js";
 import { RunEngine } from "../../src/bus/application/run-engine.js";
 import { EVENT_TYPES, type EventType } from "../../src/bus/domain/catalogue.js";
@@ -227,10 +228,20 @@ async function step(harness: Harness, options: ScriptOptions, type: EventType, p
   await options.afterEvent?.(delivered);
 }
 
+/* bus:BEH-007 / build-stage:BEH-017: a lane event is sent by a lane participant that lives around it. */
+async function laneStep(harness: Harness, options: ScriptOptions, type: EventType, role: LaneRole, taskId: string, payload: EventPayload): Promise<void> {
+  const participant = harness.runtime.joinLane(role, taskId);
+  try {
+    await step(harness, options, type, role, { taskId, ...payload });
+  } finally {
+    harness.runtime.leaveLane(participant);
+  }
+}
+
 async function lane(harness: Harness, options: ScriptOptions, taskId: string, implCost: number | null, withReviewer: boolean): Promise<void> {
-  await step(harness, options, "task.tests_written", "test-writer", { taskId, ...laneCost(1, implCost === null ? null : 0.1) });
+  await laneStep(harness, options, "task.tests_written", "test-writer", taskId, laneCost(1, implCost === null ? null : 0.1));
   await step(harness, options, "task.tests_red", "foreman", { taskId, testsSha: SHA, testFiles: [`tests/${taskId}/a.test.ts`] });
-  await step(harness, options, "task.impl_done", "implementer", { taskId, ...laneCost(1, implCost) });
+  await laneStep(harness, options, "task.impl_done", "implementer", taskId, laneCost(1, implCost));
   await step(harness, options, "task.verified", "foreman", { taskId, result: "green", evidencePath: "verifier.json", testsUnchanged: true, writeSetOk: true });
   if (withReviewer) {
     await harness.infer("reviewer", "m", { inputTokens: 1000, outputTokens: 200 });

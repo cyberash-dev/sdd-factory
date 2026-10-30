@@ -6,7 +6,7 @@ import { laneHandoffPath } from "../../domain/handoff-paths.js";
 import { implementerMessage, instructionVariables } from "../../domain/lane-messages.js";
 import type { ReworkFinding } from "../../domain/rules/support.js";
 import { isUnderTests } from "../../domain/write-set.js";
-import { costFieldsOf, runCliLane } from "../cli-lane.js";
+import { costFieldsOf, runCliLane, withLaneParticipant } from "../cli-lane.js";
 import { runWithHandoffRetry, type ParseOutcome } from "../handoff-roundtrip.js";
 import type { LaneDeps } from "../lane-deps.js";
 import { laneInputs, requireSha, reworkFindingText } from "../lane-inputs.js";
@@ -56,38 +56,40 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
   const frozen = await frozenTestFiles(deps, inputs.task.worktree, requireSha(inputs.task.baseSha, "baseSha"), requireSha(inputs.task.testsSha, "testsSha"));
   const instruction = slice.prompts.render(await slice.prompts.load("implementer"), instructionVariables(base));
   let lastRun: CliRoleOutcome | null = null;
-  const result = await runWithHandoffRetry(
-    {
-      role: "implementer",
-      handoffPath,
-      maxReruns: slice.config.caps.handoffRerun,
-      invoke: async (message) => {
-        lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message });
-        return lastRun;
+  await withLaneParticipant(slice, "implementer", run.taskId, async () => {
+    const result = await runWithHandoffRetry(
+      {
+        role: "implementer",
+        handoffPath,
+        maxReruns: slice.config.caps.handoffRerun,
+        invoke: async (message) => {
+          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message });
+          return lastRun;
+        },
+        parse: async () => {
+          const parsed = parseLaneHandoff("implementer", lastRun, await readTextOrNull(handoffPath));
+          return parsed.ok ? implementerHandoffOf(parsed.value.frontmatter) : parsed;
+        },
       },
-      parse: async () => {
-        const parsed = parseLaneHandoff("implementer", lastRun, await readTextOrNull(handoffPath));
-        return parsed.ok ? implementerHandoffOf(parsed.value.frontmatter) : parsed;
-      },
-    },
-    implementerMessage({ ...base, frozenTestFiles: frozen }),
-  );
-  if (!deps.lanes.isLive(token)) {
-    slice.log(`implementer result dropped for cancelled lane ${run.taskId}`);
-    return;
-  }
-  if (!result.ok) {
-    context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "unparseable_handoff", detail: `implementer: ${result.error}` } });
-    return;
-  }
-  const handoff = result.parsed;
-  if (handoff.finding !== null) {
-    context.publish({ type: "task.finding", producer: "implementer", payload: { taskId: run.taskId, type: handoff.finding.type, specIds: handoff.finding.specIds, detail: handoff.finding.detail, origin: "implementer" } });
-    return;
-  }
-  if (handoff.status === "blocked") {
-    context.publish({ type: "task.failed", producer: "implementer", payload: { taskId: run.taskId, reason: "blocked", detail: `implementer: ${handoff.blockedReason}` } });
-    return;
-  }
-  context.publish({ type: "task.impl_done", producer: "implementer", payload: { taskId: run.taskId, attempt: run.attempt, handoffPath, ...costFieldsOf(result.run) } });
+      implementerMessage({ ...base, frozenTestFiles: frozen }),
+    );
+    if (!deps.lanes.isLive(token)) {
+      slice.log(`implementer result dropped for cancelled lane ${run.taskId}`);
+      return;
+    }
+    if (!result.ok) {
+      context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "unparseable_handoff", detail: `implementer: ${result.error}` } });
+      return;
+    }
+    const handoff = result.parsed;
+    if (handoff.finding !== null) {
+      context.publish({ type: "task.finding", producer: "implementer", payload: { taskId: run.taskId, type: handoff.finding.type, specIds: handoff.finding.specIds, detail: handoff.finding.detail, origin: "implementer" } });
+      return;
+    }
+    if (handoff.status === "blocked") {
+      context.publish({ type: "task.failed", producer: "implementer", payload: { taskId: run.taskId, reason: "blocked", detail: `implementer: ${handoff.blockedReason}` } });
+      return;
+    }
+    context.publish({ type: "task.impl_done", producer: "implementer", payload: { taskId: run.taskId, attempt: run.attempt, handoffPath, ...costFieldsOf(result.run) } });
+  });
 }

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import type { DeliveredEvent } from "../../domain/envelope.js";
-import { createFactoryRuntime, createReactor } from "./runtime.js";
+import { createFactoryRuntime, createReactor, createRuntimeObserver } from "./runtime.js";
 
 const RUN_ID = "todo-cli-20261029-120000";
 
@@ -48,6 +48,53 @@ describe("Mozaik runtime adapter", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(seen).toEqual([]);
+  });
+
+  // @covers bus:BEH-007
+  it("sends each event from the joined participant named by its producer", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    const senders: string[] = [];
+    runtime.join(createRuntimeObserver("probe", (event) => (event.type === "design.blocked" ? senders.push(event.producerId) : undefined)));
+
+    runtime.publisher.publish({ type: "design.blocked", producer: "planner", payload: { reason: "planner_cap" } });
+
+    const planner = runtime.state.getParticipants().find((participant) => participant.getManifest().name === "planner");
+    expect([senders, planner?.getManifest().role]).toEqual([[planner?.getId()], "agent"]);
+  });
+
+  it("lists one participant per non-lane producer plus one per running lane", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+
+    runtime.joinLane("test-writer", "T-002");
+
+    expect(runtime.state.getParticipants().map((participant) => participant.getManifest().name).sort()).toEqual([
+      "architect",
+      "assembler",
+      "foreman",
+      "planner",
+      "reviewer",
+      "spec-analyst",
+      "spec-critic",
+      "test-writer",
+      "tracer",
+      "triage",
+      "verification-designer",
+    ]);
+  });
+
+  it("sends lane events from the per-task lane participant and rejects the producer once the lane left", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    const senders: string[] = [];
+    runtime.join(createRuntimeObserver("probe", (event) => (event.type === "task.failed" ? senders.push(event.producerId) : undefined)));
+    const lane = runtime.joinLane("implementer", "T-001");
+    const payload = { taskId: "T-001", reason: "blocked", detail: "implementer: no entry point" };
+
+    runtime.publisher.publish({ type: "task.failed", producer: "implementer", payload });
+    const capabilities = runtime.state.getParticipant(lane.id)?.getManifest().capabilities;
+    runtime.leaveLane(lane);
+    const code = codeOf(() => runtime.publisher.publish({ type: "task.failed", producer: "implementer", payload }));
+
+    expect([senders, capabilities, runtime.state.getParticipant(lane.id), code]).toEqual([[lane.id], ["lane", "task:T-001"], undefined, "producer_not_joined"]);
   });
 
   // @covers bus:BEH-005

@@ -1,0 +1,24 @@
+plan_id: 2026-10-30T105311Z-c2y0j
+created_at: 2026-10-30T10:53:11.282Z
+pending_attestations:
+  - id: bus:BEH-007
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T10:53:11.281Z
+    change_request: "participant roster"
+    scope: first-time-approval
+    target_status: approved
+  - id: bus:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T10:53:11.600Z
+    change_request: "participant roster"
+    scope: first-time-approval
+    target_status: approved
+  - id: build-stage:BEH-017
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T10:53:11.919Z
+    change_request: "participant roster"
+    scope: first-time-approval
+    target_status: approved

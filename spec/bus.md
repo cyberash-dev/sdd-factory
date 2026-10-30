@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.2.0"
+version: "0.3.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -126,6 +126,7 @@ members:
   - bus:BEH-002
   - bus:BEH-005
   - bus:BEH-006
+  - bus:BEH-007
 consumer_compat_policy: semver_per_surface
 notes: |
   Consumers are every participant of the runtime and the tracer. Adding
@@ -529,6 +530,77 @@ test_obligation:
   failure_scenarios:
     - process stays alive with no terminal event
     - product published after a runtime error
+---
+```
+
+```yaml
+---
+id: bus:BEH-007
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T10:53:11.281Z
+    change_request: participant roster
+    scope: first-time-approval
+partition_id: bus
+title: every event is sent by the participant it names
+surface_ref: bus:SUR-001
+given: |
+  - the runtime is initialised with a participant roster: one joined
+    Mozaik participant per producer name of bus:CTR-001 except the lane
+    roles test-writer and implementer; deterministic producers (foreman,
+    assembler, tracer) are Mozaik humans, LLM producers are Mozaik agents
+  - a lane role joins a participant per task on lane start and leaves it
+    on lane end (build-stage:BEH-017); its capabilities contain
+    `task:<taskId>`
+when: a participant publishes an event with envelope field producer P
+then: |
+  - the Mozaik `producerId` of the delivered SemanticEvent equals the id
+    of a joined participant whose name is P
+  - when P is a lane role and the payload carries taskId, the sender is
+    the lane participant of that task
+  - `runtime.state.getParticipants()` lists, at any instant, exactly the
+    roster participants plus one participant per running lane, so the
+    roster reflects the lanes that run concurrently (bus:INV-003)
+negative_cases:
+  - P has no joined participant (a lane role after its lane left, or a
+    lane role without taskId) => publication is rejected with
+    error_taxonomy `producer_not_joined`; nothing is delivered
+  - a participant whose name is not a producer of bus:CTR-001 is never
+    chosen as sender
+out_of_scope:
+  - the identity of the transient inference agents an LLM role creates
+    for each `runLoop`; they publish `inference.*` events under their own
+    id and are not roster members
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: multi_global
+  read_consistency: strong
+  idempotency: none
+  time_source: none
+data_scope: not_applicable
+policy_refs:
+  - factory:POL-001
+test_obligation:
+  predicate: |
+    An observer joined to the runtime sees an event published with
+    producer assembler carrying the id of the joined participant named
+    assembler; after joinLane(implementer, T-001) an event with producer
+    implementer and taskId T-001 carries the id of a participant whose
+    capabilities contain task:T-001; after leaveLane the same publication
+    is rejected with producer_not_joined and the observer sees nothing.
+  test_template: unit
+  boundary_classes:
+    - roster producer
+    - lane producer with a joined lane
+    - lane producer after leave
+  failure_scenarios:
+    - every event sent under one shared participant id
+    - lane participant still listed after the lane ended
 ---
 ```
 
@@ -1758,6 +1830,56 @@ test_obligation:
     - initial task state
   failure_scenarios:
     - a key missing from the snapshot
+---
+```
+
+```yaml
+---
+id: bus:DLT-003
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T10:53:11.600Z
+    change_request: participant roster
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.2.0 -> 0.3.0 - participant roster as event senders
+target_ids:
+  - bus:SUR-001
+  - bus:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.3.0"
+description: |
+  Until now one Mozaik participant named `bus` sent every event and the
+  producer existed only as an envelope field, so the Mozaik roster showed
+  a single sender and the lanes were invisible as participants. bus:BEH-007
+  introduces a participant roster: one joined participant per producer
+  name, per-task participants for the lane roles, and the sender of every
+  SemanticEvent is the participant named by the envelope producer.
+  bus:CTR-001 gains the error_taxonomy value `producer_not_joined`
+  (publication from a producer with no joined participant). The envelope
+  fields, event types and producer names are unchanged.
+tests_old_behavior:
+  - bus:CTR-001 envelope test stays green (producer field, seq, occurredAt unchanged)
+tests_new_behavior:
+  - to:bus:BEH-007
+  - to:build-stage:BEH-017
+test_obligation:
+  predicate: |
+    After finalize bus:SUR-001.members contains bus:BEH-007 and
+    `sdd ready --partition bus` reports no surface_member_drift.
+  test_template: contract
+  boundary_classes:
+    - members after finalize
+  failure_scenarios:
+    - drift still reported
 ---
 ```
 

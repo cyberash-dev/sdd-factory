@@ -6,6 +6,7 @@ import {
   SituationSpecification,
   type Human,
   type InferenceRunner,
+  type Participant,
   type SituationContext,
   type SituationHandler,
 } from "@mozaik-ai/core";
@@ -13,6 +14,7 @@ import { isEventType, TERMINAL_EVENT_TYPES, validateEvent, type EventType } from
 import { BusError, isProducer, type DeliveredEvent, type Producer } from "../../domain/envelope.js";
 import type { PendingEvent } from "../../domain/transition.js";
 import type { EventPublisher } from "../../ports/outbound/event-publisher.js";
+import { ParticipantRoster, type LaneParticipant, type LaneRole } from "./roster.js";
 
 export class FactoryRuntimeState extends RuntimeState {
   constructor(readonly runId: string) {
@@ -110,15 +112,22 @@ export interface FactoryRuntime {
   readonly publisher: EventPublisher;
   join(participant: Human): void;
   leave(participant: Human): void;
+  adopt(participant: Participant): void;
+  joinLane(role: LaneRole, taskId: string): LaneParticipant;
+  leaveLane(lane: LaneParticipant): void;
   readonly mozaik: ReturnType<typeof defineRuntime<FactoryRuntimeState>>;
+}
+
+function taskIdOf(payload: Record<string, unknown>): string | null {
+  const taskId = payload["taskId"];
+  return typeof taskId === "string" ? taskId : null;
 }
 
 export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptions = {}): FactoryRuntime {
   const mozaik = defineRuntime<FactoryRuntimeState>();
   const state = new FactoryRuntimeState(runId);
   mozaik.initializeRuntime(options.inferenceRunner === undefined ? { state } : { state, inferenceRunnerConfig: { runner: options.inferenceRunner } });
-  const bus = createHuman({ name: "bus", capabilities: [], handlers: [] });
-  mozaik.join(bus);
+  const roster = new ParticipantRoster({ join: (participant) => mozaik.join(participant), leave: (participant) => mozaik.leave(participant) });
   let seq = 0;
   let terminalPublished = false;
   const publisher: EventPublisher = {
@@ -127,6 +136,10 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
       const payload = options.redactPayload === undefined ? pending.payload : options.redactPayload({ ...pending.payload });
       const candidate = { ...pending, payload, runId, occurredAt: occurredAt.toISOString() };
       validateEvent(candidate);
+      const senderId = roster.senderIdOf(pending.producer, taskIdOf(payload));
+      if (senderId === null) {
+        throw new BusError("producer_not_joined", "producer", pending.producer);
+      }
       if (TERMINAL_EVENT_TYPES.includes(candidate.type)) {
         if (terminalPublished) {
           throw new BusError("terminal_event_duplicate", "type", candidate.type);
@@ -136,7 +149,7 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
       seq += 1;
       const delivered: DeliveredEvent<EventType> = { ...candidate, seq };
       const mozaikPayload: MozaikEventPayload = { runId, producer: pending.producer, seq, payload: { ...payload } };
-      mozaik.sendEvent(new SemanticEvent(candidate.type, bus.getId(), occurredAt, mozaikPayload), bus.getId());
+      mozaik.sendEvent(new SemanticEvent(candidate.type, senderId, occurredAt, mozaikPayload), senderId);
       return delivered;
     },
   };
@@ -146,5 +159,8 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
     mozaik,
     join: (participant) => mozaik.join(participant),
     leave: (participant) => mozaik.leave(participant),
+    adopt: (participant) => roster.adopt(participant),
+    joinLane: (role, taskId) => roster.joinLane(role, taskId),
+    leaveLane: (lane) => roster.leaveLane(lane),
   };
 }

@@ -13,18 +13,24 @@ async function surfaceRecord(id: string): Promise<{ version: string; members: st
   return { version: String("version" in surface ? surface.version : ""), members: surface.members.filter((member: unknown): member is string => typeof member === "string") };
 }
 
-describe("bus surfaces after the member and state deltas", () => {
+describe("bus surfaces after the member, state and roster deltas", () => {
   // @covers bus:DLT-001
-  it("list the reacting behaviours next to the event and handoff contracts at version 0.2.0", async () => {
+  it("list the reacting behaviours next to the event and handoff contracts", async () => {
     const events = await surfaceRecord("bus:SUR-001");
     const handoffs = await surfaceRecord("bus:SUR-002");
 
-    expect([events.version, events.members.filter((member) => member.includes(":BEH-")).sort(), handoffs.version, handoffs.members.sort()]).toEqual([
-      "0.2.0",
-      ["bus:BEH-001", "bus:BEH-002", "bus:BEH-005", "bus:BEH-006"],
+    expect([["bus:BEH-001", "bus:BEH-002", "bus:BEH-005", "bus:BEH-006"].every((id) => events.members.includes(id)), handoffs.version, handoffs.members.sort()]).toEqual([
+      true,
       "0.2.0",
       ["bus:BEH-003", "bus:BEH-004", "bus:CTR-007", "bus:CTR-008"],
     ]);
+  });
+
+  // @covers bus:DLT-003
+  it("carries the participant roster behaviour as a factory-events member at version 0.3.0", async () => {
+    const events = await surfaceRecord("bus:SUR-001");
+
+    expect([events.version, events.members.includes("bus:BEH-007")]).toEqual(["0.3.0", true]);
   });
 
   // @covers bus:DLT-002
