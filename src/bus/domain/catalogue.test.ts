@@ -37,6 +37,21 @@ const VALID_PAYLOADS: Readonly<Record<EventType, EventPayload>> = {
   "assembly.verified": { result: "green", step: "sdd_ready", evidencePath: "assembly/report.md", failingCovers: [] },
   "assembly.triaged": { taskId: null, target: "planner", reason: "config_invalid" },
   "assembly.rework": { round: 1, taskId: "T-001", target: "implementer" },
+  "fix.attempted": {
+    stage: "build",
+    taskId: "T-001",
+    unit: "T-001",
+    owner: "test-writer",
+    trigger: "red_suite_error",
+    attempt: 1,
+    outcome: "fixed",
+    filesChanged: ["src/greet.ts"],
+    answerPath: "handoffs/T-001/simple-fixer/answer-run1.md",
+    costUsd: 0.04,
+    inputTokens: 900,
+    outputTokens: 80,
+    durationMs: 4000,
+  },
 };
 
 function eventOf(type: string, payload: EventPayload, overrides: Partial<FactoryEvent> = {}): FactoryEvent {
@@ -101,6 +116,25 @@ describe("event catalogue validation", () => {
     ["human.intervention", { ...VALID_PAYLOADS["human.intervention"], kind: "shout" }, "payload.kind"],
   ] as const)("rejects %s with an enum value outside its set", (type, payload, field) => {
     expect(codeOf(() => validateEvent(eventOf(type, payload)))).toBe(`envelope_invalid:${field}`);
+  });
+
+  // @covers bus:CTR-009
+  it("accepts fix.attempted from the simple-fixer for a spec unit with a null taskId and a null cost", () => {
+    const payload = { ...VALID_PAYLOADS["fix.attempted"], stage: "spec", taskId: null, unit: "spec", owner: "spec-analyst", trigger: "spec_yaml_invalid", costUsd: null };
+
+    expect(codeOf(() => validateEvent(eventOf("fix.attempted", payload, { producer: "simple-fixer" })))).toBe("no error");
+  });
+
+  // @covers bus:CTR-009
+  it.each([
+    [{ ...VALID_PAYLOADS["fix.attempted"], trigger: "green_assertion_failed" }, "payload.trigger"],
+    [{ ...VALID_PAYLOADS["fix.attempted"], outcome: "partial" }, "payload.outcome"],
+    [{ ...VALID_PAYLOADS["fix.attempted"], owner: "reviewer" }, "payload.owner"],
+    [{ ...VALID_PAYLOADS["fix.attempted"], stage: "publish" }, "payload.stage"],
+    [{ ...VALID_PAYLOADS["fix.attempted"], attempt: 0 }, "payload.attempt"],
+    [{ ...VALID_PAYLOADS["fix.attempted"], taskId: "task-1" }, "payload.taskId"],
+  ] as const)("rejects fix.attempted with %o naming %s", (payload, field) => {
+    expect(codeOf(() => validateEvent(eventOf("fix.attempted", payload, { producer: "simple-fixer" })))).toBe(`envelope_invalid:${field}`);
   });
 
   it("rejects spec.drafted with a non-zero lintExit", () => {

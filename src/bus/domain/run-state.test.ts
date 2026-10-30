@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRunState, createTaskState, stageOf, withCostEntry } from "./run-state.js";
+import { createRunState, createTaskState, simpleFixAttempts, stageOf, withSimpleFix, withCostEntry } from "./run-state.js";
 
 describe("run state snapshot", () => {
   // @covers bus:CTR-008
@@ -22,7 +22,18 @@ describe("run state snapshot", () => {
       tasks: {},
       costLedger: { entries: [], totalUsd: 0 },
       failure: null,
+      simpleFixes: {},
     });
+  });
+
+  // @covers bus:DLT-005
+  // @covers factory:CST-005
+  it("counts simple fixes per owner and unit without sharing the counter between two tasks", () => {
+    const state = createRunState({ runId: "todo-cli-20261029-120000", slug: "todo-cli", operator: "cyberash", startedAt: "2026-10-29T12:00:00.000Z" });
+
+    const next = withSimpleFix(withSimpleFix(state, "implementer", "T-001"), "implementer", "T-001");
+
+    expect([simpleFixAttempts(next, "implementer", "T-001"), simpleFixAttempts(next, "implementer", "T-002"), next.simpleFixes]).toEqual([2, 0, { "implementer:T-001": 2 }]);
   });
 
   it("creates a task in status ready with zero attempts and the planner's covers, writes and dependencies", () => {

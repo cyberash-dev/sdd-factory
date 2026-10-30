@@ -16,7 +16,7 @@ const boolean = (): FieldSpec => ({ kind: "boolean" });
 const strings = (): FieldSpec => ({ kind: "string[]" });
 const object = (): FieldSpec => ({ kind: "object" });
 const numberOrNull = (): FieldSpec => ({ kind: "number|null" });
-const stringOrNull = (): FieldSpec => ({ kind: "string|null" });
+const stringOrNull = (extra: Omit<FieldSpec, "kind"> = {}): FieldSpec => ({ kind: "string|null", ...extra });
 
 const SHA = /^[0-9a-f]{40}$/;
 const TASK_ID = /^T-[0-9]{3}$/;
@@ -45,6 +45,19 @@ export const TESTS_REJECTED_REASONS = ["vacuous", "suite_error", "missing_covers
 export const TASK_FAILED_REASONS = ["cap_exhausted", "unparseable_handoff", "blocked"] as const;
 export const ASSEMBLY_STEPS = ["install", "typecheck", "test", "sdd_ready"] as const;
 export const ASSEMBLY_TARGETS = ["implementer", "test-writer", "planner"] as const;
+export const FIX_STAGES = ["spec", "design", "build", "assembly"] as const;
+export const FIX_OWNERS = ["spec-analyst", "architect", "verification-designer", "planner", "test-writer", "implementer", "assembler"] as const;
+export const FIX_TRIGGERS = [
+  "spec_yaml_invalid",
+  "design_file_invalid",
+  "red_suite_error",
+  "green_typecheck",
+  "green_load_failure",
+  "assembly_install",
+  "assembly_typecheck",
+  "assembly_load_failure",
+] as const;
+export const FIX_OUTCOMES = ["fixed", "unfixed", "discarded"] as const;
 
 const costFields = {
   attempt: integer({ min: 1 }),
@@ -86,6 +99,21 @@ export const EVENT_CATALOGUE = {
   "assembly.verified": { result: string({ values: ["green", "red"] }), step: string({ values: ASSEMBLY_STEPS }), evidencePath: string(), failingCovers: strings() },
   "assembly.triaged": { taskId: stringOrNull(), target: string({ values: ASSEMBLY_TARGETS }), reason: string() },
   "assembly.rework": { round: integer({ min: 1 }), taskId: string({ pattern: TASK_ID }), target: string({ values: ASSEMBLY_TARGETS }) },
+  "fix.attempted": {
+    stage: string({ values: FIX_STAGES }),
+    taskId: stringOrNull({ pattern: TASK_ID }),
+    unit: string(),
+    owner: string({ values: FIX_OWNERS }),
+    trigger: string({ values: FIX_TRIGGERS }),
+    attempt: integer({ min: 1 }),
+    outcome: string({ values: FIX_OUTCOMES }),
+    filesChanged: strings(),
+    answerPath: string(),
+    costUsd: numberOrNull(),
+    inputTokens: integer({ min: 0 }),
+    outputTokens: integer({ min: 0 }),
+    durationMs: integer({ min: 0 }),
+  },
 } as const satisfies Record<string, Record<string, FieldSpec>>;
 
 export type EventType = keyof typeof EVENT_CATALOGUE;

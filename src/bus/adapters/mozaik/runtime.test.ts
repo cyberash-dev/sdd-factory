@@ -5,6 +5,22 @@ import { createFactoryRuntime, createReactor, createRuntimeObserver } from "./ru
 
 const RUN_ID = "todo-cli-20261029-120000";
 
+const FIX_ATTEMPTED = {
+  stage: "design",
+  taskId: null,
+  unit: "design",
+  owner: "architect",
+  trigger: "design_file_invalid",
+  attempt: 1,
+  outcome: "fixed",
+  filesChanged: ["design/tech.md"],
+  answerPath: "handoffs/design/simple-fixer/answer-run1.md",
+  costUsd: 0.01,
+  inputTokens: 10,
+  outputTokens: 5,
+  durationMs: 100,
+};
+
 function codeOf(action: () => void): string {
   try {
     action();
@@ -95,6 +111,41 @@ describe("Mozaik runtime adapter", () => {
     const code = codeOf(() => runtime.publisher.publish({ type: "task.failed", producer: "implementer", payload }));
 
     expect([senders, capabilities, runtime.state.getParticipant(lane.id), code]).toEqual([[lane.id], ["lane", "task:T-001"], undefined, "producer_not_joined"]);
+  });
+
+  // @covers bus:DLT-005
+  // @covers bus:BEH-007
+  it("sends fix.attempted from the simple-fixer participant joined for its unit with capabilities lane and unit", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    const senders: string[] = [];
+    runtime.join(createRuntimeObserver("probe", (event) => (event.type === "fix.attempted" ? senders.push(event.producerId) : undefined)));
+    const fixer = runtime.joinLane("simple-fixer", "design");
+
+    runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED });
+
+    expect([senders, runtime.state.getParticipant(fixer.id)?.getManifest().capabilities]).toEqual([[fixer.id], ["lane", "unit:design"]]);
+  });
+
+  // @covers bus:DLT-005
+  it("rejects fix.attempted with producer_not_joined after the fixer participant of its unit left", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    const senders: string[] = [];
+    runtime.join(createRuntimeObserver("probe", (event) => (event.type === "fix.attempted" ? senders.push(event.producerId) : undefined)));
+    const fixer = runtime.joinLane("simple-fixer", "design");
+    runtime.leaveLane(fixer);
+
+    const code = codeOf(() => runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED }));
+
+    expect([code, senders, runtime.state.getParticipant(fixer.id)]).toEqual(["producer_not_joined", [], undefined]);
+  });
+
+  it("rejects fix.attempted when only a fixer for another unit is joined", () => {
+    const runtime = createFactoryRuntime(RUN_ID);
+    runtime.joinLane("simple-fixer", "spec");
+
+    const code = codeOf(() => runtime.publisher.publish({ type: "fix.attempted", producer: "simple-fixer", payload: FIX_ATTEMPTED }));
+
+    expect(code).toBe("producer_not_joined");
   });
 
   // @covers bus:BEH-005

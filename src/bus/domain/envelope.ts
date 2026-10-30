@@ -11,6 +11,7 @@ export const PRODUCERS = [
   "assembler",
   "triage",
   "tracer",
+  "simple-fixer",
 ] as const;
 
 export type Producer = (typeof PRODUCERS)[number];

@@ -114,16 +114,11 @@ export interface FactoryRuntime {
   join(participant: Participant): void;
   leave(participant: Participant): void;
   adopt(participant: Participant): void;
-  joinLane(role: LaneRole, taskId: string): LaneParticipant;
+  joinLane(role: LaneRole, unit: string): LaneParticipant;
   leaveLane(lane: LaneParticipant): void;
   /* A runtime event (inference.*) sent by a joined participant outside the Mozaik loop; not a factory bus event. */
   publishRuntimeEvent(senderId: string, type: string, payload: Readonly<Record<string, unknown>>): void;
   readonly mozaik: ReturnType<typeof defineRuntime<FactoryRuntimeState>>;
-}
-
-function taskIdOf(payload: Record<string, unknown>): string | null {
-  const taskId = payload["taskId"];
-  return typeof taskId === "string" ? taskId : null;
 }
 
 export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptions = {}): FactoryRuntime {
@@ -140,7 +135,7 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
       const payload = options.redactPayload === undefined ? pending.payload : options.redactPayload({ ...pending.payload });
       const candidate = { ...pending, payload, runId, occurredAt: occurredAt.toISOString() };
       validateEvent(candidate);
-      const senderId = roster.senderIdOf(pending.producer, taskIdOf(payload));
+      const senderId = roster.senderIdOf(pending.producer, payload);
       if (senderId === null) {
         throw new BusError("producer_not_joined", "producer", pending.producer);
       }
@@ -164,7 +159,7 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
     join: (participant) => mozaik.join(participant),
     leave: (participant) => mozaik.leave(participant),
     adopt: (participant) => roster.adopt(participant),
-    joinLane: (role, taskId) => roster.joinLane(role, taskId),
+    joinLane: (role, unit) => roster.joinLane(role, unit),
     leaveLane: (lane) => roster.leaveLane(lane),
     publishRuntimeEvent: (senderId, type, payload) => mozaik.sendEvent(new SemanticEvent(type, senderId, new Date(), { ...payload }), senderId),
   };

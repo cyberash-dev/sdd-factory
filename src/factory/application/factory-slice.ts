@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { stageOf, type RunStage } from "../../bus/domain/run-state.js";
+import { SIMPLE_FIX_RULE } from "../../bus/domain/simple-fix-rule.js";
 import type { Effect, TransitionRule } from "../../bus/domain/transition.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
 import { writeTextAtomic } from "../../shared/fs/text.js";
@@ -66,6 +67,7 @@ export function createFactorySlice(options: FactorySliceOptions): SliceFactory {
         eventType: "human.intervention",
         apply: ({ state }) => ({ state, emits: [], effects: [] }),
       },
+      SIMPLE_FIX_RULE,
       {
         name: "run.failed -> failed",
         eventType: "run.failed",

@@ -104,6 +104,7 @@ export interface RunState {
   readonly tasks: Readonly<Record<string, TaskState>>;
   readonly costLedger: CostLedger;
   readonly failure: RunFailure | null;
+  readonly simpleFixes: Readonly<Record<string, number>>;
 }
 
 export function createRunState(input: {
@@ -128,6 +129,7 @@ export function createRunState(input: {
     tasks: {},
     costLedger: { entries: [], totalUsd: 0 },
     failure: null,
+    simpleFixes: {},
   };
 }
 
@@ -182,4 +184,18 @@ export function withCostEntry(ledger: CostLedger, entry: CostEntry): CostLedger 
   const entries = [...ledger.entries, entry];
   const totalUsd = entries.reduce((sum, item) => sum + (item.costUsd ?? 0), 0);
   return { entries, totalUsd: Math.round(totalUsd * 1e6) / 1e6 };
+}
+
+function simpleFixKey(owner: string, unit: string): string {
+  return `${owner}:${unit}`;
+}
+
+/* factory:CST-005: the pair (owner role, unit) owns its own counter; unit is a task id, a stage name or "run". */
+export function simpleFixAttempts(state: RunState, owner: string, unit: string): number {
+  return state.simpleFixes[simpleFixKey(owner, unit)] ?? 0;
+}
+
+export function withSimpleFix(state: RunState, owner: string, unit: string): RunState {
+  const key = simpleFixKey(owner, unit);
+  return { ...state, simpleFixes: { ...state.simpleFixes, [key]: simpleFixAttempts(state, owner, unit) + 1 } };
 }

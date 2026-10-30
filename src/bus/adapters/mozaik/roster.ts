@@ -1,13 +1,14 @@
 import { createAgent, createHuman, type Participant } from "@mozaik-ai/core";
 import { isProducer, PRODUCERS, type Producer } from "../../domain/envelope.js";
 
-export const LANE_ROLES = ["test-writer", "implementer"] as const;
+export const LANE_ROLES = ["test-writer", "implementer", "simple-fixer"] as const;
 export type LaneRole = (typeof LANE_ROLES)[number];
 const HUMAN_PRODUCERS: ReadonlySet<string> = new Set(["foreman", "assembler", "tracer"]);
 
+/* A lane's unit is its task id for test-writer and implementer, and the factory:CST-005 unit (task id, stage name or "run") for simple-fixer. */
 export interface LaneParticipant {
   readonly role: LaneRole;
-  readonly taskId: string;
+  readonly unit: string;
   readonly id: string;
 }
 
@@ -20,8 +21,18 @@ export function isLaneRole(producer: string): producer is LaneRole {
   return (LANE_ROLES as readonly string[]).includes(producer);
 }
 
-function laneKey(role: LaneRole, taskId: string): string {
-  return `${role}:${taskId}`;
+function laneKey(role: LaneRole, unit: string): string {
+  return `${role}:${unit}`;
+}
+
+function laneCapability(role: LaneRole, unit: string): string {
+  return role === "simple-fixer" ? `unit:${unit}` : `task:${unit}`;
+}
+
+/* bus:BEH-007: the payload field naming the lane that sent an event; null when the event cannot name one. */
+export function laneUnitOf(role: LaneRole, payload: Readonly<Record<string, unknown>>): string | null {
+  const unit = role === "simple-fixer" ? payload["unit"] : payload["taskId"];
+  return typeof unit === "string" ? unit : null;
 }
 
 function rosterParticipant(producer: Producer): Participant {
@@ -60,21 +71,21 @@ export class ParticipantRoster {
     this.byProducer.set(name, participant);
   }
 
-  joinLane(role: LaneRole, taskId: string): LaneParticipant {
+  joinLane(role: LaneRole, unit: string): LaneParticipant {
     const participant = createAgent({
       name: role,
-      capabilities: ["lane", `task:${taskId}`],
-      instruction: `Factory lane ${role} for ${taskId}. Its loop runs in a Claude Code subprocess.`,
+      capabilities: ["lane", laneCapability(role, unit)],
+      instruction: `Factory lane ${role} for ${unit}. Its loop runs in a Claude Code subprocess.`,
       tools: [],
       handlers: [],
     });
     this.membership.join(participant);
-    this.lanes.set(laneKey(role, taskId), participant);
-    return { role, taskId, id: participant.getId() };
+    this.lanes.set(laneKey(role, unit), participant);
+    return { role, unit, id: participant.getId() };
   }
 
   leaveLane(lane: LaneParticipant): void {
-    const key = laneKey(lane.role, lane.taskId);
+    const key = laneKey(lane.role, lane.unit);
     const participant = this.lanes.get(key);
     if (participant !== undefined && participant.getId() === lane.id) {
       this.membership.leave(participant);
@@ -82,9 +93,10 @@ export class ParticipantRoster {
     }
   }
 
-  senderIdOf(producer: Producer, taskId: string | null): string | null {
+  senderIdOf(producer: Producer, payload: Readonly<Record<string, unknown>>): string | null {
     if (isLaneRole(producer)) {
-      return taskId === null ? null : (this.lanes.get(laneKey(producer, taskId))?.getId() ?? null);
+      const unit = laneUnitOf(producer, payload);
+      return unit === null ? null : (this.lanes.get(laneKey(producer, unit))?.getId() ?? null);
     }
     return this.byProducer.get(producer)?.getId() ?? null;
   }
