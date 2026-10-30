@@ -77,6 +77,7 @@ describe("spec stage through the run engine", () => {
 
   // @covers spec-stage:CST-002
   // @covers spec-stage:DLT-001
+  // @covers spec-stage:DLT-002
   // @covers spec-stage:SCN-001
   it("records the final round's finding as an assumption and approves after two rework answers, without a third draft", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
