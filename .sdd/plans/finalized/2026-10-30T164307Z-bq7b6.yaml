@@ -1,0 +1,10 @@
+plan_id: 2026-10-30T164307Z-bq7b6
+created_at: 2026-10-30T16:43:07.168Z
+pending_attestations:
+  - id: design-stage:DLT-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:43:07.167Z
+    change_request: "malformed design file is a rework finding"
+    scope: first-time-approval
+    target_status: approved
