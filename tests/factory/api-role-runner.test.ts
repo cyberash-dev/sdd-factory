@@ -97,6 +97,15 @@ describe("API role runner on the Mozaik loop", () => {
     expect(efforts).toEqual(["high", undefined]);
   });
 
+  // @covers factory:EXT-006
+  it("carries an OpenRouter model id through the loop and prices it from the configured table", async () => {
+    const runtime = createFactoryRuntime(RUN_ID, { inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: usage(1000, 100), rowResponse: null }]) });
+
+    const result = await createApiRoleRunner(runtime, { "deepseek/deepseek-v4.1-flash-1017": { inputPerMillion: 0.15, outputPerMillion: 0.6 } }).run({ role: "triage", instruction: "t", message: "m", model: "deepseek/deepseek-v4.1-flash-1017", tools: [], timeoutMs: 5000, maxOutputTokens: 100 });
+
+    expect([result.model, result.costUsd]).toEqual(["deepseek/deepseek-v4.1-flash-1017", 0.00021]);
+  });
+
   it("records cost null when the provider returns no usage", async () => {
     const runtime = createFactoryRuntime(RUN_ID, {
       inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: undefined, rowResponse: null }]),

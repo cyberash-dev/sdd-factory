@@ -21,9 +21,17 @@ describe("factory-cli surface after the member and provider-key deltas", () => {
   });
 
   // @covers factory:DLT-002
-  it("carries version 0.3.0 after the OPENAI_API_KEY identifier joined the argv contract", async () => {
+  it("moved past 0.2.0 when the OPENAI_API_KEY identifier joined the argv contract", async () => {
     const surface = await surfaceRecord("factory.md", "factory:SUR-001");
 
-    expect(surface.version).toBe("0.3.0");
+    const [major, minor] = surface.version.split(".").map(Number);
+    expect([major, (minor ?? 0) >= 3]).toEqual([0, true]);
+  });
+
+  // @covers factory:DLT-003
+  it("carries version 0.4.0 after the OPENROUTER_API_KEY identifier joined the argv contract", async () => {
+    const surface = await surfaceRecord("factory.md", "factory:SUR-001");
+
+    expect(surface.version).toBe("0.4.0");
   });
 });

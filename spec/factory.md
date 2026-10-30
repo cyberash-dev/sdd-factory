@@ -154,7 +154,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: factory
 name: factory-cli
-version: "0.3.0"
+version: "0.4.0"
 boundary_type: cli
 members:
   - factory:CTR-001
@@ -1313,6 +1313,67 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:EXT-006
+type: ExternalDependency
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:48:03.985Z
+    change_request: openrouter provider
+    scope: first-time-approval
+partition_id: factory
+title: OpenRouter as a multi-vendor model gateway through the Mozaik OpenAI-compatible endpoint
+provider: OpenRouter
+provider_surface: "OpenRouter chat completions API (OpenAI-compatible) at https://openrouter.ai/api/v1, driven by @mozaik-ai/core 4.1.0 OpenAIChatCompletions with baseURL and apiKey set"
+interface: "HTTPS JSON; model selected by the OpenRouter model id (<vendor>/<model>, e.g. deepseek/deepseek-v4.1-flash-1017); key from OPENROUTER_API_KEY; tools and reasoning_effort passed in the OpenAI request shape"
+authority_url_or_doc: https://openrouter.ai/docs/api-reference/parameters
+consumer_contract: |
+  Used for API roles whose configured model id is registered on the
+  provider `openrouter` in the factory model registry (factory:ASM-005).
+  The factory sends system + user messages, function-tool definitions and
+  `reasoning_effort` through Mozaik `runLoop`; it expects
+  `inference.completed` events carrying `tokenUsage` derived from
+  `usage.prompt_tokens` and `usage.completion_tokens`, treats a missing
+  usage object as cost null and prices tokens from `pricing.<model>`.
+  The provider that OpenRouter picks upstream is not fixed by the
+  factory.
+failure_modes:
+  - 401 invalid key
+  - 402 insufficient credits
+  - 429 rate limited
+  - 5xx or network error
+  - upstream provider returning a malformed tool call
+fallback_policy: "none; any provider failure surfaces as run.failed{reason:\"provider_error\"}; no cross-provider fallback"
+drift_detection:
+  mechanism: none_with_review_by:2026-11-30
+last_verified_at: "2026-10-30"
+auth_scope: OPENROUTER_API_KEY environment variable, never written to disk, never forwarded to lanes
+rate_limits: provider-enforced per key and per upstream; the factory bounds concurrency by maxParallelLanes and emits no retries
+retry_idempotency: no automatic retry; a failed inference fails the participant and the run
+error_taxonomy:
+  - "provider_error:<http status> in run.failed.detail"
+test_obligation:
+  predicate: |
+    A model id registered on provider openrouter resolves to that provider
+    and preflight requires OPENROUTER_API_KEY for it; with a fake
+    inference for such a model the role request carries the OpenRouter id
+    and the cost is computed from `pricing.<model>`; the key value appears
+    in no artefact.
+  test_template: integration
+  boundary_classes:
+    - registered OpenRouter id
+    - key absent
+    - priced and unpriced model
+  failure_scenarios:
+    - OpenRouter id accepted without the key
+    - key value appearing in any artefact
+---
+```
+
 ---
 
 ## 10. Generated artifacts
@@ -1685,6 +1746,64 @@ test_obligation:
     - run.failed provider_error on the first review instead of exit 3 at launch
     - key value appearing in any artefact
     - exit 3 demanded for a provider no configured role uses
+---
+```
+
+```yaml
+---
+id: factory:DLT-003
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:48:04.307Z
+    change_request: openrouter provider
+    scope: first-time-approval
+partition_id: factory
+title: factory-cli 0.3.0 -> 0.4.0 - OpenRouter provider and model profiles
+target_ids:
+  - factory:SUR-001
+  - factory:CTR-001
+  - factory:BEH-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: factory:SUR-001
+    intended_version: "0.4.0"
+description: |
+  A third provider joins the preflight key mapping of factory:DLT-002:
+  openrouter => OPENROUTER_API_KEY (factory:EXT-006). The factory model
+  registry (factory:ASM-005) gains entries for OpenRouter ids, each with
+  the specification of its direct sibling in the Mozaik bundle and the
+  OpenAI-compatible endpoint pointed at https://openrouter.ai/api/v1.
+  factory:CTR-001 external identifiers gain the environment variable
+  OPENROUTER_API_KEY (optional) => minor bump on factory:SUR-001. Model
+  choice stays configuration: the repository ships two profiles,
+  factory.config.json (active) and factory.config.target.json, switched
+  by copying; the file format is unchanged.
+tests_old_behavior:
+  - preflight with Anthropic-only and OpenAI-only model sets keeps its exit codes and messages
+tests_new_behavior:
+  - to:factory:BEH-001
+  - to:factory:EXT-006
+test_obligation:
+  predicate: |
+    With a model set containing an OpenRouter id and OPENROUTER_API_KEY
+    unset, preflight exits 3 naming OPENROUTER_API_KEY; with the key set
+    it passes without ANTHROPIC_API_KEY or OPENAI_API_KEY when no model
+    routes to those providers; after finalize factory:SUR-001 is at
+    version 0.4.0.
+  test_template: integration
+  boundary_classes:
+    - OpenRouter-only model set
+    - mixed providers
+    - key absent
+  failure_scenarios:
+    - ANTHROPIC_API_KEY demanded for an OpenRouter-only configuration
+    - drift still reported
 ---
 ```
 

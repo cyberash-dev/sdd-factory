@@ -1,0 +1,17 @@
+plan_id: 2026-10-30T114803Z-2jvp7
+created_at: 2026-10-30T11:48:03.986Z
+pending_attestations:
+  - id: factory:EXT-006
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:48:03.985Z
+    change_request: "openrouter provider"
+    scope: first-time-approval
+    target_status: approved
+  - id: factory:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:48:04.307Z
+    change_request: "openrouter provider"
+    scope: first-time-approval
+    target_status: approved

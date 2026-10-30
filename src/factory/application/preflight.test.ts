@@ -43,6 +43,7 @@ describe("preflight", () => {
     ["no openai key for an openai reviewer model", { models: { ...DEFAULT_CONFIG.models, reviewer: "gpt-6.1-sol" } }, "3 OPENAI_API_KEY is not set"],
     ["unknown model id", { models: { ...DEFAULT_CONFIG.models, critic: "gpt-99" } }, "2 unknown model gpt-99: not in the Mozaik supported model list"],
     ["no openai key for the registered gpt-6.1-terra", { models: { ...DEFAULT_CONFIG.models, critic: "gpt-6.1-terra" } }, "3 OPENAI_API_KEY is not set"],
+    ["no openrouter key for an OpenRouter model", { models: { ...DEFAULT_CONFIG.models, default: "deepseek/deepseek-v4.1-flash-1017" } }, "3 OPENROUTER_API_KEY is not set"],
     ["provider without a key mapping", { models: { ...DEFAULT_CONFIG.models, triage: "gemini-3.5-flash" } }, "2 model gemini-3.5-flash routes to provider google, which has no API key mapping"],
     ["claude missing", { env: { PATH: "/opt/none", ANTHROPIC_API_KEY: "sk" } }, "3 claude not found on PATH"],
   ])("fails %s with the documented exit code", async (_label, overrides, expected) => {
@@ -54,6 +55,14 @@ describe("preflight", () => {
     const mixed = { ...DEFAULT_CONFIG.models, reviewer: "gpt-6.1-sol" };
 
     expect(await preflight(input({ models: mixed, env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-test", OPENAI_API_KEY: "sk-openai" } }))).toEqual({ slug: "todo-cli", operator: "cyberash" });
+  });
+
+  // @covers factory:DLT-003
+  // @covers factory:EXT-006
+  it("needs only OPENROUTER_API_KEY when every role routes through OpenRouter", async () => {
+    const openRouterOnly = { ...DEFAULT_CONFIG.models, default: "deepseek/deepseek-v4.1-flash-1017", critic: "z-ai/glm-5.3-flash", triage: "deepseek/deepseek-v4.1-flash-1017", reviewer: "z-ai/glm-5.3-flash" };
+
+    expect(await preflight(input({ models: openRouterOnly, env: { PATH: "/usr/bin", OPENROUTER_API_KEY: "sk-or-test" } }))).toEqual({ slug: "todo-cli", operator: "cyberash" });
   });
 
   it("takes the operator from FACTORY_OPERATOR when the flag is absent", async () => {
