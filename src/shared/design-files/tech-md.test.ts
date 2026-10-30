@@ -83,10 +83,10 @@ describe("parseTechMd", () => {
     expect(design.modules.map((module) => module.exports)).toEqual([
       [
         { name: "parseArgs", kind: "function", signature: "export function parseArgs(argv: readonly string[]): ParsedCommand | CliError;" },
-        { name: "ParsedCommand", kind: "interface", signature: "export interface ParsedCommand {" },
+        { name: "ParsedCommand", kind: "interface", signature: "export interface ParsedCommand {\n  readonly name: string;\n}" },
       ],
       [
-        { name: "Store", kind: "class", signature: "export class Store {" },
+        { name: "Store", kind: "class", signature: "export class Store {\n  load(): Todo[];\n}" },
         { name: "DEFAULT_PATH", kind: "const", signature: "export const DEFAULT_PATH = 'todo.json';" },
         { name: "Todo", kind: "type", signature: "export type Todo = { id: number };" },
       ],

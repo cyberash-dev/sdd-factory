@@ -4,8 +4,12 @@ function notImplemented(name: string): string {
   return `throw new Error("not implemented: ${name}");`;
 }
 
+function withoutExportModifiers(signature: string): string {
+  return signature.trim().replace(/^export\s+/, "").replace(/^declare\s+/, "");
+}
+
 function withoutExportKeyword(signature: string): string {
-  return signature.trim().replace(/^export\s+/, "").replace(/^declare\s+/, "").replace(/;\s*$/, "");
+  return withoutExportModifiers(signature).replace(/;\s*$/, "");
 }
 
 function functionStub(name: string, signature: string): string {
@@ -55,10 +59,11 @@ function constStub(name: string, signature: string): string {
 }
 
 function typeStub(keyword: "type" | "interface", name: string, signature: string): string {
-  const declaration = withoutExportKeyword(signature);
-  if (declaration.startsWith(`${keyword} `)) {
-    return `export ${declaration}`;
+  const verbatim = withoutExportModifiers(signature);
+  if (verbatim.startsWith(`${keyword} `)) {
+    return `export ${verbatim}`;
   }
+  const declaration = withoutExportKeyword(signature);
   if (declaration.startsWith(name)) {
     return `export ${keyword} ${declaration}`;
   }

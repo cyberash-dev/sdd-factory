@@ -143,19 +143,40 @@ function collectModuleFields(lines: readonly string[]): ModuleFields {
   return { fields, interfaceSource: interfaceSource ?? "" };
 }
 
-function signatureAt(lines: readonly string[], start: number, kind: TechExport["kind"]): string {
-  const first = lines[start]?.trim() ?? "";
-  if (kind === "class" || kind === "interface") {
-    return first;
+function bracketDepthChange(line: string): number {
+  let change = 0;
+  for (const char of line) {
+    if (char === "{" || char === "(" || char === "[") {
+      change += 1;
+    } else if (char === "}" || char === ")" || char === "]") {
+      change -= 1;
+    }
   }
+  return change;
+}
+
+function isDeclarationEnd(line: string, depth: number, next: string | undefined, kind: TechExport["kind"]): boolean {
+  if (depth > 0) {
+    return false;
+  }
+  const isBlockKind = kind === "class" || kind === "interface";
+  return line.endsWith(";") || (isBlockKind && line.endsWith("}")) || next === undefined || EXPORT_LINE.test(next) || /^\s*import\b/.test(next);
+}
+
+/* Types, interfaces and classes keep their line breaks so the stub reproduces them verbatim; other signatures are joined on one line. */
+function signatureAt(lines: readonly string[], start: number, kind: TechExport["kind"]): string {
   const collected: string[] = [];
-  for (let index = start; index < Math.min(lines.length, start + 20); index += 1) {
-    collected.push(lines[index]?.trim() ?? "");
-    if (collected.join(" ").trimEnd().endsWith(";")) {
+  let depth = 0;
+  for (let index = start; index < lines.length; index += 1) {
+    const line = (lines[index] ?? "").trimEnd();
+    collected.push(line);
+    depth += bracketDepthChange(line);
+    if (isDeclarationEnd(line, depth, lines[index + 1], kind)) {
       break;
     }
   }
-  return collected.join(" ");
+  const isVerbatimKind = kind === "type" || kind === "interface" || kind === "class";
+  return isVerbatimKind ? collected.join("\n").trim() : collected.map((line) => line.trim()).join(" ");
 }
 
 function isExportKind(value: string): value is TechExport["kind"] {
