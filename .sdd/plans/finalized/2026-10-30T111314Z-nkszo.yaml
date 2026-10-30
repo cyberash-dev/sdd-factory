@@ -1,0 +1,24 @@
+plan_id: 2026-10-30T111314Z-nkszo
+created_at: 2026-10-30T11:13:14.559Z
+pending_attestations:
+  - id: trace:EXT-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:13:14.557Z
+    change_request: "mozaik cloud mirror"
+    scope: first-time-approval
+    target_status: approved
+  - id: trace:BEH-010
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:13:14.872Z
+    change_request: "mozaik cloud mirror"
+    scope: first-time-approval
+    target_status: approved
+  - id: trace:DLT-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:13:15.189Z
+    change_request: "mozaik cloud mirror"
+    scope: first-time-approval
+    target_status: approved

@@ -14,7 +14,7 @@ import { createApiRoleRunner } from "../../src/shared/llm/api-role-runner.js";
 import type { TokenCounts } from "../../src/shared/llm/pricing.js";
 import type { SliceContext } from "../../src/shared/slice.js";
 import type { Environment } from "../../src/trace/domain/redaction.js";
-import { copyTraceTo, createTraceSlice, type TraceSlice } from "../../src/trace/index.js";
+import { copyTraceTo, createTraceSlice, type TraceSlice, type TraceSliceOptions } from "../../src/trace/index.js";
 
 export const RUN_ID = "todo-cli-20261029-120000";
 export const SLUG = "todo-cli";
@@ -22,6 +22,7 @@ export const SHA = "0123456789abcdef0123456789abcdef01234567";
 
 export interface HarnessOptions {
   readonly env?: Environment;
+  readonly cloud?: TraceSliceOptions["cloud"];
   readonly pricing?: FactoryConfig["pricing"];
   readonly prepare?: (paths: { readonly traceDir: string; readonly productDir: string }) => Promise<void>;
 }
@@ -154,7 +155,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
   });
   const apiRoles = createApiRoleRunner(runtime, pricing);
   const context = sliceContextFor({ root, traceDir, productDir, pricing, runtime, apiRoles });
-  const slice = createTraceSlice(options.env === undefined ? {} : { env: options.env })(context);
+  const slice = createTraceSlice({ ...(options.env === undefined ? {} : { env: options.env }), ...(options.cloud === undefined ? {} : { cloud: options.cloud }) })(context);
   for (const participant of slice.participants(context)) {
     runtime.join(participant);
   }
@@ -164,7 +165,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
       await Promise.all(settled.splice(0));
       await new Promise((resolve) => setImmediate(resolve));
     }
-    await slice.shutdown();
+    await slice.idle();
   };
   return {
     root,

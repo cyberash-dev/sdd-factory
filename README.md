@@ -31,7 +31,7 @@ export FACTORY_OPERATOR=<your identity>     # owner of the pre-authorised approv
 npm run factory -- run specs/todo-cli.md    # output lands in hidden/todo-cli/
 ```
 
-The same variables can live in a `.env` file at the repository root (git-ignored); `npm run factory` loads it when present.
+The same variables can live in a `.env` file at the repository root (git-ignored); `npm run factory` loads it when present. With `MOZAIK_API_KEY` set (from [app.jigjoy.ai](https://app.jigjoy.ai)) the run is mirrored live into Mozaik Cloud through `@mozaik-ai/cloud-sdk`: every bus and runtime event is forwarded after secret redaction, the session link is logged at start and written into `trace.md` as `cloud:`, and a failing mirror only adds a warning line, never fails the run.
 
 Flags: `--operator <identity>`, `--no-push` (dry run), `--out <dir>`, `--max-parallel-lanes <1..8>`. Mid-run nudges are recorded, never required: `npm run factory -- nudge <runId> --note "..."`.
 

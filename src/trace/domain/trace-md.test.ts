@@ -22,6 +22,7 @@ function fixtureReport(overrides: Partial<TraceReport> = {}): TraceReport {
     assumptions: [{ id: "todo-cli:ASM-001", text: "Tasks are stored in a JSON file." }],
     midRunInterventions: 1,
     warnings: [],
+    cloudSessionUrl: null,
     ...overrides,
   };
 }
@@ -48,6 +49,14 @@ describe("trace.md rendering", () => {
       text.includes("- outcome: published\n"),
       text.endsWith("## Warnings\n\nnone\n"),
     ]).toEqual([true, true, true, true, true, true, true, true]);
+  });
+
+  // @covers trace:DLT-002
+  it("ends the header with the cloud session link, or none when the run was not mirrored", () => {
+    const mirrored = renderTraceMd(fixtureReport({ cloudSessionUrl: "https://app.jigjoy.ai/?s=sess-1" }));
+    const offline = renderTraceMd(fixtureReport());
+
+    expect([mirrored.includes("- outcome: published\n- cloud: https://app.jigjoy.ai/?s=sess-1\n"), offline.includes("- outcome: published\n- cloud: none\n")]).toEqual([true, true]);
   });
 
   // @covers trace:CTR-002

@@ -68,6 +68,7 @@ export interface TraceReport {
   readonly assumptions: readonly AssumptionNote[];
   readonly midRunInterventions: number;
   readonly warnings: readonly string[];
+  readonly cloudSessionUrl: string | null;
 }
 
 export interface ReportInput {
@@ -83,6 +84,7 @@ export interface ReportInput {
   readonly pricing: Readonly<Record<string, ModelPricing>>;
   /* Set by the publish step: the copy is written before run.published is recorded. */
   readonly finished: { readonly finishedAt: string } | null;
+  readonly cloudSessionUrl: string | null;
 }
 
 export class TraceReportError extends Error {
@@ -253,5 +255,6 @@ export function buildReport(input: ReportInput): TraceReport {
     assumptions: input.assumptions,
     midRunInterventions: input.midRunInterventions,
     warnings: input.warnings,
+    cloudSessionUrl: input.cloudSessionUrl,
   };
 }

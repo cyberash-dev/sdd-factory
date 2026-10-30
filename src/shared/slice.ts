@@ -1,4 +1,4 @@
-import type { Human } from "@mozaik-ai/core";
+import type { Participant } from "@mozaik-ai/core";
 import type { FactoryRuntime } from "../bus/adapters/mozaik/runtime.js";
 import type { Effect, TransitionRule } from "../bus/domain/transition.js";
 import type { EffectContext, EffectRunner } from "../bus/ports/outbound/effect-runner.js";
@@ -39,7 +39,7 @@ export interface Slice {
   readonly name: string;
   readonly rules: readonly TransitionRule[];
   readonly effects: Readonly<Record<string, EffectHandler>>;
-  participants(context: SliceContext): readonly Human[];
+  participants(context: SliceContext): readonly Participant[];
   shutdown?(): Promise<void>;
 }
 

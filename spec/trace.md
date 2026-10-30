@@ -112,7 +112,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: trace
 name: trace-files
-version: "0.2.0"
+version: "0.3.0"
 boundary_type: public_storage
 members:
   - trace:CTR-001
@@ -128,6 +128,7 @@ members:
   - trace:BEH-007
   - trace:BEH-008
   - trace:BEH-009
+  - trace:BEH-010
 consumer_compat_policy: semver_per_surface
 notes: |
   Consumers are the hackathon judges (reading hidden/<slug>/trace/ on
@@ -658,6 +659,78 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: trace:BEH-010
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:13:14.872Z
+    change_request: mozaik cloud mirror
+    scope: first-time-approval
+partition_id: trace
+title: events are mirrored to Mozaik Cloud when MOZAIK_API_KEY is set
+surface_ref: trace:SUR-001
+given: |
+  - the process environment carries MOZAIK_API_KEY (trace:EXT-001)
+  - the secret value set of trace:BEH-006 is known
+when: the trace slice joins its participants, before run.started is published
+then: |
+  - a participant named `mozaik-cloud-exporter` joins the runtime and
+    receives every SemanticEvent of the run: bus events and runtime
+    events alike
+  - every forwarded payload passes the trace redactor first; the mirror
+    never carries a secret value (trace:INV-003)
+  - the exporter learns the roster from `runtime.state.getParticipants()`,
+    so lane participants (build-stage:BEH-017) appear in the cloud roster
+  - the session URL `<appUrl>/?s=<sessionId>` is logged once and written
+    into the trace.md header as `cloud: <url>` (trace:CTR-002)
+  - at slice shutdown the exporter flushes its queue before the process
+    exits; the flush is bounded by timeouts.shutdownMs
+negative_cases:
+  - "MOZAIK_API_KEY absent or empty => no exporter participant joins, no network request is made, trace.md header reads `cloud: none`"
+  - "transport failure (network error, 4xx, 5xx, rejected ingest) => the run continues; one Warnings line `warning: cloud export dropped <n> event(s): <reason>` per failed batch; the mirror misses those events, the trace files do not"
+  - "an exception inside the exporter handler => caught, counted as a dropped event with the same warning line; the run continues (bus:BEH-006 is not triggered)"
+out_of_scope:
+  - the cloud UI and what it renders
+  - pairing flow and credential files of the SDK (only the environment variable is read)
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: single
+  read_consistency: eventual
+  idempotency: none
+  time_source: none
+data_scope: new_writes_only
+policy_refs:
+  - factory:POL-003
+test_obligation:
+  predicate: |
+    In a scripted run with MOZAIK_API_KEY set and a fake fetch, the roster
+    contains mozaik-cloud-exporter before run.started is recorded, the
+    fake fetch receives every published bus event type and the
+    inference.completed events, a payload carrying a secret value arrives
+    redacted, and trace.md's header carries `cloud: <url>`; with a fetch
+    that rejects every request the run still ends with run.published and
+    Warnings carries the cloud export line; without the key no exporter
+    participant exists, fetch is never called and the header reads
+    `cloud: none`.
+  test_template: integration
+  boundary_classes:
+    - key present, transport healthy
+    - key present, transport failing
+    - key absent
+    - secret value in a forwarded payload
+  failure_scenarios:
+    - run.failed caused by the mirror
+    - secret value in a forwarded payload
+    - exporter joined after run.started
+---
+```
+
 ---
 
 ## 7. Data contracts
@@ -1113,7 +1186,60 @@ test_obligation:
 
 ## 9. External dependencies
 
-none
+```yaml
+---
+id: trace:EXT-001
+type: ExternalDependency
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:13:14.557Z
+    change_request: mozaik cloud mirror
+    scope: first-time-approval
+partition_id: trace
+title: Mozaik Cloud event ingestion through the @mozaik-ai/cloud-sdk exporter
+provider: JigJoy Mozaik Cloud
+provider_surface: "@mozaik-ai/cloud-sdk 0.1.3 exporter entrypoint; ingest endpoint https://api.app.jigjoy.ai (override MOZAIK_CLOUD_ENDPOINT), app https://app.jigjoy.ai"
+interface: "createCloudExporter({endpoint, projectKey, participants, fetch, onError, onSessionUrl}) returns a Mozaik participant named mozaik-cloud-exporter plus end(); the participant batches every SemanticEvent (100 events or 1 s) and posts JSON over HTTPS"
+authority_url_or_doc: https://www.npmjs.com/package/@mozaik-ai/cloud-sdk
+consumer_contract: |
+  The trace slice creates the exporter only when MOZAIK_API_KEY is set,
+  wraps its handler so that payloads are redacted and exceptions are
+  caught (trace:BEH-010), supplies the roster callback, logs the session
+  URL from onSessionUrl and calls end() at shutdown. It reads nothing
+  back from the cloud.
+failure_modes:
+  - 401 invalid key
+  - 429 rate limited
+  - 5xx or network error
+  - ingest rejected events (schema or size)
+fallback_policy: "mirror only; a failed batch is dropped from the cloud with a warning line, trace files stay complete, the run never fails because of the mirror"
+drift_detection:
+  mechanism: none_with_review_by:2026-11-30
+last_verified_at: "2026-10-30"
+auth_scope: MOZAIK_API_KEY environment variable, never written to disk, never forwarded to lanes
+rate_limits: provider-enforced per key; one session per run; batches of at most 100 events
+retry_idempotency: the SDK retries a failed batch a bounded number of times, then reports it through onError; events are not re-sent afterwards
+error_taxonomy:
+  - "warning: cloud export dropped <n> event(s): <reason> in trace.md Warnings"
+test_obligation:
+  predicate: |
+    With a fake fetch, every request goes to the configured endpoint and
+    the posted bodies contain the published event types; a fetch that
+    rejects yields one warning line per failed batch and no run.failed;
+    MOZAIK_API_KEY absent yields no request at all.
+  test_template: integration
+  boundary_classes:
+    - healthy transport
+    - rejecting transport
+    - key absent
+  failure_scenarios:
+    - mirror failure escalated to run.failed
+    - key value appearing in any artefact
+---
+```
 
 ---
 
@@ -1244,6 +1370,54 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: trace:DLT-002
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T11:13:15.189Z
+    change_request: mozaik cloud mirror
+    scope: first-time-approval
+partition_id: trace
+title: trace-files 0.2.0 -> 0.3.0 - cloud session link in the report header
+target_ids:
+  - trace:SUR-001
+  - trace:CTR-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: trace:SUR-001
+    intended_version: "0.3.0"
+description: |
+  The trace.md header list (trace:CTR-002) gains one item at its end:
+  `cloud: <Mozaik Cloud session url>` when the run was mirrored
+  (trace:BEH-010), `cloud: none` otherwise. Sections, columns and number
+  formats are unchanged; trace:BEH-010 joins the Surface members.
+tests_old_behavior:
+  - trace:CTR-002 contract test keeps the eight sections in order with the added header item present
+tests_new_behavior:
+  - to:trace:BEH-010
+  - to:trace:CTR-002
+test_obligation:
+  predicate: |
+    After finalize trace:SUR-001.members contains trace:BEH-010 at version
+    0.3.0; the generated trace.md header ends with `- cloud: <url>` for a
+    mirrored fixture and `- cloud: none` otherwise.
+  test_template: contract
+  boundary_classes:
+    - mirrored run
+    - run without mirror
+  failure_scenarios:
+    - header item missing
+    - drift still reported
+---
+```
+
 ---
 
 ## 16. Implementation bindings
@@ -1369,6 +1543,28 @@ review_by: "2026-10-31"
 default_if_unresolved: keep_assumption
 tests:
   - tests/trace/pricing.test.ts
+---
+```
+
+```yaml
+---
+id: trace:ASM-003
+type: ASSUMPTION
+lifecycle:
+  status: proposed
+partition_id: trace
+assumption: |
+  Mozaik core 4.1.0 opens its own cloud session per agent loop whenever
+  MOZAIK_API_KEY is visible in the process environment. The factory reads
+  the variable into a snapshot at start and blanks it in its own process
+  so that the trace exporter (trace:EXT-001, trace:BEH-010) is the single
+  transport of the run. Lanes never saw the variable (allowlist).
+source_open_q: not_applicable
+blocking: no
+review_by: "2026-11-30"
+default_if_unresolved: keep_assumption
+tests:
+  - tests/trace/cloud-mirror.test.ts
 ---
 ```
 

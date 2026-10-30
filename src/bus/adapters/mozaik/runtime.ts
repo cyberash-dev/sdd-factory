@@ -110,8 +110,8 @@ export interface FactoryRuntimeOptions {
 export interface FactoryRuntime {
   readonly state: FactoryRuntimeState;
   readonly publisher: EventPublisher;
-  join(participant: Human): void;
-  leave(participant: Human): void;
+  join(participant: Participant): void;
+  leave(participant: Participant): void;
   adopt(participant: Participant): void;
   joinLane(role: LaneRole, taskId: string): LaneParticipant;
   leaveLane(lane: LaneParticipant): void;

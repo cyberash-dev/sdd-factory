@@ -12,13 +12,20 @@ async function surfaceRecord(file: string, id: string): Promise<{ version: strin
   return { version: String("version" in surface ? surface.version : ""), members: surface.members.filter((member: unknown): member is string => typeof member === "string") };
 }
 
-describe("trace-files surface after the member delta", () => {
+describe("trace-files surface after the member and cloud deltas", () => {
   // @covers trace:DLT-001
-  it("lists the nine tracer behaviours next to its four file contracts at version 0.2.0", async () => {
+  it("lists the nine tracer behaviours next to its four file contracts", async () => {
     const surface = await surfaceRecord("trace.md", "trace:SUR-001");
 
-    const behaviours = surface.members.filter((member) => member.includes(":BEH-")).sort();
+    const original = ["trace:BEH-001", "trace:BEH-002", "trace:BEH-003", "trace:BEH-004", "trace:BEH-005", "trace:BEH-006", "trace:BEH-007", "trace:BEH-008", "trace:BEH-009"];
     const contracts = surface.members.filter((member) => member.includes(":CTR-")).sort();
-    expect([surface.version, behaviours.length, contracts]).toEqual(["0.2.0", 9, ["trace:CTR-001", "trace:CTR-002", "trace:CTR-003", "trace:CTR-004"]]);
+    expect([original.every((id) => surface.members.includes(id)), contracts]).toEqual([true, ["trace:CTR-001", "trace:CTR-002", "trace:CTR-003", "trace:CTR-004"]]);
+  });
+
+  // @covers trace:DLT-002
+  it("carries the cloud mirror behaviour as a member at version 0.3.0", async () => {
+    const surface = await surfaceRecord("trace.md", "trace:SUR-001");
+
+    expect([surface.version, surface.members.includes("trace:BEH-010")]).toEqual(["0.3.0", true]);
   });
 });

@@ -36,6 +36,7 @@ export function renderTraceMd(report: TraceReport): string {
     `- startedAt: ${report.startedAt}`,
     `- finishedAt: ${report.finishedAt ?? "in progress"}`,
     `- outcome: ${outcomeText(report.outcome)}`,
+    `- cloud: ${report.cloudSessionUrl ?? "none"}`,
     "",
     "## Stages",
     "",

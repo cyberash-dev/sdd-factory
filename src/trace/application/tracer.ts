@@ -79,6 +79,7 @@ export class Tracer {
   private startedAtMs: number | null = null;
   private stage: RunStage = "workspace";
   private midRunInterventions = 0;
+  private cloudSessionUrl: string | null = null;
   private isBroken = false;
   private pendingWrites: Promise<void> = Promise.resolve();
 
@@ -125,6 +126,17 @@ export class Tracer {
       return;
     }
     this.commitRuntime(input, this.startedAtMs);
+  }
+
+  recordCloudSession(url: string): void {
+    this.cloudSessionUrl = url;
+  }
+
+  recordCloudDrop(count: number, reason: string): void {
+    this.warnings.push(`warning: cloud export dropped ${count} event(s): ${reason}`);
+    if (this.startedAtMs !== null && !this.isBroken) {
+      this.regenerate();
+    }
   }
 
   idle(): Promise<void> {
@@ -334,6 +346,7 @@ export class Tracer {
       midRunInterventions: this.midRunInterventions,
       pricing: this.deps.pricing,
       finished,
+      cloudSessionUrl: this.cloudSessionUrl,
     });
   }
 
