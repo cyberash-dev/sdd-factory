@@ -192,6 +192,26 @@ describe("RunEngine", () => {
     expect([replayed, h.snapshots.map((snapshot) => snapshot.lastSeq)]).toEqual([h.snapshots, [42]]);
   });
 
+  // @covers bus:INV-004
+  it("publishes one run.failed when a second failure arrives before the first is consumed", () => {
+    const h = harness();
+
+    h.engine.fail(null, "terminated", "SIGTERM");
+    h.engine.fail(null, "terminated", "SIGTERM");
+
+    expect(h.published.map((pending) => pending.type)).toEqual(["run.failed"]);
+  });
+
+  // @covers bus:INV-004
+  it("ignores a failure that arrives after run.published was published but before it is consumed", () => {
+    const h = harness();
+
+    h.engine.publish({ type: "run.published", producer: "assembler", payload: { branch: "hidden/todo-cli" } });
+    h.engine.fail(null, "terminated", "SIGTERM");
+
+    expect(h.published.map((pending) => pending.type)).toEqual(["run.published"]);
+  });
+
   it("logs a warning instead of a second terminal event when failing after the terminal status", () => {
     const terminal = { ...buildingState("verify_pending"), status: "published" as const };
     const h = harness({ initial: terminal });

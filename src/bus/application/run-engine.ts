@@ -1,4 +1,4 @@
-import type { EventType } from "../domain/catalogue.js";
+import { TERMINAL_EVENT_TYPES, type EventType } from "../domain/catalogue.js";
 import { BusError, type DeliveredEvent } from "../domain/envelope.js";
 import { isTerminalStatus, stageOf, type RunState } from "../domain/run-state.js";
 import { dedupeKey, reduce, type PendingEvent, type ReduceOutcome, type TransitionRule } from "../domain/transition.js";
@@ -40,7 +40,7 @@ export class RunEngine {
   private eventsQueued = 0;
   private effectsInFlight = 0;
   private stallTimer: ReturnType<typeof setTimeout> | null = null;
-  private hasPublishedFailure = false;
+  private hasPublishedTerminal = false;
 
   constructor(private readonly deps: RunEngineDeps) {
     this.current = deps.initialState;
@@ -62,17 +62,19 @@ export class RunEngine {
   }
 
   publish(pending: PendingEvent): void {
+    if (TERMINAL_EVENT_TYPES.includes(pending.type)) {
+      this.hasPublishedTerminal = true;
+    }
     this.deps.publisher.publish(pending);
   }
 
   fail(stageHint: RunState["status"] | null, reason: EngineFailureReason, detail: string): void {
-    if (isTerminalStatus(this.current.status)) {
+    if (this.hasPublishedTerminal || isTerminalStatus(this.current.status)) {
       this.deps.log(`warning after terminal event: ${reason}: ${detail}`);
       return;
     }
     const stage = stageOf(stageHint ?? this.current.status, this.current.failure);
-    this.hasPublishedFailure = true;
-    this.deps.publisher.publish({ type: "run.failed", producer: "foreman", payload: { stage, reason, detail } });
+    this.publish({ type: "run.failed", producer: "foreman", payload: { stage, reason, detail } });
   }
 
   private async handle(event: DeliveredEvent<EventType>): Promise<ConsumeOutcome> {
@@ -99,7 +101,7 @@ export class RunEngine {
     this.current = outcome.result.state;
     this.deps.log(`applied ${outcome.rule} ${event.type} seq=${event.seq}`);
     for (const pending of outcome.result.emits) {
-      this.deps.publisher.publish(pending);
+      this.publish(pending);
     }
     for (const effect of outcome.result.effects) {
       this.runEffect(effect);
@@ -123,7 +125,7 @@ export class RunEngine {
   }
 
   private isQuiescent(): boolean {
-    return this.eventsQueued === 0 && this.effectsInFlight === 0 && !this.hasPublishedFailure && !isTerminalStatus(this.current.status);
+    return this.eventsQueued === 0 && this.effectsInFlight === 0 && !this.hasPublishedTerminal && !isTerminalStatus(this.current.status);
   }
 
   /* bus:DLT-007: a ref'd timer, so the process stays alive while Mozaik delivers late events; any event or effect start disarms it. */
