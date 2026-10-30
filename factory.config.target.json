@@ -1,0 +1,76 @@
+{
+  "caps": {
+    "lintCycles": 5,
+    "criticRounds": 2,
+    "implementerAttempts": 3,
+    "testWriterRework": 1,
+    "plannerRecuts": 1,
+    "architectRepairs": 1,
+    "criticAssumptionsPerId": 1,
+    "assemblyRounds": 2,
+    "handoffRerun": 1
+  },
+  "timeouts": {
+    "specStageMs": 1200000,
+    "apiRoleMs": 900000,
+    "cliRoleMs": 1500000,
+    "verifierMs": 300000,
+    "shutdownMs": 10000
+  },
+  "maxParallelLanes": 4,
+  "models": {
+    "default": "anthropic/claude-opus-5.5",
+    "critic": "openai/gpt-6.1-terra",
+    "triage": "openai/gpt-6-luna",
+    "reviewer": "openai/gpt-6.1-terra",
+    "lane": null,
+    "effort": {
+      "spec-analyst": "high",
+      "architect": "high",
+      "verification-designer": "high",
+      "planner": "high"
+    }
+  },
+  "pricing": {
+    "deepseek/deepseek-v4.1-flash-1017": {
+      "inputPerMillion": 0.15,
+      "outputPerMillion": 0.6
+    },
+    "z-ai/glm-5.3-flash": {
+      "inputPerMillion": 0.15,
+      "outputPerMillion": 0.5
+    },
+    "anthropic/claude-opus-5.5": {
+      "inputPerMillion": 4,
+      "outputPerMillion": 20
+    },
+    "openai/gpt-6.1-terra": {
+      "inputPerMillion": 1,
+      "outputPerMillion": 5
+    },
+    "openai/gpt-6-luna": {
+      "inputPerMillion": 0.1,
+      "outputPerMillion": 0.5
+    },
+    "claude-opus-5-5": {
+      "inputPerMillion": 4,
+      "outputPerMillion": 20
+    },
+    "claude-sonnet-5-5": {
+      "inputPerMillion": 2,
+      "outputPerMillion": 10
+    },
+    "claude-haiku-4-5": {
+      "inputPerMillion": 1,
+      "outputPerMillion": 5
+    },
+    "gpt-6.1-terra": {
+      "inputPerMillion": 1,
+      "outputPerMillion": 5
+    },
+    "gpt-6-luna": {
+      "inputPerMillion": 0.1,
+      "outputPerMillion": 0.5
+    }
+  }
+}

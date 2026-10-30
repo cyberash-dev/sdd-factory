@@ -19,10 +19,10 @@
   },
   "maxParallelLanes": 4,
   "models": {
-    "default": "claude-opus-5-5",
-    "critic": "gpt-6.1-terra",
-    "triage": "gpt-6-luna",
-    "reviewer": "gpt-6.1-terra",
+    "default": "anthropic/claude-opus-5.5",
+    "critic": "openai/gpt-6.1-terra",
+    "triage": "openai/gpt-6-luna",
+    "reviewer": "openai/gpt-6.1-terra",
     "lane": null,
     "effort": {
       "spec-analyst": "high",
@@ -32,6 +32,26 @@
     }
   },
   "pricing": {
+    "deepseek/deepseek-v4.1-flash-1017": {
+      "inputPerMillion": 0.15,
+      "outputPerMillion": 0.6
+    },
+    "z-ai/glm-5.3-flash": {
+      "inputPerMillion": 0.15,
+      "outputPerMillion": 0.5
+    },
+    "anthropic/claude-opus-5.5": {
+      "inputPerMillion": 4,
+      "outputPerMillion": 20
+    },
+    "openai/gpt-6.1-terra": {
+      "inputPerMillion": 1,
+      "outputPerMillion": 5
+    },
+    "openai/gpt-6-luna": {
+      "inputPerMillion": 0.1,
+      "outputPerMillion": 0.5
+    },
     "claude-opus-5-5": {
       "inputPerMillion": 4,
       "outputPerMillion": 20
@@ -47,10 +67,6 @@
     "gpt-6.1-terra": {
       "inputPerMillion": 1,
       "outputPerMillion": 5
-    },
-    "gpt-6.1-sol": {
-      "inputPerMillion": 2,
-      "outputPerMillion": 10
     },
     "gpt-6-luna": {
       "inputPerMillion": 0.1,
