@@ -135,7 +135,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: build-stage
 name: lane-files
-version: "0.2.0"
+version: "0.3.0"
 boundary_type: public_storage
 members:
   - build-stage:CTR-001
@@ -2510,6 +2510,68 @@ test_obligation:
     - effort absent
   failure_scenarios:
     - --effort emitted for none
+---
+```
+
+```yaml
+---
+id: build-stage:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T20:35:09.597Z
+    change_request: lane runs keep a redacted stream-json transcript
+    scope: first-time-approval
+partition_id: build-stage
+title: lane-files 0.2.0 -> 0.3.0 - every lane run keeps its redacted stream-json transcript
+target_ids:
+  - build-stage:SUR-001
+  - build-stage:EXT-001
+  - build-stage:CST-006
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: build-stage:SUR-001
+    intended_version: "0.3.0"
+description: |
+  In run 12 the simple-fixer's first run on T-002 cost $0.21, lasted
+  15 seconds, changed no file and left an empty final answer; nothing on
+  disk says what the subprocess did, because the lane wrapper keeps only
+  the result message and the tool_use records in memory. Every Claude
+  Code lane run (test-writer, implementer, simple-fixer) now writes the
+  stream-json lines it receives, secrets redacted per factory:POL-003,
+  to `handoffs/<unit>/<role>-<attempt>/transcript.jsonl` next to the
+  handoff (for the fixer: `handoffs/<unit>/simple-fixer/transcript-run<n>.jsonl`
+  next to answer-run<n>.md), appended line by line as they arrive so a
+  killed subprocess still leaves what it produced. The wrapper still
+  interprets nothing beyond build-stage:EXT-001's consumer contract; the
+  file is evidence for the operator and for trace.md readers, not input
+  to any role. build-stage:CST-006 is unchanged in substance: the
+  transcript is a copy of the subprocess output, not shared state
+  between roles. build-stage:SUR-001 lane-files 0.2.0 -> 0.3.0.
+tests_old_behavior:
+  - the parsed result, cost fields, tool_use records and the handoff protocol are unchanged
+tests_new_behavior:
+  - to:build-stage:EXT-001
+test_obligation:
+  predicate: |
+    A fake claude that prints two stream-json lines and exits leaves a
+    transcript.jsonl with exactly those two lines in the lane directory;
+    a line containing a configured secret value is written with the
+    value replaced; a subprocess killed after one line leaves that one
+    line.
+  test_template: unit
+  boundary_classes:
+    - complete run
+    - secret in a line
+    - killed mid-run
+  failure_scenarios:
+    - transcript written only at exit
+    - secret value on disk
 ---
 ```
 
