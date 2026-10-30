@@ -121,13 +121,13 @@ discovery_scope:
   - tsconfig.json
 coverage_evidence:
   - kind: git_tree_hash_v1
-    reference: d3e4ce841b02331f1f05cf2a1aa00ab94c846b15
+    reference: bb067a25a08a707659f3c70318cf5fa319ee9b33
     note: |
       Token computed by `sdd token --format=json` at the first implementation
       commit (bus engine, toolchain, tests). Refreshed on every
       scope-touching commit via `sdd check` / `sdd refresh`.
-freshness_token: 3af8bfc1b933e7bbd0fa49ae96b154c39d15efd4132aec62412213d66e89e22c
-baseline_commit_sha: d3e4ce841b02331f1f05cf2a1aa00ab94c846b15
+freshness_token: 7c3aa3cc71fc130d4118b9d54b7bfea5b5755b8fe965493b99c4acfa6ec04668
+baseline_commit_sha: bb067a25a08a707659f3c70318cf5fa319ee9b33
 mechanism: git_tree_hash_v1
 notes: |
   The baseline carries no preserved as-is behaviour: there is no prior code.
@@ -154,7 +154,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: factory
 name: factory-cli
-version: "0.4.0"
+version: "0.5.0"
 boundary_type: cli
 members:
   - factory:CTR-001
@@ -162,6 +162,7 @@ members:
   - factory:BEH-001
   - factory:BEH-005
   - factory:BEH-006
+  - factory:BEH-009
 consumer_compat_policy: semver_per_surface
 notes: |
   The single operator-facing command. Judges run exactly this surface.
@@ -682,6 +683,93 @@ test_obligation:
   failure_scenarios:
     - nudge accepted without an interventions.md line
     - nudge altering a product file
+---
+```
+
+```yaml
+---
+id: factory:BEH-009
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:27:57.377Z
+    change_request: resume a failed run
+    scope: first-time-approval
+partition_id: factory
+title: factory resume continues a failed run in a new run directory
+surface_ref: factory:SUR-001
+given: |
+  - `.factory/runs/<R0>/run.json` exists with status `failed`, or with
+    status `running` and the flag `--force` (the operator vouches that
+    the process is gone)
+  - `.factory/runs/<R0>/trace/trace.jsonl` and `.factory/runs/<R0>/product/`
+    exist
+  - the operator fixed the factory between the runs
+when: the operator runs `factory resume <R0> [--note <text>]`
+then: |
+  - a new run R1 is created with its own runId, run directory, state.json
+    and trace; its product directory, worktrees directory and handoffs
+    directory are those of R0, nothing is copied; the source spec path
+    comes from R0's run.json
+  - the bus events of R0 (trace.jsonl records whose producer is not
+    `runtime`) are replayed in order through the pure transition rules;
+    the redo event is the latest replayed event whose transition produced
+    at least one effect; the seeded state of R1 is the state before the
+    redo event; events after the redo event and R0's terminal event are
+    dropped
+  - R1 publishes, in this order: `run.started{specPath, slug, operator,
+    mode: "autonomous"}` (recorded; the seeded state is not reset and no
+    bootstrap runs), `human.intervention{kind: "fix_between_runs", actor:
+    <operator>, note: "resume of <R0> from <redo type> seq <n>" plus the
+    operator's --note}`, then the redo event with its original producer
+    and payload; the run continues from there under the usual rules
+  - R1's run.json carries `resumedFrom: <R0>`; a run that was not resumed
+    carries `resumedFrom: null` (factory:CTR-003)
+  - when the redo event's producer is a lane role, a lane participant for
+    the payload's taskId is joined around the publication (bus:BEH-007)
+negative_cases:
+  - "R0 run directory or trace.jsonl missing => exit 2, nothing created"
+  - "R0 run.json status running without --force, or status published => exit 2, nothing created"
+  - "no replayed event produced an effect (R0 failed before any effectful transition) => exit 2 with `nothing to resume`"
+out_of_scope:
+  - repairing a product directory whose files diverged from the replayed
+    state (the operator inspects R0 before resuming)
+  - resuming inside a lane's subprocess; a lane restarts from its last
+    committed worktree state
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: single
+  read_consistency: strong
+  idempotency: none
+  time_source: wall_clock:1s
+data_scope: new_writes_only
+policy_refs:
+  - factory:POL-001
+  - factory:POL-003
+test_obligation:
+  predicate: |
+    Given a run directory whose trace ends with workspace.ready,
+    spec.approved (whose transition yields one effect) and run.failed,
+    resuming yields a new run whose trace reads run.started,
+    human.intervention{fix_between_runs} naming R0 and spec.approved,
+    then the events the redone effect produces, whose run.json has
+    resumedFrom R0, and whose paths.productDir equals R0's; a run.json
+    with status running and no --force is rejected with exit 2; a trace
+    without an effectful event is rejected with `nothing to resume`.
+  test_template: integration
+  boundary_classes:
+    - failed run with an effectful redo event
+    - running run without --force
+    - trace without an effectful event
+    - redo event produced by a lane role
+  failure_scenarios:
+    - bootstrap re-run on the existing product directory
+    - redo event applied twice (state advanced during replay and again at publication)
+    - resume creating a second terminal event in R0's trace
 ---
 ```
 
@@ -1803,6 +1891,63 @@ test_obligation:
     - key absent
   failure_scenarios:
     - ANTHROPIC_API_KEY demanded for an OpenRouter-only configuration
+    - drift still reported
+---
+```
+
+```yaml
+---
+id: factory:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:27:57.703Z
+    change_request: resume a failed run
+    scope: first-time-approval
+partition_id: factory
+title: factory-cli 0.4.0 -> 0.5.0 - resume a failed run
+target_ids:
+  - factory:SUR-001
+  - factory:CTR-001
+  - factory:CTR-003
+  - factory:BEH-001
+  - factory:BEH-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: factory:SUR-001
+    intended_version: "0.5.0"
+description: |
+  Restarting from scratch after every factory fix costs about thirty
+  minutes of model time per attempt. `factory resume <runId> [--note
+  <text>] [--force] [--no-push] [--out <dir>] [--max-parallel-lanes <n>]`
+  joins factory:CTR-001 as a third subcommand => minor bump on
+  factory:SUR-001. factory:CTR-003 run.json gains the field `resumedFrom`
+  (string or null). factory:BEH-001 drops "resuming a failed run from a
+  checkpoint" from its out_of_scope; the behaviour is factory:BEH-009,
+  which also joins the Surface members. The `run.started` transition no
+  longer bootstraps when the seeded state is past `started`: it records
+  the event and writes run.json only.
+tests_old_behavior:
+  - factory run keeps its argv, exit codes and manifest fields; the bootstrap still runs on a fresh run
+tests_new_behavior:
+  - to:factory:BEH-009
+  - to:factory:CTR-001
+test_obligation:
+  predicate: |
+    After finalize factory:SUR-001 is at version 0.5.0 with factory:BEH-009
+    among its members; `factory resume` parses with and without --note and
+    --force; a fresh run's run.json carries resumedFrom null.
+  test_template: contract
+  boundary_classes:
+    - resume argv with and without flags
+    - fresh run manifest
+  failure_scenarios:
+    - resume accepted without a runId
     - drift still reported
 ---
 ```
