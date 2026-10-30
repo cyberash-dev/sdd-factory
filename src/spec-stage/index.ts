@@ -2,6 +2,7 @@ import type { EffectHandler, SliceFactory } from "../shared/slice.js";
 import { createExecFileCommandRunner } from "./adapters/exec-file-command-runner.js";
 import { runApprove } from "./application/approve.js";
 import { runAssume } from "./application/assume.js";
+import { runAssumeFindings } from "./application/assume-findings.js";
 import { runDraft } from "./application/draft.js";
 import { runReview } from "./application/review.js";
 import { createStageClock } from "./application/stage-clock.js";
@@ -35,6 +36,7 @@ export function createSpecStageSlice(options: SpecStageOptions = {}): SliceFacto
         [SPEC_EFFECT_KINDS.review]: withDeps(runReview, deps),
         [SPEC_EFFECT_KINDS.approve]: withDeps(runApprove, deps),
         [SPEC_EFFECT_KINDS.assume]: withDeps(runAssume, deps),
+        [SPEC_EFFECT_KINDS.assumeFindings]: withDeps(runAssumeFindings, deps),
       },
       participants: () => [],
     };

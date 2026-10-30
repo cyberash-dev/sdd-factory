@@ -6,6 +6,7 @@ import { readTextOrNull } from "../../shared/fs/text.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { fileTools } from "../adapters/role-tools.js";
 import { parseGaReview, type ReviewDecision } from "../domain/ga-review.js";
+import { unappliedFindings } from "./assume-findings.js";
 import { effectInteger } from "./effect-fields.js";
 import { sha256OrNull } from "./file-digest.js";
 import { invokeRole, promptBody, type HandoffVerdict } from "./role-invocation.js";
@@ -85,7 +86,10 @@ export async function runReview(effect: Effect, context: EffectContext, slice: S
     return;
   }
   if (outcome.kind === "unparseable") {
-    concludeStage(deps, context, specBlocked("spec-critic", "analyst_blocked", `unparseable_handoff: ${outcome.error}`));
+    /* spec-stage:DLT-001: the critic never ends the run; an unparseable final round still hands its findings to the foreman. */
+    const decision: ReviewDecision = round >= slice.config.caps.criticRounds && (await unappliedFindings(gaPath)).length > 0 ? "rework" : "accept";
+    slice.log(`spec-critic round ${round}: handoff unparseable after ${outcome.reruns} re-run(s) (${outcome.error}); the round counts as ${decision}`);
+    context.publish({ type: "spec.reviewed", producer: "foreman", payload: { round, decision, findingsPath: FINDINGS_PATH } });
     return;
   }
   slice.log(`spec-critic round ${round}: decision ${outcome.value}`);

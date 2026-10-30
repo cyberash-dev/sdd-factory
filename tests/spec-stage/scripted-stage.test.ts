@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createFactoryRuntime, createReactor } from "../../src/bus/adapters/mozaik/runtime.js";
@@ -75,15 +76,28 @@ describe("spec stage through the run engine", () => {
   });
 
   // @covers spec-stage:CST-002
-  it("ends with spec.blocked{critic_cap} and run.failed after two rework answers, without a third draft", async () => {
+  // @covers spec-stage:DLT-001
+  // @covers spec-stage:SCN-001
+  it("records the final round's finding as an assumption and approves after two rework answers, without a third draft", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
 
-    const { trace } = await scriptedStage(ws, [analystWrites(ws, 1), criticAnswers(ws, 1, "rework"), analystWrites(ws, 2), criticAnswers(ws, 2, "rework")]);
+    const { trace, engine } = await scriptedStage(ws, [analystWrites(ws, 1), criticAnswers(ws, 1, "rework"), analystWrites(ws, 2), criticAnswers(ws, 2, "rework")]);
 
-    expect([trace.map((event) => event.type), trace.at(-2)?.payload["reason"], trace.at(-1)?.payload]).toEqual([
-      ["workspace.ready", "spec.drafted", "spec.reviewed", "spec.rework", "spec.drafted", "spec.reviewed", "spec.blocked", "run.failed"],
-      "critic_cap",
-      { stage: "spec", reason: "critic_cap", detail: "critic answered rework in round 2 of 2; findings at spec/review/ga.md" },
+    const assumptions = await readFile(ws.assumptionsPath, "utf8");
+    expect([trace.map((event) => [event.type, event.producer]), trace.at(-2)?.payload["decision"], engine.state.status, assumptions.includes("id: todo-cli:ASM-002"), assumptions.includes("critic finding GA-001")]).toEqual([
+      [
+        ["workspace.ready", "foreman"],
+        ["spec.drafted", "spec-analyst"],
+        ["spec.reviewed", "spec-critic"],
+        ["spec.rework", "foreman"],
+        ["spec.drafted", "spec-analyst"],
+        ["spec.reviewed", "spec-critic"],
+        ["spec.approved", "foreman"],
+      ],
+      "rework",
+      "spec_approved",
+      true,
+      true,
     ]);
   });
 

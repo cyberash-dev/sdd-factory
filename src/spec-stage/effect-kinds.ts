@@ -3,6 +3,7 @@ export const SPEC_EFFECT_KINDS = {
   review: "spec.review",
   approve: "spec.approve",
   assume: "spec.assume",
+  assumeFindings: "spec.assume_findings",
 } as const;
 
 export const DESIGN_EFFECT_KINDS = {

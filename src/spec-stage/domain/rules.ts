@@ -1,5 +1,4 @@
 import type { Caps } from "../../shared/config.js";
-import type { RunState } from "../../bus/domain/run-state.js";
 import type { PendingEvent, TransitionRule } from "../../bus/domain/transition.js";
 import { DESIGN_EFFECT_KINDS, SPEC_EFFECT_KINDS } from "../effect-kinds.js";
 
@@ -17,14 +16,6 @@ function stringField(payload: Readonly<Record<string, unknown>>, field: string):
     throw new Error(`payload.${field} must be a string`);
   }
   return value;
-}
-
-function criticCapReached(state: RunState, round: number, findingsPath: string): PendingEvent {
-  return {
-    type: "spec.blocked",
-    producer: "foreman",
-    payload: { reason: "critic_cap", detail: `critic answered rework in round ${round} of ${state.stageAttempts.criticRounds}; findings at ${findingsPath}` },
-  };
 }
 
 export function specStageRules(caps: Caps): readonly TransitionRule[] {
@@ -58,8 +49,9 @@ export function specStageRules(caps: Caps): readonly TransitionRule[] {
         if (stringField(event.payload, "decision") === "accept") {
           return { state, emits: [], effects: [{ kind: SPEC_EFFECT_KINDS.approve }] };
         }
+        /* spec-stage:DLT-001: the final round never ends the run; its open findings become sandbox assumptions. */
         if (round >= caps.criticRounds) {
-          return { state, emits: [criticCapReached(state, round, findingsPath)], effects: [] };
+          return { state, emits: [], effects: [{ kind: SPEC_EFFECT_KINDS.assumeFindings, round, findingsPath }] };
         }
         return {
           state: { ...state, status: "spec_drafting" },

@@ -55,6 +55,20 @@ describe("spec.review effect", () => {
     expect([published, roles.requests[0]?.message.includes("Review round 2")]).toEqual([[{ type: "spec.reviewed", producer: "spec-critic", payload: { round: 2, decision: "accept", findingsPath: "spec/review/ga.md" } }], true]);
   });
 
+  // @covers spec-stage:DLT-001
+  it("counts a round whose handoff stays unparseable after the re-run as accept instead of blocking the run", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const garbage = async (): Promise<void> => {
+      await writeText(handoffPath(ws), "no frontmatter here\n");
+    };
+    const roles = scriptedRoles([garbage, garbage]);
+    const { context, published } = effectContext(runStateAt("spec_review"));
+
+    await runReview({ kind: "spec.review", round: 1 }, context, sliceContext(ws, roles), deps());
+
+    expect([roles.requests.length, published]).toEqual([2, [{ type: "spec.reviewed", producer: "foreman", payload: { round: 1, decision: "accept", findingsPath: "spec/review/ga.md" } }]]);
+  });
+
   // @covers spec-stage:BEH-002
   it("blocks the run when spec/spec.md changed while the critic ran", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
@@ -130,7 +144,7 @@ describe("spec.review effect", () => {
   });
 
   // @covers spec-stage:CTR-003
-  it("re-runs the critic when ga.md disagrees with the handoff decision and blocks after the second miss", async () => {
+  it("re-runs the critic when ga.md disagrees with the handoff decision and counts the round as accept after the second miss", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
     const roles = scriptedRoles([
       async () => {
@@ -148,18 +162,18 @@ describe("spec.review effect", () => {
     expect([roles.requests[1]?.message.includes("rejected: spec/review/ga.md says decision rework but the handoff says accept"), (await readdir(join(ws.handoffsDir, "spec-critic"))).sort(), published]).toEqual([
       true,
       ["handoff.md.rejected-1", "handoff.md.rejected-2"],
-      [{ type: "spec.blocked", producer: "spec-critic", payload: { reason: "analyst_blocked", detail: "unparseable_handoff: spec/review/ga.md says decision rework but the handoff says accept" } }],
+      [{ type: "spec.reviewed", producer: "foreman", payload: { round: 1, decision: "accept", findingsPath: "spec/review/ga.md" } }],
     ]);
   });
 
   // @covers spec-stage:CTR-003
-  it("treats a missing ga.md as an invalid handoff", async () => {
+  it("treats a missing ga.md as an invalid handoff and counts the round as accept after the re-run", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
     const roles = scriptedRoles([() => writeText(handoffPath(ws), criticHandoff(1, "accept")), () => writeText(handoffPath(ws), criticHandoff(1, "accept"))]);
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runReview({ kind: "spec.review", round: 1 }, context, sliceContext(ws, roles), deps());
 
-    expect([roles.requests.length, published[0]?.payload["detail"]]).toEqual([2, "unparseable_handoff: spec/review/ga.md was not written"]);
+    expect([roles.requests.length, roles.requests[1]?.message.includes("rejected: spec/review/ga.md was not written"), published]).toEqual([2, true, [{ type: "spec.reviewed", producer: "foreman", payload: { round: 1, decision: "accept", findingsPath: "spec/review/ga.md" } }]]);
   });
 });

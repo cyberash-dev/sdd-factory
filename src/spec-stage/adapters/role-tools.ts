@@ -1,6 +1,6 @@
 import { relative, resolve, sep } from "node:path";
 import type { Tool } from "@mozaik-ai/core";
-import { listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../shared/llm/tools.js";
+import { editFileTool, listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../shared/llm/tools.js";
 import { isRecord } from "../domain/guards.js";
 import type { CommandRunner } from "../ports/command-runner.js";
 
@@ -75,6 +75,7 @@ export function fileTools(options: RoleToolOptions): readonly Tool[] {
   return [
     scopedTool(readFileTool(options.repoRoot, options.trace), { base, allowed: options.reads }, "read"),
     scopedTool(writeFileTool(options.repoRoot, options.trace), { base, allowed: options.writes }, "write"),
+    scopedTool(editFileTool(options.repoRoot, options.trace), { base, allowed: options.writes }, "write"),
     scopedTool(listDirTool(options.repoRoot, options.trace), { base, allowed: options.lists }, "list"),
   ];
 }

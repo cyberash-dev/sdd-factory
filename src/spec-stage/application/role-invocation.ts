@@ -1,4 +1,5 @@
 import { rename } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { Tool } from "@mozaik-ai/core";
 import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../bus/domain/handoff.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
@@ -51,6 +52,7 @@ export async function invokeRole<T>(slice: SliceContext, invocation: RoleInvocat
       tools: invocation.tools,
       timeoutMs: slice.config.timeouts.apiRoleMs,
       maxOutputTokens: invocation.maxOutputTokens,
+      toolTracePath: join(dirname(invocation.handoffPath), `tools-run${run}.jsonl`),
     });
     const text = await readTextOrNull(invocation.handoffPath);
     const parsed = parseHandoff(invocation.role, text);

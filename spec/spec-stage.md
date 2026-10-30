@@ -103,7 +103,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: spec-stage
 name: product-spec-files
-version: "0.1.0"
+version: "0.2.0"
 boundary_type: public_storage
 members:
   - spec-stage:CTR-001
@@ -856,7 +856,130 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+---
+id: spec-stage:DLT-001
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T15:02:00.862Z
+    change_request: critic never ends the run
+    scope: first-time-approval
+partition_id: spec-stage
+title: product-spec-files 0.1.0 -> 0.2.0 - the final critic round never ends the run; stage budget from configuration
+target_ids:
+  - spec-stage:SUR-001
+  - spec-stage:BEH-002
+  - spec-stage:SCN-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: spec-stage:SUR-001
+    intended_version: "0.2.0"
+description: |
+  - Critic rounds are bounded by the factory configuration
+    `caps.criticRounds` (N, shipped value 4) instead of the literal two of
+    BEH-002 and SCN-001. Round 1 reviews; rounds 2..N verify that earlier
+    findings were applied and open no new finding.
+  - The final round N never ends the run. When round N answers `rework`,
+    the foreman materialises every finding of the round-N
+    `spec/review/ga.md` as an ASSUMPTION record in `spec/assumptions.md`
+    (CTR-002) without a model call: id `<slug>:ASM-NNN` continuing the
+    numbering, `assumption` = the finding's `required_change` as the
+    reading taken, `source_open_q: not_applicable`, `blocking: no`,
+    `tests: []`, `notes` citing the finding id and the round. It then runs
+    `sdd lint`, emits `spec.reviewed{round: N, decision: "accept",
+    findingsPath}` as foreman and proceeds to `spec.approve`. The critic's
+    own `rework` event stays in the trace before the foreman's `accept`.
+  - A critic handoff that stays unparseable after its automatic re-run no
+    longer blocks the run in any round: the round counts as `accept` over
+    the findings present in ga.md (materialised as above when it is the
+    final round, routed to the analyst otherwise); the rejected handoffs
+    stay in the run directory.
+  - `spec.blocked{reason: "critic_cap"}` is no longer emitted by the spec
+    stage.
+  - SCN-001's wall-clock budget is `timeouts.specStageMs` of the factory
+    configuration (shipped value 40 minutes) instead of the literal 20
+    minutes; its sequence allows up to N review rounds.
+  - spec-stage:SUR-001 gains BEH-002 and SCN-001 as members => minor bump.
+tests_old_behavior:
+  - a rework in a non-final round still routes to the analyst; BEH-003 tests stay green
+tests_new_behavior:
+  - to:spec-stage:BEH-002
+  - to:spec-stage:SCN-001
+test_obligation:
+  predicate: |
+    With caps.criticRounds = 2 and a scripted critic answering rework in
+    round 2 with two findings, spec/assumptions.md gains two ASSUMPTION
+    records with consecutive ids whose notes name the finding ids,
+    spec/spec.md is byte-identical, the foreman emits
+    spec.reviewed{round: 2, decision: "accept"} and spec.approved
+    follows; no spec.blocked is emitted. With caps.criticRounds = 4 a
+    rework in round 1 routes to the analyst as before. A critic handoff
+    unparseable twice in round 1 yields spec.reviewed{decision: "accept"}
+    and no spec.blocked.
+  test_template: integration
+  boundary_classes:
+    - final round rework
+    - non-final round rework
+    - unparseable critic handoff after the re-run
+  failure_scenarios:
+    - run ends with critic_cap or analyst_blocked because of the critic
+    - assumption written into spec/spec.md
+    - assumption id colliding with an existing record
+---
+```
+
+```yaml
+---
+id: spec-stage:DLT-002
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: spec-stage
+title: final critic round - approval follows the recorded assumptions directly
+target_ids:
+  - spec-stage:DLT-001
+  - spec-stage:BEH-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  spec-stage:DLT-001 let the foreman emit a second
+  `spec.reviewed{round: N, decision: "accept"}` after recording the open
+  findings. bus:BEH-002 treats an event with the same type and round as a
+  duplicate of the critic's `spec.reviewed{round: N, decision: "rework"}`
+  and ignores it, so that event cannot drive the approval. The foreman
+  therefore proceeds to `spec.approve` directly after writing the
+  assumptions and running `sdd lint`: the trace carries the critic's
+  `rework` for round N followed by `spec.approved`; the recorded
+  assumptions are listed in trace.md and in spec/assumptions.md. The
+  foreman's `spec.reviewed` is still emitted when the critic's handoff
+  stayed unparseable, because the critic published nothing for that round.
+tests_old_behavior:
+  - spec-stage:DLT-001 tests on the recorded assumptions and the untouched spec.md stay green
+tests_new_behavior:
+  - to:spec-stage:BEH-002
+test_obligation:
+  predicate: |
+    With caps.criticRounds = 2 and a scripted critic answering rework in
+    round 2, the run engine's trace reads workspace.ready, spec.drafted,
+    spec.reviewed, spec.rework, spec.drafted, spec.reviewed, spec.approved
+    with no further spec.reviewed, and spec/assumptions.md carries the
+    recorded finding.
+  test_template: integration
+  boundary_classes:
+    - final round rework through the run engine
+  failure_scenarios:
+    - a second spec.reviewed for round N that the engine ignores as a duplicate
+    - spec.approved missing after the recorded assumptions
+---
+```
 
 ---
 

@@ -64,10 +64,11 @@ describe("spec-stage rules", () => {
   });
 
   // @covers spec-stage:CST-002
-  it("blocks the run with critic_cap instead of a third draft when round 2 answers rework", () => {
+  // @covers spec-stage:DLT-001
+  it("hands the final round's open findings to the foreman instead of a third draft or a blocked run", () => {
     const result = applied(stateAt("spec_review", 2), "spec.reviewed", { round: 2, decision: "rework", findingsPath: "spec/review/ga.md" });
 
-    expect([result.emits.map((event) => [event.type, event.payload["reason"]]), result.effects]).toEqual([[["spec.blocked", "critic_cap"]], []]);
+    expect([result.state.status, result.emits, result.effects]).toEqual(["spec_review", [], [{ kind: "spec.assume_findings", round: 2, findingsPath: "spec/review/ga.md" }]]);
   });
 
   it("treats spec.rework as bookkeeping without state change or effects", () => {
