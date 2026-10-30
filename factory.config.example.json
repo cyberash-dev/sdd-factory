@@ -1,7 +1,7 @@
 {
   "caps": {
     "lintCycles": 5,
-    "criticRounds": 2,
+    "criticRounds": 4,
     "implementerAttempts": 3,
     "testWriterRework": 1,
     "plannerRecuts": 1,
