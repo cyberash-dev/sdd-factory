@@ -34,7 +34,7 @@ Must not read: `design/tech.md` (your design must hold for any implementation), 
 ## 4. Infeasible candidates  (id, reason, what would make it feasible; or the literal `none`)
 ```
 
-Block shape: heading `### <id>`, then one yaml block:
+Block shape: heading `### <id>`, then one yaml block. Every string value in a yaml block is a double-quoted YAML string; a `"` inside it is written `\"`; never single quotes (an apostrophe in the text ends a single-quoted scalar), never a bare value containing `: ` or ` #`. A file the parser rejects comes back to you once as a rework finding with the parser message; write valid yaml the first time.
 
 ```yaml
 id: <slug>:BEH-003

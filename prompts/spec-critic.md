@@ -64,6 +64,7 @@ notes: 'decided by GA-NNN; source: L<n> or none'
 decision: accept|rework
 
 ## Findings
+One yaml fence, a list. Every free-text value in it (`finding`, `required_change`, `resolution_text`) is a double-quoted YAML string; a `"` inside it is written `\"`; never single quotes (an apostrophe in the text ends a single-quoted scalar).
 ```yaml
 - id: GA-001
   kind: gap|conflict|weasel|untestable|missing_negative|unmodeled_term

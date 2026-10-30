@@ -814,7 +814,71 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+---
+id: design-stage:DLT-001
+type: Delta
+lifecycle:
+  status: proposed
+partition_id: design-stage
+title: a malformed design file is a rework finding, not a blocker
+target_ids:
+  - design-stage:CTR-001
+  - design-stage:CTR-002
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+description: |
+  Live run 8 ended at the design stage because the verification-designer
+  left an unescaped quote inside a yaml scalar of design/verification.md:
+  the parser rejected the file and design.blocked{reason:
+  "verification_md_invalid"} failed the run. The author of the file is
+  the role best placed to repair it when told the parser message, so a
+  file the parser rejects is treated like a missing block: the role
+  re-runs once with the parser message as its rework finding, and only a
+  second unusable output blocks.
+  design-stage:CTR-001 error_taxonomy row "missing TD-TOOLING or
+  unparseable dependency list => design.blocked{reason:
+  \"tech_md_invalid\"}" becomes "missing TD-TOOLING, unparseable file or
+  unparseable dependency list => design.rework{target: \"architect\"}
+  once, then design.blocked{reason: \"tech_md_invalid\"}"; an unpinned
+  dependency keeps its existing design.rework route. A missing file keeps
+  design.blocked (the role produced nothing to repair).
+  design-stage:CTR-002 error_taxonomy row gains "unparseable file =>
+  design.rework{target: \"verification-designer\"} once, then
+  design.blocked{reason: \"verification_md_invalid\"}". The rework
+  finding carries the parser message verbatim (block heading, line and
+  column when the parser reports them). No change to design-stage:SUR-001
+  members or file shapes.
+surface_impact:
+  - id: design-stage:SUR-001
+    intended_version: "0.1.1"
+tests_old_behavior:
+  - a missing design/tech.md or design/verification.md still ends in design.blocked with the existing reasons
+tests_new_behavior:
+  - to:design-stage:CTR-001
+  - to:design-stage:CTR-002
+test_obligation:
+  predicate: |
+    Given a verification-designer whose first design/verification.md
+    fails to parse and whose second parses and covers every id, the
+    effect publishes design.verification.ready and the role was invoked
+    twice with the parser message in the second rework finding; given an
+    architect whose first design/tech.md fails to parse, the effect
+    publishes design.rework{target: "architect"} with the parser message;
+    given two unparseable outputs in a row, design.blocked carries the
+    existing reason; a file that was never written still blocks at once.
+  test_template: integration
+  boundary_classes:
+    - unparseable then valid verification.md
+    - unparseable tech.md
+    - unparseable twice
+    - file not written
+  failure_scenarios:
+    - the parser message lost from the rework finding
+    - the rework loop running past one repair
+---
+```
 
 ---
 
