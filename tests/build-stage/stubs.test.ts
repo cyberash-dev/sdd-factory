@@ -36,6 +36,34 @@ describe("stub generation from the tech.md module table", () => {
     expect(stubSource(aModule({ exports: [] }))).toBe("export {};\n");
   });
 
+  // @covers build-stage:DLT-003
+  it("starts the stub with the type import line of the interface block", () => {
+    const module = aModule({
+      interfaceSource: 'import type { Result } from "../errors/index.js";\n\nexport function run(argv: string[]): Result<string>;',
+      exports: [{ name: "run", kind: "function", signature: "run(argv: string[]): Result<string>" }],
+    });
+
+    expect(stubSource(module)).toBe('import type { Result } from "../errors/index.js";\n\nexport function run(argv: string[]): Result<string> {\n  throw new Error("not implemented: run");\n}\n');
+  });
+
+  // @covers build-stage:DLT-003
+  it("keeps value and multi-line imports verbatim and emits each import once", () => {
+    const module = aModule({
+      interfaceSource: 'import { parse } from "../parser/index.js";\nimport type {\n  Token,\n  Span,\n} from "../lexer/index.js";\n\nexport function first(source: string): Token;\nexport function where(token: Token): Span;',
+      exports: [
+        { name: "first", kind: "function", signature: "first(source: string): Token" },
+        { name: "where", kind: "function", signature: "where(token: Token): Span" },
+      ],
+    });
+
+    expect(stubSource(module)).toBe('import { parse } from "../parser/index.js";\nimport type {\n  Token,\n  Span,\n} from "../lexer/index.js";\n\nexport function first(source: string): Token {\n  throw new Error("not implemented: first");\n}\n\nexport function where(token: Token): Span {\n  throw new Error("not implemented: where");\n}\n');
+  });
+
+  // @covers build-stage:DLT-003
+  it("renders an interface without imports with no import lines", () => {
+    expect(stubSource(aModule())).toBe('export function greet(name: string): string {\n  throw new Error("not implemented: greet");\n}\n');
+  });
+
   it("selects the modules referenced by designRefs or sharing a covered id", () => {
     const modules = [aModule(), aModule({ id: "M-02", covers: ["greeter:BEH-002"] }), aModule({ id: "M-03", covers: ["greeter:BEH-001"] })];
 

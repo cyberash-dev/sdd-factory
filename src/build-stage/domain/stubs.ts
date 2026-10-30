@@ -86,11 +86,34 @@ export function isPlaceholderModule(source: string): boolean {
   return body.length === 0 || body === "export {};" || body === "export {}";
 }
 
+const IMPORT_END = /(?:\bfrom\s*|^import\s*)["'][^"']+["']\s*;?\s*$/;
+
+function importStatements(interfaceSource: string): readonly string[] {
+  const statements: string[] = [];
+  let pending: string[] | null = null;
+  for (const line of interfaceSource.split("\n")) {
+    if (pending === null && /^import\b/.test(line.trimStart())) {
+      pending = [];
+    }
+    if (pending === null) {
+      continue;
+    }
+    pending.push(line);
+    if (IMPORT_END.test(line.trim())) {
+      statements.push(pending.join("\n").trim());
+      pending = null;
+    }
+  }
+  return statements;
+}
+
 export function stubSource(module: TechModule): string {
   if (module.exports.length === 0) {
     return "export {};\n";
   }
-  return `${module.exports.map(stubForExport).join("\n\n")}\n`;
+  const imports = importStatements(module.interfaceSource);
+  const header = imports.length === 0 ? "" : `${imports.join("\n")}\n\n`;
+  return `${header}${module.exports.map(stubForExport).join("\n\n")}\n`;
 }
 
 export function modulesOfTask(modules: readonly TechModule[], task: { readonly designRefs: readonly string[]; readonly covers: readonly string[] }): readonly TechModule[] {
