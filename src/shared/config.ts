@@ -34,11 +34,13 @@ export interface RoleModels {
   readonly triage: string;
   readonly reviewer: string | null;
   readonly lane: string | null;
+  readonly lanes: Readonly<Record<string, string>>;
   readonly effort: Readonly<Record<string, ReasoningEffort>>;
 }
 
 export const REASONING_EFFORTS = ["max", "xhigh", "high", "medium", "low", "none"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+export type LaneEffort = Exclude<ReasoningEffort, "none">;
 
 function isReasoningEffort(value: unknown): value is ReasoningEffort {
   return typeof value === "string" && (REASONING_EFFORTS as readonly string[]).includes(value);
@@ -81,6 +83,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
     triage: "claude-haiku-4-5",
     reviewer: null,
     lane: null,
+    lanes: {},
     effort: {},
   },
   pricing: {},
@@ -126,6 +129,19 @@ function pickEfforts(source: Json, fallback: Readonly<Record<string, ReasoningEf
     }
   }
   return efforts;
+}
+
+function pickLaneModels(source: Json, fallback: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+  if (Object.keys(source).length === 0) {
+    return fallback;
+  }
+  const lanes: Record<string, string> = {};
+  for (const [role, model] of Object.entries(source)) {
+    if (typeof model === "string" && model.length > 0) {
+      lanes[role] = model;
+    }
+  }
+  return lanes;
 }
 
 function isPricing(value: unknown): value is ModelPricing {
@@ -174,6 +190,7 @@ export function mergeConfig(base: FactoryConfig, override: unknown): FactoryConf
       triage: pickString(models, "triage", base.models.triage),
       reviewer: pickStringOrNull(models, "reviewer", base.models.reviewer),
       lane: pickStringOrNull(models, "lane", base.models.lane),
+      lanes: pickLaneModels(section(models, "lanes"), base.models.lanes),
       effort: pickEfforts(section(models, "effort"), base.models.effort),
     },
     pricing,
@@ -197,4 +214,13 @@ export function reviewerModel(models: RoleModels): string {
 
 export function apiRoleModelIds(models: RoleModels): readonly string[] {
   return [...new Set([models.default, models.critic, models.triage, reviewerModel(models)])];
+}
+
+export function laneModelFor(models: RoleModels, role: string): string | null {
+  return models.lanes[role] ?? models.lane;
+}
+
+export function laneEffortFor(models: RoleModels, role: string): LaneEffort | null {
+  const effort = models.effort[role];
+  return effort === undefined || effort === "none" ? null : effort;
 }

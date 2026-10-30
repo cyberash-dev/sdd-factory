@@ -4,10 +4,11 @@ import { createRuntimeObserver } from "../../src/bus/adapters/mozaik/runtime.js"
 import type { RunState } from "../../src/bus/domain/run-state.js";
 import type { PendingEvent } from "../../src/bus/domain/transition.js";
 import { aTaskSpec, greeterDesign } from "./support/design.js";
-import { aLaneHarness, type LaneHarness } from "./support/harness.js";
-import { handoffPathFromWorktree, laneState, provisionLane, RED_TEST } from "./support/lanes.js";
+import { aLaneHarness, TEST_CONFIG, type LaneHarness } from "./support/harness.js";
+import { handoffPathFromWorktree, laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
 import { aProductRepo, writeProductFile } from "./support/product.js";
-import { scriptedCliRoles, writeHandoff } from "./support/runners.js";
+import { scriptedCliRoles, writeHandoff, type ScriptedCliRoles } from "./support/runners.js";
+import { claudeArgv } from "../../src/shared/llm/cli-role-runner.js";
 import { aTask, buildingState } from "./support/state.js";
 import { isRecord } from "../../src/trace/domain/guards.js";
 
@@ -66,6 +67,10 @@ function arrivalBarrier(expected: number): () => Promise<void> {
   };
 }
 
+function aSonnetTestWriterHarness(productDir: string, cliRoles: ScriptedCliRoles): Promise<LaneHarness> {
+  return aLaneHarness({ productDir, design: greeterDesign(), cliRoles, config: { models: { ...TEST_CONFIG.models, lanes: { "test-writer": "claude-sonnet-5-5" }, effort: { "test-writer": "medium" } } } });
+}
+
 describe("lane participants", () => {
   // @covers build-stage:BEH-017
   it("joins a test-writer participant for the task while the subprocess runs, sends its event from it and leaves afterwards", async () => {
@@ -112,6 +117,42 @@ describe("lane participants", () => {
       ["inference.completed", laneId, "claude-opus-5-5", { inputTokens: 500, outputTokens: 120 }],
       ["task.tests_written", laneId, undefined, undefined],
     ]);
+  });
+
+  // @covers factory:DLT-010
+  // @covers build-stage:DLT-006
+  it("spawns the test-writer lane with the model and effort configured for its role", async () => {
+    const cliRoles = scriptedCliRoles(async (request) => writeCompleteHandoff(request.cwd));
+    const harness = await aSonnetTestWriterHarness(await aProductRepo(), cliRoles);
+    const lane = await provisionLane(harness);
+
+    await runTestWriterThroughRuntime(harness, "T-001", laneState(lane));
+
+    expect(cliRoles.requests.map((request) => claudeArgv(request).slice(-4))).toEqual([["--model", "claude-sonnet-5-5", "--effort", "medium"]]);
+  });
+
+  // @covers factory:DLT-010
+  it("spawns the implementer lane with neither a model nor an effort when only the test-writer has entries", async () => {
+    const cliRoles = scriptedCliRoles(async () => undefined);
+    const harness = await aSonnetTestWriterHarness(await aProductRepo(), cliRoles);
+    const lane = await provisionLane(harness);
+
+    await runLaneEffect(harness, "build.implementer", { taskId: "T-001", attempt: 1, reworkFinding: null }, laneState(lane, { status: "impl_pending", attempts: { implementer: 1, testWriter: 1 }, testsSha: lane.baseSha }));
+
+    expect([cliRoles.requests.length > 0, cliRoles.requests.flatMap((request) => claudeArgv(request).filter((arg) => arg === "--model" || arg === "--effort"))]).toEqual([true, []]);
+  });
+
+  // @covers factory:DLT-010
+  it("reports the resolved lane model in inference.started", async () => {
+    const cliRoles = scriptedCliRoles(async (request) => writeCompleteHandoff(request.cwd));
+    const harness = await aSonnetTestWriterHarness(await aProductRepo(), cliRoles);
+    const startedModels: unknown[] = [];
+    harness.context.runtime.join(createRuntimeObserver("started-probe", (event) => (event.type === "inference.started" && isRecord(event.payload) ? startedModels.push(event.payload["model"]) : undefined)));
+    const lane = await provisionLane(harness);
+
+    await runTestWriterThroughRuntime(harness, "T-001", laneState(lane));
+
+    expect(startedModels).toEqual(["claude-sonnet-5-5"]);
   });
 
   it("leaves the lane participant without publishing when the lane is cancelled while the subprocess runs", async () => {

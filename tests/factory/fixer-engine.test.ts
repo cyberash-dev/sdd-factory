@@ -13,11 +13,11 @@ import type { DeliveredEvent } from "../../src/bus/domain/envelope.js";
 import { createRunState, createTaskState, type RunState } from "../../src/bus/domain/run-state.js";
 import { SIMPLE_FIX_RULE } from "../../src/bus/domain/simple-fix-rule.js";
 import type { PendingEvent } from "../../src/bus/domain/transition.js";
-import { DEFAULT_CONFIG } from "../../src/shared/config.js";
+import { DEFAULT_CONFIG, type RoleModels } from "../../src/shared/config.js";
 import { createGitWorkingTree } from "../../src/shared/fixer/adapters/outbound/git-working-tree.js";
 import { runSimpleFix, type FixCheck, type SimpleFixRequest, type SimpleFixResult } from "../../src/shared/fixer/application/run-simple-fix.js";
 import { fixScopeOf } from "../../src/shared/fixer/domain/fix-scope.js";
-import type { CliRoleOutcome, CliRoleRequest, CliRoleRunner } from "../../src/shared/llm/cli-role-runner.js";
+import { claudeArgv, type CliRoleOutcome, type CliRoleRequest, type CliRoleRunner } from "../../src/shared/llm/cli-role-runner.js";
 import { createPromptLibrary } from "../../src/shared/prompts.js";
 import type { SliceContext } from "../../src/shared/slice.js";
 
@@ -83,7 +83,7 @@ function aState(simpleFixes: Readonly<Record<string, number>> = {}): RunState {
   return { ...base, status: "building", simpleFixes, tasks: { "T-001": createTaskState({ worktree: "/wt", covers: [], writes: [], dependsOn: [] }) } };
 }
 
-async function aFixerHarness(files: Readonly<Record<string, string>>, script: FixerScript, initialState: RunState = aState(), outcomeOverrides: Partial<CliRoleOutcome> = {}): Promise<FixerHarness> {
+async function aFixerHarness(files: Readonly<Record<string, string>>, script: FixerScript, initialState: RunState = aState(), outcomeOverrides: Partial<CliRoleOutcome> = {}, models: RoleModels = DEFAULT_CONFIG.models): Promise<FixerHarness> {
   const directory = await aRepo(files);
   const runDir = await mkdtemp(join(tmpdir(), "fixer-run-"));
   const requests: CliRoleRequest[] = [];
@@ -108,7 +108,7 @@ async function aFixerHarness(files: Readonly<Record<string, string>>, script: Fi
     log: () => undefined,
   });
   const slice: SliceContext = {
-    config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, simpleFixes: 2 } },
+    config: { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, simpleFixes: 2 }, models },
     runId: RUN_ID,
     slug: "greeter",
     operator: "cyberash",
@@ -238,6 +238,16 @@ describe("simple-fixer engine", () => {
 
     const prompt = harness.requests[0]?.prompt ?? "";
     expect([prompt.includes(TSC_OUTPUT), prompt.includes("- `src/**`"), harness.requests[0]?.cwd]).toEqual([true, true, harness.directory]);
+  });
+
+  // @covers factory:DLT-010
+  it("spawns the fixer on the simple-fixer lane model and effort instead of models.lane", async () => {
+    const models: RoleModels = { ...DEFAULT_CONFIG.models, lane: "claude-haiku-4-5", lanes: { "simple-fixer": "claude-opus-5-5" }, effort: { "simple-fixer": "medium" } };
+    const harness = await aFixerHarness({ "src/greet.ts": STUB }, addFormatStub, aState(), {}, models);
+
+    await harness.fix(redSuiteRequest(harness.directory));
+
+    expect(harness.requests.map((request) => claudeArgv(request).slice(-4))).toEqual([["--model", "claude-opus-5-5", "--effort", "medium"]]);
   });
 
   // @covers factory:BEH-012

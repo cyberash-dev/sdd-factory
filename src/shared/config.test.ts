@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, loadConfig, mergeConfig, reviewerModel } from "./config.js";
+import { apiRoleModelIds, DEFAULT_CONFIG, laneEffortFor, laneModelFor, loadConfig, mergeConfig, reviewerModel } from "./config.js";
 
 describe("factory config", () => {
   it("overrides caps, timeouts, lanes, models and pricing from a partial document", () => {
@@ -45,6 +45,48 @@ describe("factory config", () => {
     const merged = mergeConfig(DEFAULT_CONFIG, { models: { effort: { "spec-analyst": "high", planner: "turbo", triage: 5 } } });
 
     expect([DEFAULT_CONFIG.models.effort, merged.models.effort]).toEqual([{}, { "spec-analyst": "high" }]);
+  });
+
+  // @covers factory:DLT-010
+  it("reads a Claude Code model per lane role and falls back to models.lane for a role absent from the map", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { models: { lane: "claude-haiku-4-5", lanes: { "test-writer": "claude-sonnet-5-5", implementer: 7 } } });
+
+    expect([merged.models.lanes, laneModelFor(merged.models, "test-writer"), laneModelFor(merged.models, "implementer")]).toEqual([{ "test-writer": "claude-sonnet-5-5" }, "claude-sonnet-5-5", "claude-haiku-4-5"]);
+  });
+
+  // @covers factory:DLT-010
+  it("resolves no lane model when the role is absent from the map and models.lane is null", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { models: { lanes: { "test-writer": "claude-sonnet-5-5" } } });
+
+    expect([DEFAULT_CONFIG.models.lanes, laneModelFor(merged.models, "simple-fixer")]).toEqual([{}, null]);
+  });
+
+  // @covers factory:DLT-010
+  it.each([
+    [{ "test-writer": "medium" }, "medium"],
+    [{ "test-writer": "none" }, null],
+    [{ implementer: "high" }, null],
+  ])("resolves the lane effort of test-writer from effort %j as %s", (effort, expected) => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { models: { effort } });
+
+    expect(laneEffortFor(merged.models, "test-writer")).toBe(expected);
+  });
+
+  // @covers factory:DLT-010
+  it("keeps lane models out of the API model ids", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { models: { default: "m-default", critic: "m-critic", triage: "m-triage", lane: "m-lane", lanes: { implementer: "m-implementer" } } });
+
+    expect(apiRoleModelIds(merged.models)).toEqual(["m-default", "m-critic", "m-triage"]);
+  });
+
+  // @covers factory:DLT-010
+  it("ships sonnet test-writer and implementer lanes, an opus simple-fixer and medium effort for the analyst, triage and lane roles", async () => {
+    const shipped = await loadConfig(join(import.meta.dirname, "..", "..", "factory.config.json"));
+
+    expect([shipped.models.lanes, shipped.models.effort]).toEqual([
+      { "test-writer": "claude-sonnet-5-5", implementer: "claude-sonnet-5-5", "simple-fixer": "claude-opus-5-5" },
+      { "spec-analyst": "medium", architect: "medium", "verification-designer": "high", planner: "medium", triage: "medium", "test-writer": "medium", implementer: "medium", "simple-fixer": "medium" },
+    ]);
   });
 
   it("ignores values of the wrong type and keeps the defaults", () => {

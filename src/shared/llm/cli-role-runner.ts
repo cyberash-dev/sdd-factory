@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import type { LaneEffort } from "../config.js";
 
 export interface CliRoleRequest {
   readonly binary: string;
@@ -6,6 +7,7 @@ export interface CliRoleRequest {
   readonly prompt: string;
   readonly addDirs: readonly string[];
   readonly model: string | null;
+  readonly effort: LaneEffort | null;
   readonly timeoutMs: number;
   readonly env: Readonly<Record<string, string>>;
 }
@@ -72,6 +74,9 @@ export function claudeArgv(request: CliRoleRequest): string[] {
   }
   if (request.model !== null) {
     argv.push("--model", request.model);
+  }
+  if (request.effort !== null) {
+    argv.push("--effort", request.effort);
   }
   return argv;
 }

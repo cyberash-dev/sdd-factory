@@ -29,7 +29,7 @@ async function fakeClaude(lines: readonly string[], options: { readonly exitCode
 }
 
 function request(binary: string, timeoutMs = 5000): CliRoleRequest {
-  return { binary, cwd: tmpdir(), prompt: "do the task", addDirs: ["/tmp/wt"], model: null, timeoutMs, env: { PATH: process.env["PATH"] ?? "" } };
+  return { binary, cwd: tmpdir(), prompt: "do the task", addDirs: ["/tmp/wt"], model: null, effort: null, timeoutMs, env: { PATH: process.env["PATH"] ?? "" } };
 }
 
 describe("claude -p lane executor", () => {
@@ -118,6 +118,20 @@ describe("claude -p lane executor", () => {
   // @covers build-stage:DLT-002
   it("keeps safe mode when there are no add-dirs and no model", () => {
     expect(claudeArgv({ ...request("claude"), addDirs: [] })).toEqual(["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--safe-mode"]);
+  });
+
+  // @covers build-stage:DLT-006
+  it("appends the reasoning effort after the model", () => {
+    const argv = claudeArgv({ ...request("claude"), addDirs: [], model: "claude-sonnet-5-5", effort: "medium" });
+
+    expect(argv).toEqual(["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--safe-mode", "--model", "claude-sonnet-5-5", "--effort", "medium"]);
+  });
+
+  // @covers build-stage:DLT-006
+  it("passes the reasoning effort without a model", () => {
+    const argv = claudeArgv({ ...request("claude"), addDirs: [], effort: "xhigh" });
+
+    expect(argv).toEqual(["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--safe-mode", "--effort", "xhigh"]);
   });
 
   it("ignores unparseable and unrelated lines", () => {

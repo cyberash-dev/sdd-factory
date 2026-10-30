@@ -1,5 +1,6 @@
 import { dirname } from "node:path";
 import type { LaneParticipant, LaneRole } from "../../bus/adapters/mozaik/roster.js";
+import { laneEffortFor, laneModelFor } from "../config.js";
 import type { SliceContext } from "../slice.js";
 import { isTerminatedOutcome, laneEnvironment, type CliRoleOutcome } from "./cli-role-runner.js";
 
@@ -50,7 +51,8 @@ export async function withLaneParticipant<T>(slice: SliceContext, role: LaneRole
 
 /* build-stage:EXT-001: one retry after a rate-limited result, without counting an attempt. */
 export async function runCliLane(slice: SliceContext, deps: LaneClock, request: CliLaneRequest, lane: LaneParticipant): Promise<CliRoleOutcome> {
-  const configuredModel = slice.config.models.lane ?? LANE_MODEL_FALLBACK;
+  const laneModel = laneModelFor(slice.config.models, lane.role);
+  const configuredModel = laneModel ?? LANE_MODEL_FALLBACK;
   const run = async (): Promise<CliRoleOutcome> => {
     /* build-stage:DLT-001: the subprocess is reported like a loop inference so Mozaik Cloud counts lane work. */
     slice.runtime.publishRuntimeEvent(lane.id, "inference.started", { model: configuredModel });
@@ -59,7 +61,8 @@ export async function runCliLane(slice: SliceContext, deps: LaneClock, request: 
       cwd: request.worktree,
       prompt: `${request.instruction}\n\n---\n\n${request.message}`,
       addDirs: request.handoffPath === null ? [request.worktree] : [request.worktree, dirname(request.handoffPath)],
-      model: slice.config.models.lane,
+      model: laneModel,
+      effort: laneEffortFor(slice.config.models, lane.role),
       timeoutMs: slice.config.timeouts.cliRoleMs,
       env: laneEnvironment(process.env),
     });

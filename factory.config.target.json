@@ -27,11 +27,20 @@
     "triage": "openai/gpt-6-luna",
     "reviewer": "openai/gpt-6.1-terra",
     "lane": null,
+    "lanes": {
+      "test-writer": "claude-sonnet-5-5",
+      "implementer": "claude-sonnet-5-5",
+      "simple-fixer": "claude-opus-5-5"
+    },
     "effort": {
-      "spec-analyst": "high",
+      "spec-analyst": "medium",
       "architect": "high",
       "verification-designer": "high",
-      "planner": "high"
+      "planner": "high",
+      "triage": "medium",
+      "test-writer": "medium",
+      "implementer": "medium",
+      "simple-fixer": "medium"
     }
   },
   "pricing": {

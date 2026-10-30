@@ -27,11 +27,20 @@
     "triage": "deepseek/deepseek-v4.1-flash-1017",
     "reviewer": "z-ai/glm-5.3-flash",
     "lane": null,
+    "lanes": {
+      "test-writer": "claude-sonnet-5-5",
+      "implementer": "claude-sonnet-5-5",
+      "simple-fixer": "claude-opus-5-5"
+    },
     "effort": {
-      "spec-analyst": "high",
+      "spec-analyst": "medium",
       "architect": "medium",
       "verification-designer": "high",
-      "planner": "medium"
+      "planner": "medium",
+      "triage": "medium",
+      "test-writer": "medium",
+      "implementer": "medium",
+      "simple-fixer": "medium"
     }
   },
   "pricing": {
