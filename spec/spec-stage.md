@@ -992,7 +992,13 @@ test_obligation:
 id: spec-stage:DLT-003
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:02:14.266Z
+    change_request: spec blockers never end the run
+    scope: first-time-approval
 partition_id: spec-stage
 title: approval materialises the default of every undecided Open-Q instead of blocking
 target_ids:
