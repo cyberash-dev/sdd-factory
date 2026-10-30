@@ -1375,6 +1375,65 @@ test_obligation:
     - triage invoked before the fixer cap
 ```
 
+```yaml
+---
+id: assembly-stage:DLT-002
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:25:44.275Z
+    change_request: "run 11 resume trace: failure chain is never redone; triage fallback"
+    scope: first-time-approval
+partition_id: assembly-stage
+title: triage without a handoff falls back to the default model, then routes to the planner instead of failing the run
+target_ids:
+  - assembly-stage:BEH-005
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  assembly-stage:BEH-005 ends the run with run.failed{reason:
+  unparseable_handoff} when triage leaves no usable handoff after its
+  re-run: the same single point of failure that build-stage:DLT-004
+  removed for the reviewer, on a role that runs on the cheapest model.
+  After the BEH-005 re-run the assembler invokes triage once more with
+  models.default when it differs from models.triage (same message plus
+  the re-run note); when that run also yields no usable handoff the
+  assembler itself publishes assembly.triaged{taskId: null, target:
+  "planner", reason: "triage unavailable: <last parse error>"} and the
+  planner re-cut path of build-stage:BEH-009 applies, bounded by its
+  own cap; the run no longer fails over a missing triage handoff. A
+  handoff naming an unknown task is still malformed. The model's final
+  answer is kept as answer-run<N>.md per build-stage:DLT-004.
+tests_old_behavior:
+  - a usable triage handoff on the first or second run still routes as before; an unknown task id in the route is still treated as malformed
+tests_new_behavior:
+  - to:assembly-stage:BEH-005
+test_obligation:
+  predicate: |
+    Given a triage runner that writes no handoff on every invocation while
+    models.triage differs from models.default, the effect invokes triage
+    handoffRerun + 2 times, the last with models.default, then publishes
+    assembly.triaged{taskId: null, target: planner} whose reason starts
+    "triage unavailable" and no run.failed; given the same models, no
+    extra invocation happens and assembly.triaged{taskId: null, target:
+    planner} follows the re-run; given a handoff on the fallback run, its
+    route is published.
+  test_template: unit
+  boundary_classes:
+    - no handoff, distinct models
+    - no handoff, same model
+    - handoff on the fallback run
+  failure_scenarios:
+    - run.failed published for a missing triage handoff
+    - the fallback invoked with models.triage
+---
+```
+
 ---
 
 ## 16. Implementation bindings

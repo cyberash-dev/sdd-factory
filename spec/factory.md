@@ -2350,6 +2350,76 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:25:43.931Z
+    change_request: "run 11 resume trace: failure chain is never redone; triage fallback"
+    scope: first-time-approval
+partition_id: factory
+title: resume never redoes the failure chain itself
+target_ids:
+  - factory:BEH-009
+  - factory:DLT-006
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  On the trace of run 11 the latest replayed event whose transition
+  produced an effect is task.failed{T-007} (its effect terminates the
+  lanes), followed by run.failed. A literal factory:BEH-009 redoes
+  task.failed, fails the run again at once, and excludes T-007 from the
+  in-flight set of factory:DLT-006 because it is "the task of the latest
+  event", so the reviewer whose absence caused the failure is never
+  re-run. The failure chain is what the fix between runs addresses, so
+  the replay stops at its first event the way it stops at run.failed
+  today: the chain is task.failed, spec.blocked, design.blocked and
+  run.failed; events from the first of them onwards are neither applied
+  nor redo candidates, so the task named by task.failed keeps the status
+  it had before the failure and counts as in flight. BEH-009 and
+  DLT-006 then apply to the remaining events. For run 11 the redo list
+  is task.ready{T-002} seq 199, task.verified{T-007, green} seq 217
+  (the reviewer) and task.tests_rejected{T-003} seq 224. A failure by an
+  exhausted cap (task.failed{cap_exhausted}, design.blocked{planner_cap})
+  is resumable the same way: run-level counters are not rolled back
+  (DLT-006), and the resumed run reads caps from factory.config.json at
+  start, so the operator raises the cap between runs when the retry is
+  wanted; without that the same cap fires again and the resume fails
+  with the same reason, which is a correct outcome, not an error of the
+  CLI. A trace with nothing left to redo after the cut still fails
+  readResumeSource with "nothing to resume". The fix_between_runs note
+  keeps listing every redone event.
+tests_old_behavior:
+  - a trace whose last effectful event is not part of the failure chain resumes exactly as before (factory:BEH-009 and DLT-006 tests stay green)
+tests_new_behavior:
+  - to:factory:BEH-009
+test_obligation:
+  predicate: |
+    Given a replayed trace ending in task.verified{T-007, green},
+    task.failed{T-007, unparseable_handoff}, run.failed, the redo list
+    holds task.verified{T-007} and no task.failed, and the seeded T-007
+    status is review_pending with its implSha kept; given a trace ending
+    in spec.drafted, spec.blocked, run.failed, the redo is spec.drafted;
+    given a trace of run.started, run.failed only, planReplay reports
+    "nothing to resume".
+  test_template: unit
+  boundary_classes:
+    - task.failed before run.failed
+    - spec.blocked before run.failed
+    - nothing left to redo
+  failure_scenarios:
+    - task.failed republished on resume
+    - the failed task left out of the in-flight set
+---
+```
+
 ---
 
 ## 16. Implementation bindings

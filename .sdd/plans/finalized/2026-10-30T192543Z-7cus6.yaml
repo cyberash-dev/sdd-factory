@@ -1,0 +1,17 @@
+plan_id: 2026-10-30T192543Z-7cus6
+created_at: 2026-10-30T19:25:43.932Z
+pending_attestations:
+  - id: factory:DLT-007
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:25:43.931Z
+    change_request: "run 11 resume trace: failure chain is never redone; triage fallback"
+    scope: first-time-approval
+    target_status: approved
+  - id: assembly-stage:DLT-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:25:44.275Z
+    change_request: "run 11 resume trace: failure chain is never redone; triage fallback"
+    scope: first-time-approval
+    target_status: approved
