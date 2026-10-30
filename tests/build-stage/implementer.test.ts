@@ -92,6 +92,20 @@ describe("implementer invocation", () => {
     expect([prompt.includes(`verification_red\nsource: ${evidencePath}`), prompt.includes('"reasons":["tests_failed"]'), prompt.includes("This is attempt 2 of at most 3")]).toEqual([true, true, true]);
   });
 
+  // @covers build-stage:BEH-005
+  it("inlines the review report named by a worktree-relative finding path in the rework message", async () => {
+    const cliRoles = scriptedCliRoles(async (request) => {
+      await writeHandoff(handoffPathFromWorktree(request.cwd, "implementer", 2), { role: "implementer", attempt: 2, status: "complete", changed_files: ["src/greet.ts"] });
+    });
+    const { harness, lane, state } = await frozenLane(cliRoles);
+    await writeProductFile(join(lane.worktree, "reviews"), "T-001.md", "---\nrole: reviewer\ndecision: request_changes\n---\nRV-001 ids are not compared pairwise\n");
+
+    await runLaneEffect(harness, "build.implementer", { taskId: "T-001", attempt: 2, reworkFinding: { reason: "review_changes", findingPath: "reviews/T-001.md" } }, laneState(lane, { status: "impl_pending", attempts: { implementer: 2, testWriter: 1 }, testsSha: state.tasks["T-001"]?.testsSha ?? null }));
+
+    const prompt = cliRoles.requests[0]?.prompt ?? "";
+    expect([prompt.includes("review_changes\nsource: reviews/T-001.md"), prompt.includes("RV-001 ids are not compared pairwise")]).toEqual([true, true]);
+  });
+
   it("never includes the test-writer transcript: the message carries only paths of the frozen tests, not a conversation", async () => {
     const cliRoles = scriptedCliRoles(async (request) => {
       await writeHandoff(handoffPathFromWorktree(request.cwd, "implementer", 1), { role: "implementer", attempt: 1, status: "complete", changed_files: [] });

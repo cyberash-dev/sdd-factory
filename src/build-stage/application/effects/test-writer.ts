@@ -50,7 +50,7 @@ export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context
   const inputs = await laneInputs(slice, deps, context.state, run.taskId);
   const handoffPath = laneHandoffPath(slice.paths.handoffsDir, run.taskId, "test-writer", run.attempt);
   const transcriptPath = laneTranscriptPath(slice.paths.handoffsDir, run.taskId, "test-writer", run.attempt);
-  const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding));
+  const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding, inputs.task.worktree));
   const instruction = slice.prompts.render(await slice.prompts.load("test-writer"), instructionVariables(messageInput));
   let lastRun: CliRoleOutcome | null = null;
   await withLaneParticipant(slice, "test-writer", run.taskId, async (lane) => {

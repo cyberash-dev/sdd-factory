@@ -53,7 +53,7 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
   const inputs = await laneInputs(slice, deps, context.state, run.taskId);
   const handoffPath = laneHandoffPath(slice.paths.handoffsDir, run.taskId, "implementer", run.attempt);
   const transcriptPath = laneTranscriptPath(slice.paths.handoffsDir, run.taskId, "implementer", run.attempt);
-  const base = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding));
+  const base = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding, inputs.task.worktree));
   const frozen = await frozenTestFiles(deps, inputs.task.worktree, requireSha(inputs.task.baseSha, "baseSha"), requireSha(inputs.task.testsSha, "testsSha"));
   const instruction = slice.prompts.render(await slice.prompts.load("implementer"), instructionVariables(base));
   let lastRun: CliRoleOutcome | null = null;

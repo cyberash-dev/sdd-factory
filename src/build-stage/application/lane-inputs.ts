@@ -1,3 +1,4 @@
+import { isAbsolute, join } from "node:path";
 import type { RunState, TaskState } from "../../bus/domain/run-state.js";
 import type { TaskSpec } from "../../shared/design-files/tasks-json.js";
 import type { TechModule, TechTooling } from "../../shared/design-files/tech-md.js";
@@ -48,11 +49,12 @@ export async function laneInputs(slice: SliceContext, deps: LaneDeps, state: Run
   return { entry, task, modules, stubPaths: modules.map((module) => module.entry), specRecords, verificationBlocks, tooling: design.tech.tooling };
 }
 
-export async function reworkFindingText(finding: ReworkFinding | null): Promise<string | null> {
+/* A review report path is worktree-relative (build-stage:CTR-001); verifier evidence paths are absolute. */
+export async function reworkFindingText(finding: ReworkFinding | null, worktree: string): Promise<string | null> {
   if (finding === null) {
     return null;
   }
-  const content = finding.findingPath === null ? null : await readTextOrNull(finding.findingPath);
+  const content = finding.findingPath === null ? null : await readTextOrNull(isAbsolute(finding.findingPath) ? finding.findingPath : join(worktree, finding.findingPath));
   const reference = finding.findingPath === null ? "" : `\nsource: ${finding.findingPath}`;
   return content === null ? `${finding.reason}${reference}` : `${finding.reason}${reference}\n\n${content.trimEnd()}`;
 }
