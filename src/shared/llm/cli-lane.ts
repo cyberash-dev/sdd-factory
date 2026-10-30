@@ -1,6 +1,7 @@
 import { dirname } from "node:path";
 import type { LaneParticipant, LaneRole } from "../../bus/adapters/mozaik/roster.js";
 import { laneEffortFor, laneModelFor } from "../config.js";
+import { createRedactor } from "../redaction.js";
 import type { SliceContext } from "../slice.js";
 import { isTerminatedOutcome, laneEnvironment, type CliRoleOutcome } from "./cli-role-runner.js";
 
@@ -19,6 +20,7 @@ export interface CliLaneRequest {
   readonly handoffPath: string | null;
   readonly instruction: string;
   readonly message: string;
+  readonly transcriptPath: string;
 }
 
 export interface CostFields {
@@ -65,6 +67,7 @@ export async function runCliLane(slice: SliceContext, deps: LaneClock, request: 
       effort: laneEffortFor(slice.config.models, lane.role),
       timeoutMs: slice.config.timeouts.cliRoleMs,
       env: laneEnvironment(process.env),
+      transcript: { path: request.transcriptPath, redact: createRedactor(process.env) },
     });
     const cost = costFieldsOf(outcome);
     slice.runtime.publishRuntimeEvent(lane.id, "inference.completed", {

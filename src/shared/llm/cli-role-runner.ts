@@ -1,5 +1,14 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createWriteStream, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import type { LaneEffort } from "../config.js";
+import type { Redactor } from "../redaction.js";
+
+/* build-stage:DLT-007: every stream-json line is appended, redacted, as it arrives, so a killed subprocess still leaves what it printed. */
+export interface CliTranscript {
+  readonly path: string;
+  readonly redact: Redactor;
+}
 
 export interface CliRoleRequest {
   readonly binary: string;
@@ -10,6 +19,7 @@ export interface CliRoleRequest {
   readonly effort: LaneEffort | null;
   readonly timeoutMs: number;
   readonly env: Readonly<Record<string, string>>;
+  readonly transcript: CliTranscript | null;
 }
 
 export interface CliToolUse {
@@ -138,6 +148,34 @@ export function parseStreamJsonLine(line: string): { readonly kind: "tool_use"; 
   return { kind: "other" };
 }
 
+interface TranscriptSink {
+  append(line: string): void;
+  close(): Promise<void>;
+}
+
+function openTranscript(transcript: CliTranscript | null): TranscriptSink {
+  if (transcript === null) {
+    return { append: () => undefined, close: () => Promise.resolve() };
+  }
+  mkdirSync(dirname(transcript.path), { recursive: true });
+  const stream = createWriteStream(transcript.path, { flags: "a", encoding: "utf8" });
+  const closed = new Promise<void>((resolvePromise, rejectPromise) => {
+    stream.once("error", rejectPromise);
+    stream.once("finish", () => resolvePromise());
+  });
+  /* a write error before close() is awaited must not surface as an unhandled rejection; close() still rejects with it. */
+  closed.catch(() => undefined);
+  return {
+    append: (line) => {
+      stream.write(`${transcript.redact(line)}\n`);
+    },
+    close: () => {
+      stream.end();
+      return closed;
+    },
+  };
+}
+
 export function createCliRoleRunner(): CliRoleRunner {
   const createdInGeneration = signalGeneration;
   return {
@@ -152,6 +190,7 @@ export function createCliRoleRunner(): CliRoleRunner {
         let stderr = "";
         let buffer = "";
         let timedOut = false;
+        const transcript = openTranscript(request.transcript);
         const child = spawn(request.binary, claudeArgv(request), { cwd: request.cwd, env: { ...request.env }, stdio: ["pipe", "pipe", "pipe"] });
         liveLanes.add(child);
         const timer = setTimeout(() => {
@@ -163,6 +202,7 @@ export function createCliRoleRunner(): CliRoleRunner {
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
           for (const line of lines) {
+            transcript.append(line);
             const message = parseStreamJsonLine(line);
             if (message.kind === "tool_use") {
               toolUses.push(message.toolUse);
@@ -180,7 +220,8 @@ export function createCliRoleRunner(): CliRoleRunner {
         child.on("error", (error) => {
           clearTimeout(timer);
           liveLanes.delete(child);
-          rejectPromise(error);
+          /* the spawn error is the cause worth reporting; a transcript write failure behind it adds nothing. */
+          transcript.close().then(() => rejectPromise(error), () => rejectPromise(error));
         });
         child.on("close", (exitCode, signal) => {
           clearTimeout(timer);
@@ -188,7 +229,8 @@ export function createCliRoleRunner(): CliRoleRunner {
           if (buffer.length > 0) {
             consume("\n");
           }
-          resolvePromise({ exitCode, signal, timedOut, result, toolUses, stderrTail: stderr, durationMs: Date.now() - startedAt });
+          const outcome: CliRoleOutcome = { exitCode, signal, timedOut, result, toolUses, stderrTail: stderr, durationMs: Date.now() - startedAt };
+          transcript.close().then(() => resolvePromise(outcome), rejectPromise);
         });
         child.stdin.end(request.prompt);
       });

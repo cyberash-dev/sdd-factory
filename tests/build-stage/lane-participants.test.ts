@@ -1,11 +1,11 @@
-import { basename } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRuntimeObserver } from "../../src/bus/adapters/mozaik/runtime.js";
 import type { RunState } from "../../src/bus/domain/run-state.js";
 import type { PendingEvent } from "../../src/bus/domain/transition.js";
 import { aTaskSpec, greeterDesign } from "./support/design.js";
 import { aLaneHarness, TEST_CONFIG, type LaneHarness } from "./support/harness.js";
-import { handoffPathFromWorktree, laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
+import { handoffPathFromWorktree, handoffPathOf, laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
 import { aProductRepo, writeProductFile } from "./support/product.js";
 import { scriptedCliRoles, writeHandoff, type ScriptedCliRoles } from "./support/runners.js";
 import { claudeArgv } from "../../src/shared/llm/cli-role-runner.js";
@@ -197,5 +197,26 @@ describe("lane participants", () => {
     await Promise.all([runTestWriterThroughRuntime(harness, "T-001", state), runTestWriterThroughRuntime(harness, "T-002", state)]);
 
     expect([rosterAtOverlap[0], rosterAtOverlap[1], testWriterRoster(harness)]).toEqual([["lane task:T-001", "lane task:T-002"], ["lane task:T-001", "lane task:T-002"], []]);
+  });
+  // @covers build-stage:DLT-007
+  it("hands the test-writer run a transcript.jsonl next to its handoff", async () => {
+    const cliRoles = scriptedCliRoles(async (request) => writeCompleteHandoff(request.cwd));
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
+    const lane = await provisionLane(harness);
+
+    await runTestWriterThroughRuntime(harness, "T-001", laneState(lane));
+
+    expect(cliRoles.requests.map((request) => request.transcript?.path)).toEqual([join(dirname(handoffPathOf(harness, "test-writer", 1)), "transcript.jsonl")]);
+  });
+
+  // @covers build-stage:DLT-007
+  it("hands the implementer run a transcript.jsonl next to its handoff for the attempt", async () => {
+    const cliRoles = scriptedCliRoles(async () => undefined);
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
+    const lane = await provisionLane(harness);
+
+    await runLaneEffect(harness, "build.implementer", { taskId: "T-001", attempt: 2, reworkFinding: null }, laneState(lane, { status: "impl_pending", attempts: { implementer: 2, testWriter: 1 }, testsSha: lane.baseSha }));
+
+    expect(new Set(cliRoles.requests.map((request) => request.transcript?.path))).toEqual(new Set([join(dirname(handoffPathOf(harness, "implementer", 2)), "transcript.jsonl")]));
   });
 });

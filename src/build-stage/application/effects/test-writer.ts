@@ -4,7 +4,7 @@ import { readTextOrNull } from "../../../shared/fs/text.js";
 import { isTerminatedOutcome, type CliRoleOutcome } from "../../../shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../../shared/slice.js";
 import { firewallViolations } from "../../domain/context-firewall.js";
-import { laneHandoffPath } from "../../domain/handoff-paths.js";
+import { laneHandoffPath, laneTranscriptPath } from "../../domain/handoff-paths.js";
 import { instructionVariables, testWriterMessage, techExcerptOf, type LaneMessageInput } from "../../domain/lane-messages.js";
 import type { ReworkFinding } from "../../domain/rules/support.js";
 import { costFieldsOf, runCliLane, withLaneParticipant } from "../cli-lane.js";
@@ -49,6 +49,7 @@ export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context
   const token = deps.lanes.tokenOf(run.taskId);
   const inputs = await laneInputs(slice, deps, context.state, run.taskId);
   const handoffPath = laneHandoffPath(slice.paths.handoffsDir, run.taskId, "test-writer", run.attempt);
+  const transcriptPath = laneTranscriptPath(slice.paths.handoffsDir, run.taskId, "test-writer", run.attempt);
   const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding));
   const instruction = slice.prompts.render(await slice.prompts.load("test-writer"), instructionVariables(messageInput));
   let lastRun: CliRoleOutcome | null = null;
@@ -59,7 +60,7 @@ export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context
         handoffPath,
         maxReruns: slice.config.caps.handoffRerun,
         invoke: async (message) => {
-          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message }, lane);
+          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message, transcriptPath }, lane);
           return lastRun;
         },
         isTerminated: isTerminatedOutcome,

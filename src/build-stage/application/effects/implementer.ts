@@ -2,7 +2,7 @@ import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js
 import { readTextOrNull } from "../../../shared/fs/text.js";
 import { isTerminatedOutcome, type CliRoleOutcome } from "../../../shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../../shared/slice.js";
-import { laneHandoffPath } from "../../domain/handoff-paths.js";
+import { laneHandoffPath, laneTranscriptPath } from "../../domain/handoff-paths.js";
 import { implementerMessage, instructionVariables } from "../../domain/lane-messages.js";
 import type { ReworkFinding } from "../../domain/rules/support.js";
 import { isUnderTests } from "../../domain/write-set.js";
@@ -52,6 +52,7 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
   const token = deps.lanes.tokenOf(run.taskId);
   const inputs = await laneInputs(slice, deps, context.state, run.taskId);
   const handoffPath = laneHandoffPath(slice.paths.handoffsDir, run.taskId, "implementer", run.attempt);
+  const transcriptPath = laneTranscriptPath(slice.paths.handoffsDir, run.taskId, "implementer", run.attempt);
   const base = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding));
   const frozen = await frozenTestFiles(deps, inputs.task.worktree, requireSha(inputs.task.baseSha, "baseSha"), requireSha(inputs.task.testsSha, "testsSha"));
   const instruction = slice.prompts.render(await slice.prompts.load("implementer"), instructionVariables(base));
@@ -63,7 +64,7 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
         handoffPath,
         maxReruns: slice.config.caps.handoffRerun,
         invoke: async (message) => {
-          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message }, lane);
+          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message, transcriptPath }, lane);
           return lastRun;
         },
         isTerminated: isTerminatedOutcome,

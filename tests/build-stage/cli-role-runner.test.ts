@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import { greeterDesign } from "./support/design.js";
 import { aLaneHarness } from "./support/harness.js";
 import { aProductRepo } from "./support/product.js";
 import { buildingState } from "./support/state.js";
+import { createRedactor } from "../../src/shared/redaction.js";
 import { claudeArgv, createCliRoleRunner, laneEnvironment, parseStreamJsonLine, signalLanes, type CliRoleRequest } from "../../src/shared/llm/cli-role-runner.js";
 
 const RESULT_LINE = JSON.stringify({ type: "result", subtype: "success", is_error: false, total_cost_usd: 0.0421, duration_ms: 1234, usage: { input_tokens: 500, output_tokens: 120 }, modelUsage: { "claude-opus-5-5": { outputTokens: 120 }, "claude-haiku-4-5": { outputTokens: 10 } }, result: "done" });
@@ -28,8 +29,20 @@ async function fakeClaude(lines: readonly string[], options: { readonly exitCode
   return script;
 }
 
+async function textOnceWritten(path: string, timeoutMs: number): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const text = await readFile(path, "utf8").catch(() => "");
+    if (text.length > 0) {
+      return text;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+  }
+  return "";
+}
+
 function request(binary: string, timeoutMs = 5000): CliRoleRequest {
-  return { binary, cwd: tmpdir(), prompt: "do the task", addDirs: ["/tmp/wt"], model: null, effort: null, timeoutMs, env: { PATH: process.env["PATH"] ?? "" } };
+  return { binary, cwd: tmpdir(), prompt: "do the task", addDirs: ["/tmp/wt"], model: null, effort: null, timeoutMs, env: { PATH: process.env["PATH"] ?? "" }, transcript: null };
 }
 
 describe("claude -p lane executor", () => {
@@ -164,5 +177,37 @@ describe("claude -p lane executor", () => {
     const outcome = await createCliRoleRunner().run(request(binary));
 
     expect([outcome.signal, outcome.result?.resultText]).toEqual([null, "done"]);
+  });
+  // @covers build-stage:DLT-007
+  it("keeps every stream-json line the subprocess printed in the transcript file", async () => {
+    const binary = await fakeClaude([TOOL_LINE, RESULT_LINE]);
+    const path = join(await mkdtemp(join(tmpdir(), "lane-transcript-")), "test-writer-1", "transcript.jsonl");
+
+    await createCliRoleRunner().run({ ...request(binary), transcript: { path, redact: createRedactor({}) } });
+
+    expect(await readFile(path, "utf8")).toBe(`${TOOL_LINE}\n${RESULT_LINE}\n`);
+  });
+
+  // @covers build-stage:DLT-007
+  it("writes a transcript line with the configured secret value replaced", async () => {
+    const binary = await fakeClaude([JSON.stringify({ type: "assistant", text: "key is sk-sentinel-0042" })]);
+    const path = join(await mkdtemp(join(tmpdir(), "lane-transcript-")), "transcript.jsonl");
+
+    await createCliRoleRunner().run({ ...request(binary), transcript: { path, redact: createRedactor({ ANTHROPIC_API_KEY: "sk-sentinel-0042" }) } });
+
+    expect(await readFile(path, "utf8")).toBe(`${JSON.stringify({ type: "assistant", text: "key is [REDACTED]" })}\n`);
+  });
+
+  // @covers build-stage:DLT-007
+  it("has the lines printed so far on disk while the subprocess runs, and keeps them after it is killed", async () => {
+    const binary = await fakeClaude([TOOL_LINE], { sleepMs: 5000 });
+    const path = join(await mkdtemp(join(tmpdir(), "lane-transcript-")), "transcript.jsonl");
+    const running = createCliRoleRunner().run({ ...request(binary, 20000), transcript: { path, redact: createRedactor({}) } });
+
+    const whileRunning = await textOnceWritten(path, 3000);
+    signalLanes("SIGTERM");
+    const outcome = await running;
+
+    expect([whileRunning, outcome.signal, await readFile(path, "utf8")]).toEqual([`${TOOL_LINE}\n`, "SIGTERM", `${TOOL_LINE}\n`]);
   });
 });

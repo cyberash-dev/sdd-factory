@@ -96,25 +96,38 @@ function answerText(outcome: CliRoleOutcome): string {
   return `${text.trimEnd()}\n`;
 }
 
-/* answer-run<n> numbers the fixer runs of the unit; several owners share a unit ("design"), so the first free n wins. */
-async function saveAnswer(answerDir: string, text: string): Promise<string> {
+function isAlreadyExisting(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST";
+}
+
+interface FixerRunFiles {
+  readonly answerPath: string;
+  readonly transcriptPath: string;
+}
+
+/* answer-run<n> and transcript-run<n> number the fixer runs of the unit; several owners share a unit ("design"),
+   so the run claims the first n with no answer by creating its transcript before the subprocess starts. */
+async function claimRunFiles(answerDir: string): Promise<FixerRunFiles> {
   await mkdir(answerDir, { recursive: true });
   for (let run = 1; ; run += 1) {
-    const path = join(answerDir, `answer-run${run}.md`);
+    const files = { answerPath: join(answerDir, `answer-run${run}.md`), transcriptPath: join(answerDir, `transcript-run${run}.jsonl`) };
+    if ((await readTextOrNull(files.answerPath)) !== null) {
+      continue;
+    }
     try {
-      await writeFile(path, text, { encoding: "utf8", flag: "wx" });
-      return path;
+      await writeFile(files.transcriptPath, "", { encoding: "utf8", flag: "wx" });
+      return files;
     } catch (error) {
-      if (!(typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST")) {
+      if (!isAlreadyExisting(error)) {
         throw error;
       }
     }
   }
 }
 
-async function invokeFixer(slice: SliceContext, deps: SimpleFixDeps, lane: LaneParticipant, prompt: FixerPromptInput): Promise<CliRoleOutcome> {
+async function invokeFixer(slice: SliceContext, deps: SimpleFixDeps, lane: LaneParticipant, prompt: FixerPromptInput, transcriptPath: string): Promise<CliRoleOutcome> {
   const instruction = slice.prompts.render(await slice.prompts.load("simple-fixer"), fixerInstructionVariables(prompt));
-  return runCliLane(slice, deps, { worktree: prompt.directory, handoffPath: null, instruction, message: fixerMessage(prompt) }, lane);
+  return runCliLane(slice, deps, { worktree: prompt.directory, handoffPath: null, instruction, message: fixerMessage(prompt), transcriptPath }, lane);
 }
 
 interface RunInput {
@@ -128,14 +141,16 @@ async function fixOnce(slice: SliceContext, deps: SimpleFixDeps, context: Effect
   return withLaneParticipant(slice, "simple-fixer", request.unit, async (lane) => {
     const before = await parsedFiles(request.directory, request.formatOnly);
     const snapshot = await deps.tree.snapshot(request.directory);
-    const outcome = await invokeFixer(slice, deps, lane, prompt);
+    const files = await claimRunFiles(join(slice.paths.handoffsDir, request.unit, "simple-fixer"));
+    const outcome = await invokeFixer(slice, deps, lane, prompt, files.transcriptPath);
     if (isTerminatedOutcome(outcome)) {
       slice.log(`simple-fixer ${request.owner}:${request.unit} run ${input.attempt}: ended by a termination signal`);
       return null;
     }
     const changes = await deps.tree.changesSince(request.directory, snapshot);
     const verdict = await verdictOf(deps, request, snapshot, changes, before, input.failureOutput);
-    const answerPath = relative(slice.paths.runDir, await saveAnswer(join(slice.paths.handoffsDir, request.unit, "simple-fixer"), answerText(outcome)));
+    await writeFile(files.answerPath, answerText(outcome), { encoding: "utf8", flag: "wx" });
+    const answerPath = relative(slice.paths.runDir, files.answerPath);
     const run = { attempt: input.attempt, outcome: verdict.outcome, filesChanged: changes.files.map((change) => change.path), violations: verdict.violations, answerPath, cost: costFieldsOf(outcome) };
     context.publish({
       type: "fix.attempted",

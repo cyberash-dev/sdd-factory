@@ -212,6 +212,25 @@ describe("simple-fixer engine", () => {
     expect(await readFile(join(harness.runDir, "handoffs/T-001/simple-fixer/answer-run1.md"), "utf8")).toBe("run 1: changed what the output named\n");
   });
 
+  // @covers build-stage:DLT-007
+  it("hands the fixer run a transcript-run1.jsonl next to answer-run1.md", async () => {
+    const harness = await aFixerHarness({ "src/greet.ts": STUB, "tests/greet.test.ts": RED_TEST }, addFormatStub);
+
+    await harness.fix(redSuiteRequest(harness.directory));
+
+    expect(harness.requests.map((request) => request.transcript?.path)).toEqual([join(harness.runDir, "handoffs/T-001/simple-fixer/transcript-run1.jsonl")]);
+  });
+
+  // @covers build-stage:DLT-007
+  it("numbers the transcript with the same n as the answer when another owner already saved answer-run1.md for the unit", async () => {
+    const harness = await aFixerHarness({ "src/greet.ts": STUB, "tests/greet.test.ts": RED_TEST }, addFormatStub);
+    await put(harness.runDir, "handoffs/T-001/simple-fixer/answer-run1.md", "another owner's answer\n");
+
+    await harness.fix(redSuiteRequest(harness.directory));
+
+    expect([harness.requests[0]?.transcript?.path, harness.events[0]?.payload["answerPath"]]).toEqual([join(harness.runDir, "handoffs/T-001/simple-fixer/transcript-run2.jsonl"), "handoffs/T-001/simple-fixer/answer-run2.md"]);
+  });
+
   // @covers bus:DLT-005
   // @covers bus:BEH-007
   it("sends fix.attempted from a simple-fixer participant joined with capability unit:T-001 that leaves after the run", async () => {
