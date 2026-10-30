@@ -73,7 +73,7 @@ export function createGit(commands: CommandRunner): Git {
       }
       return (await tryRun(cwd, ["diff", "--quiet", ref, "--", ...paths])).exitCode === 0;
     },
-    commitAll: (cwd, message) => commitStaged(cwd, ["add", "-A", "--", ".", ":(exclude)node_modules"], message),
+    commitAll: (cwd, message) => commitStaged(cwd, ["add", "-A", "--", "."], message),
     commitPaths: (cwd, paths, message) => commitStaged(cwd, ["add", "--", ...paths], message),
     async resetHard(cwd, ref) {
       await run(cwd, ["reset", "-q", "--hard", ref]);

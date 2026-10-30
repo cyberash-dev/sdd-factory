@@ -86,7 +86,7 @@ export function productVitestConfig(): string {
 }
 
 export function productGitignore(): string {
-  return "node_modules/\ndist/\n";
+  return "node_modules\ndist\n";
 }
 
 export function productSddConfig(slug: string): string {

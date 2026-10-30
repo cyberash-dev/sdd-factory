@@ -30,7 +30,7 @@ export async function aProductRepo(files: Readonly<Record<string, string>> = {})
   const productDir = await mkdtemp(join(tmpdir(), "sdd-product-"));
   await writeProductFile(productDir, "package.json", `${JSON.stringify({ name: "greeter", type: "module", private: true }, null, 2)}\n`);
   await writeProductFile(productDir, "tsconfig.json", `${PRODUCT_TSCONFIG}\n`);
-  await writeProductFile(productDir, ".gitignore", "node_modules/\n");
+  await writeProductFile(productDir, ".gitignore", "node_modules\n");
   for (const [path, content] of Object.entries(files)) {
     await writeProductFile(productDir, path, content);
   }
