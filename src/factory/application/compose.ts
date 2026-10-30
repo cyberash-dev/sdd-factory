@@ -100,8 +100,8 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
   const runId = runIdOf(input.slug, startedAt);
   const source = input.resume === undefined ? null : await readResumeSource(input.repoRoot, input.resume.fromRunId, input.resume.force);
   const freshPaths = runPaths(input.repoRoot, runId, input.slug, input.specPath, input.outDir);
-  /* factory:BEH-009: a resumed run keeps its own directory but works in the failed run's product, worktrees and handoffs. */
-  const paths: RunPaths = source === null ? freshPaths : { ...freshPaths, productDir: join(source.runDir, "product"), worktreesDir: join(source.runDir, "worktrees"), handoffsDir: join(source.runDir, "handoffs") };
+  /* factory:BEH-009, DLT-009: a resumed run keeps its own directory but works in the product, worktrees and handoffs of the chain's first run. */
+  const paths: RunPaths = source === null ? freshPaths : { ...freshPaths, productDir: join(source.workDir, "product"), worktreesDir: join(source.workDir, "worktrees"), handoffsDir: join(source.workDir, "handoffs") };
   await mkdir(paths.handoffsDir, { recursive: true });
   await mkdir(paths.traceDir, { recursive: true });
   await mkdir(join(paths.runDir, "nudges"), { recursive: true });
@@ -172,8 +172,9 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
   });
 
   runtime.publisher.publish({ type: "run.started", producer: "foreman", payload: { specPath: input.specPath, slug: input.slug, operator: input.operator, mode: "autonomous" } });
-  if (input.resume !== undefined && replay !== null) {
-    const redone = replay.redo.map((event) => `${event.type} seq ${event.seq}`).join(", ");
+  if (input.resume !== undefined && source !== null && replay !== null) {
+    const isChain = source.chain.length > 1;
+    const redone = replay.redo.map((event) => `${event.type} seq ${event.seq}${isChain ? ` of ${event.runId}` : ""}`).join(", ");
     const note = `resume of ${input.resume.fromRunId} from ${redone}${input.resume.note === null ? "" : `; ${input.resume.note}`}`;
     runtime.publisher.publish({ type: "human.intervention", producer: "foreman", payload: { kind: "fix_between_runs", note, actor: input.operator } });
     for (const event of replay.redo) {

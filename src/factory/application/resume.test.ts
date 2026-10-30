@@ -274,3 +274,99 @@ describe("resume source", () => {
     await expect(readResumeSource(repoRoot, "todo-cli-20261030-000000", false)).rejects.toThrow("has no run.json under");
   });
 });
+
+const ANCESTOR_RUN_ID = "todo-cli-20261030-150000";
+const RESUMED_RUN_ID = "todo-cli-20261030-160028";
+
+function traceLine(runId: string, seq: number, type: EventType, payload: Record<string, unknown> = {}): string {
+  return JSON.stringify({ type, runId, occurredAt: `2026-10-30T16:0${seq}:00.000Z`, producer: "foreman", seq, payload });
+}
+
+async function chainRunDir(repoRoot: string, runId: string, resumedFrom: string | null, traceLines: readonly string[] | null): Promise<string> {
+  const runDir = join(repoRoot, ".factory", "runs", runId);
+  await mkdir(join(runDir, "trace"), { recursive: true });
+  await writeFile(join(runDir, "run.json"), JSON.stringify({ runId, slug: "todo-cli", specPath: "specs/todo-cli.md", operator: "cyberash", startedAt: "2026-10-30T16:00:00.000Z", status: "failed", resumedFrom }));
+  if (traceLines !== null) {
+    await writeFile(join(runDir, "trace", "trace.jsonl"), `${traceLines.join("\n")}\n`);
+  }
+  return runDir;
+}
+
+describe("resume source of a resumed run", () => {
+  // @covers factory:DLT-009
+  it("prefixes the run's own events with the ancestor's events cut at the ancestor's failure chain", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "resume-"));
+    await chainRunDir(repoRoot, ANCESTOR_RUN_ID, null, [
+      traceLine(ANCESTOR_RUN_ID, 1, "run.started"),
+      traceLine(ANCESTOR_RUN_ID, 2, "workspace.ready"),
+      traceLine(ANCESTOR_RUN_ID, 3, "run.failed"),
+    ]);
+    await chainRunDir(repoRoot, RESUMED_RUN_ID, ANCESTOR_RUN_ID, [
+      traceLine(RESUMED_RUN_ID, 1, "run.started"),
+      traceLine(RESUMED_RUN_ID, 2, "human.intervention", { kind: "fix_between_runs" }),
+      traceLine(RESUMED_RUN_ID, 3, "workspace.ready"),
+      traceLine(RESUMED_RUN_ID, 4, "run.failed"),
+    ]);
+
+    const source = await readResumeSource(repoRoot, RESUMED_RUN_ID, false);
+
+    expect(source.events.map((event) => [event.runId, event.type, event.seq])).toEqual([
+      [ANCESTOR_RUN_ID, "run.started", 1],
+      [ANCESTOR_RUN_ID, "workspace.ready", 2],
+      [RESUMED_RUN_ID, "run.started", 1],
+      [RESUMED_RUN_ID, "human.intervention", 2],
+      [RESUMED_RUN_ID, "workspace.ready", 3],
+      [RESUMED_RUN_ID, "run.failed", 4],
+    ]);
+  });
+
+  // @covers factory:DLT-009
+  it("names every run of the chain, first run first, and keeps the first run's directory as the work directory", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "resume-"));
+    const ancestorDir = await chainRunDir(repoRoot, ANCESTOR_RUN_ID, null, [traceLine(ANCESTOR_RUN_ID, 1, "run.started")]);
+    await chainRunDir(repoRoot, RESUMED_RUN_ID, ANCESTOR_RUN_ID, [traceLine(RESUMED_RUN_ID, 1, "run.started")]);
+
+    const source = await readResumeSource(repoRoot, RESUMED_RUN_ID, false);
+
+    expect([source.chain, source.workDir]).toEqual([[ANCESTOR_RUN_ID, RESUMED_RUN_ID], ancestorDir]);
+  });
+
+  // @covers factory:DLT-009
+  it.each([
+    ["directory", false],
+    ["trace", true],
+  ])("rejects a resumed run whose ancestor %s is missing, naming the ancestor", async (_missing, hasAncestorDir) => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "resume-"));
+    if (hasAncestorDir) {
+      await chainRunDir(repoRoot, ANCESTOR_RUN_ID, null, null);
+    }
+    await chainRunDir(repoRoot, RESUMED_RUN_ID, ANCESTOR_RUN_ID, [traceLine(RESUMED_RUN_ID, 1, "run.started")]);
+
+    await expect(readResumeSource(repoRoot, RESUMED_RUN_ID, false)).rejects.toThrow(new RegExp(`^ancestor run ${ANCESTOR_RUN_ID} of ${RESUMED_RUN_ID} has no `));
+  });
+
+  // @covers factory:DLT-009
+  it("keeps a run that was not resumed as a chain of itself working in its own directory", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "resume-"));
+    const runDir = await chainRunDir(repoRoot, RESUMED_RUN_ID, null, [traceLine(RESUMED_RUN_ID, 1, "run.started")]);
+
+    const source = await readResumeSource(repoRoot, RESUMED_RUN_ID, false);
+
+    expect([source.chain, source.workDir]).toEqual([[RESUMED_RUN_ID], runDir]);
+  });
+});
+
+describe("resume replay plan over a chain of runs", () => {
+  // @covers factory:DLT-009
+  it("orders redo events by their place in the chain, not by seq numbers that restart in every run", () => {
+    const ancestorEvent = (seq: number, type: EventType, payload: Record<string, unknown> = {}): DeliveredEvent<EventType> => ({ ...delivered(seq, type, "foreman", payload), runId: ANCESTOR_RUN_ID });
+    const events = [ancestorEvent(8, "task.ready", { taskId: "T-001" }), ancestorEvent(9, "task.ready", { taskId: "T-002" }), delivered(1, "run.started", "foreman"), delivered(2, "task.tests_rejected", "foreman", { taskId: "T-002" }), delivered(3, "run.failed", "foreman")];
+
+    const plan = planReplay(TASK_RULES, buildingWith(["T-001", "T-002"]), events);
+
+    expect(plan.redo.map((event) => [event.runId, event.type, taskIdOf(event.payload), event.seq])).toEqual([
+      [ANCESTOR_RUN_ID, "task.ready", "T-001", 8],
+      [RESUMED_RUN_ID, "task.tests_rejected", "T-002", 2],
+    ]);
+  });
+});
