@@ -1,3 +1,4 @@
+import type { RunState } from "../../../bus/domain/run-state.js";
 import type { TransitionRule } from "../../../bus/domain/transition.js";
 import { PayloadShapeError, nullableStringField, stringField } from "../payload.js";
 import { TRIAGE, WRITE_SET_CONFLICT } from "../rework-reasons.js";
@@ -19,11 +20,15 @@ export function assemblyTriagedRule(deps: AssemblyRuleDeps): TransitionRule {
         throw new PayloadShapeError("payload.target: expected an assembly target");
       }
       const triage = [{ round, task_id: taskId, target, reason }];
-      if (taskId === null) {
-        return failedRun(state, "design_blocked", reason, triage);
-      }
       if (round >= deps.assemblyRoundsCap) {
         return failedRun(state, "cap_exhausted", `round ${round}`, triage);
+      }
+      if (taskId === null) {
+        return {
+          state: { ...state, status: "building" },
+          emits: [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason, attempt: designReworkAttempt(state) } }],
+          effects: [recordEffect({ triage })],
+        };
       }
       const isConflict = reason === WRITE_SET_CONFLICT;
       return {
@@ -33,4 +38,9 @@ export function assemblyTriagedRule(deps: AssemblyRuleDeps): TransitionRule {
       };
     },
   };
+}
+
+/* Mirrors build-stage designReworkAttempt: bus:CTR-004 dedupes design.rework on attempt alone, so the ordinal spans both design roles. */
+function designReworkAttempt(state: RunState): number {
+  return state.stageAttempts.plannerRecuts + state.stageAttempts.architectRepairs + 1;
 }

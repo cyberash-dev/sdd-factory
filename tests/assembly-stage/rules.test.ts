@@ -179,12 +179,13 @@ describe("assembly.triaged rule", () => {
   });
 
   // @covers assembly-stage:BEH-005
-  it("fails the run as design_blocked when triage names no task for the planner", () => {
+  it("sends a route that names no task to the planner re-cut as design.rework instead of failing the run", () => {
     const result = assemblyTriagedRule(DEPS).apply({ state: assembling(1), event: delivered("assembly.triaged", { taskId: null, target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts" }) });
 
-    expect([result.state.status, result.emits]).toEqual([
-      "assembling",
-      [{ type: "run.failed", producer: "assembler", payload: { stage: "assembly", reason: "design_blocked", detail: "conflict between T-001 and T-002 in src/types.ts" } }],
+    expect([result.state.status, result.emits, result.effects]).toEqual([
+      "building",
+      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts", attempt: 1 } }],
+      [{ kind: "assembly.record", triage: [{ round: 1, task_id: null, target: "planner", reason: "conflict between T-001 and T-002 in src/types.ts" }] }],
     ]);
   });
 

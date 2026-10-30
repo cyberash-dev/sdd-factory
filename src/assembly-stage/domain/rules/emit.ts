@@ -3,7 +3,7 @@ import type { Effect, PendingEvent, TransitionResult } from "../../../bus/domain
 import { ASSEMBLY_EFFECT } from "../effects.js";
 import type { ReworkEntry, ReworkTarget, TriageEntry } from "../ledger.js";
 
-export type AssemblyFailureReason = "cap_exhausted" | "design_blocked";
+export type AssemblyFailureReason = "cap_exhausted";
 
 export function unchanged(state: RunState): TransitionResult {
   return { state, emits: [], effects: [] };
