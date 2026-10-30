@@ -45,7 +45,7 @@ export function cliOutcome(overrides: Partial<CliRoleOutcome> = {}): CliRoleOutc
     exitCode: 0,
     signal: null,
     timedOut: false,
-    result: { isError: false, costUsd: 0.05, inputTokens: 1000, outputTokens: 200, durationMs: 1500, resultText: "done" },
+    result: { isError: false, costUsd: 0.05, inputTokens: 1000, outputTokens: 200, durationMs: 1500, resultText: "done", dominantModel: null },
     toolUses: [],
     stderrTail: "",
     durationMs: 1600,

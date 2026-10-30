@@ -36,6 +36,7 @@ export function runtimeEventInputOf(event: SemanticEvent, runtime: FactoryRuntim
     loopId: stringOf(payload["loopId"]),
     model: stringOf(payload["model"]),
     tokenUsage: tokenUsageOf(payload),
+    isLane: manifest?.capabilities?.includes("lane") ?? false,
   };
 }
 

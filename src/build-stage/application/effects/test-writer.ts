@@ -52,14 +52,14 @@ export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context
   const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding));
   const instruction = slice.prompts.render(await slice.prompts.load("test-writer"), instructionVariables(messageInput));
   let lastRun: CliRoleOutcome | null = null;
-  await withLaneParticipant(slice, "test-writer", run.taskId, async () => {
+  await withLaneParticipant(slice, "test-writer", run.taskId, async (lane) => {
     const result = await runWithHandoffRetry(
       {
         role: "test-writer",
         handoffPath,
         maxReruns: slice.config.caps.handoffRerun,
         invoke: async (message) => {
-          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message });
+          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message }, lane);
           return lastRun;
         },
         parse: async () => parseLaneHandoff("test-writer", lastRun, await readTextOrNull(handoffPath)),

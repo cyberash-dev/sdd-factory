@@ -1,0 +1,31 @@
+plan_id: 2026-10-30T171228Z-8bvcg
+created_at: 2026-10-30T17:12:28.453Z
+pending_attestations:
+  - id: design-stage:DLT-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:28.452Z
+    change_request: "build stage shakedown after run 9"
+    scope: first-time-approval
+    target_status: approved
+  - id: build-stage:DLT-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:28.775Z
+    change_request: "build stage shakedown after run 9"
+    scope: first-time-approval
+    target_status: approved
+  - id: build-stage:DLT-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:29.106Z
+    change_request: "build stage shakedown after run 9"
+    scope: first-time-approval
+    target_status: approved
+  - id: trace:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:29.436Z
+    change_request: "build stage shakedown after run 9"
+    scope: first-time-approval
+    target_status: approved

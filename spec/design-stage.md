@@ -886,6 +886,61 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-002
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:28.452Z
+    change_request: build stage shakedown after run 9
+    scope: first-time-approval
+partition_id: design-stage
+title: the tooling step drops rootDir so the typecheck keeps covering tests
+target_ids:
+  - design-stage:BEH-003
+  - design-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Run 9 lost its first task to the tooling step: the architect's
+  TD-TOOLING `tsconfig` carried `rootDir: "src"` for emission, the
+  foreman copied it into the one tsconfig.json whose `include` lists
+  `src`, `tests` and `vitest.config.ts`, and `npx tsc --noEmit` then
+  failed with TS6059 on every test file, so the red check reported
+  suite_error for tests that were fine. The typecheck of
+  design-stage:CTR-001 `typecheck_cmd` covers src and tests by
+  construction, so `rootDir` can never be right in that file: the
+  foreman now applies the architect's compilerOptions without
+  `rootDir`, logs `design-stage: tsconfig rootDir dropped` when it was
+  present, and keeps `include` as scaffolded. An emitting build that
+  needs `rootDir` belongs in a separate tsconfig the composition-root
+  task owns (tsconfig.build.json). The architect prompt says so too.
+tests_old_behavior:
+  - every other compilerOption of the tooling block still overwrites the scaffold's
+tests_new_behavior:
+  - to:design-stage:BEH-003
+test_obligation:
+  predicate: |
+    Given a tooling block with tsconfig {strict: true, rootDir: "src",
+    outDir: "dist"}, the committed tsconfig.json has compilerOptions
+    {strict: true, outDir: "dist"} and include unchanged; a block without
+    rootDir is applied verbatim.
+  test_template: integration
+  boundary_classes:
+    - tsconfig with rootDir
+    - tsconfig without rootDir
+  failure_scenarios:
+    - rootDir kept
+    - include rewritten
+---
+```
+
 ---
 
 ## 16. Implementation bindings

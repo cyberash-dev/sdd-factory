@@ -116,6 +116,8 @@ export interface FactoryRuntime {
   adopt(participant: Participant): void;
   joinLane(role: LaneRole, taskId: string): LaneParticipant;
   leaveLane(lane: LaneParticipant): void;
+  /* A runtime event (inference.*) sent by a joined participant outside the Mozaik loop; not a factory bus event. */
+  publishRuntimeEvent(senderId: string, type: string, payload: Readonly<Record<string, unknown>>): void;
   readonly mozaik: ReturnType<typeof defineRuntime<FactoryRuntimeState>>;
 }
 
@@ -164,5 +166,6 @@ export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptio
     adopt: (participant) => roster.adopt(participant),
     joinLane: (role, taskId) => roster.joinLane(role, taskId),
     leaveLane: (lane) => roster.leaveLane(lane),
+    publishRuntimeEvent: (senderId, type, payload) => mozaik.sendEvent(new SemanticEvent(type, senderId, new Date(), { ...payload }), senderId),
   };
 }

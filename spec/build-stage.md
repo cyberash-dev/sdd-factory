@@ -2141,7 +2141,124 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+---
+id: build-stage:DLT-001
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:28.775Z
+    change_request: build stage shakedown after run 9
+    scope: first-time-approval
+partition_id: build-stage
+title: lane participants report their subprocess inference as Mozaik inference events
+target_ids:
+  - build-stage:BEH-017
+  - build-stage:EXT-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Mozaik Cloud derives its token and cost statistics from the
+  `inference.started` / `inference.completed` events its agent loop
+  publishes. Lanes run `claude -p` outside that loop, so the largest
+  share of a run's model work was invisible in the cloud statistics
+  even though the lane participants and their task events were
+  mirrored. The lane participant of build-stage:BEH-017 now publishes
+  `inference.started{model}` right before the subprocess starts and
+  `inference.completed{model, tokenUsage: {inputTokens, outputTokens},
+  items: []}` when the subprocess ends, one pair per subprocess
+  invocation (a rate-limit retry is a second pair). `model` is the key
+  of the result message's `modelUsage` map with the most output tokens
+  (Claude Code lists every model it used), or `claude-code` when there
+  is no result message or the map is empty; the token counts are
+  `usage.input_tokens` / `usage.output_tokens` of the result message,
+  or zero when there is no result message. The events
+  are sent by the lane participant itself (bus:BEH-007) and are runtime
+  events, not factory bus events: no transition rule reacts to them.
+  build-stage:EXT-001 consumer_contract widens to reading `modelUsage`
+  from the result message. Pricing stays with trace:DLT-003.
+tests_old_behavior:
+  - task.tests_written and task.impl_done still carry costUsd, inputTokens, outputTokens, durationMs from the result message (trace:BEH-005)
+tests_new_behavior:
+  - to:build-stage:BEH-017
+  - to:build-stage:EXT-001
+test_obligation:
+  predicate: |
+    Given a lane whose fake claude transcript reports modelUsage
+    {claude-opus-5-5: 120 output tokens, claude-haiku-4-5: 10 output
+    tokens} and usage 500 input / 120 output tokens, the runtime events the
+    tracer records contain, under the lane participant, one
+    inference.started with that model and one inference.completed with
+    tokenUsage {500, 120}, both between participant.joined and
+    participant.left of that lane; a transcript without a result message
+    yields inference.completed with tokenUsage {0, 0} and model
+    claude-code.
+  test_template: integration
+  boundary_classes:
+    - transcript with modelUsage and usage
+    - transcript without a result message
+    - rate-limited first attempt (two pairs)
+  failure_scenarios:
+    - inference events published after the participant left
+    - the events reaching a transition rule
+---
+```
+
+```yaml
+---
+id: build-stage:DLT-002
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:29.106Z
+    change_request: build stage shakedown after run 9
+    scope: first-time-approval
+partition_id: build-stage
+title: lanes run Claude Code isolated from the operator's own configuration
+target_ids:
+  - build-stage:EXT-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  A lane subprocess inherited the operator's Claude Code configuration:
+  user settings, every MCP server of the operator (observed in run 9:
+  code-skeleton, gitlab, veche and a human-io server started inside a
+  test-writer lane), skills and slash commands. That costs startup
+  time and context, exposes the operator's integrations to product
+  code, and makes a run depend on whose machine it runs on. The argv of
+  build-stage:EXT-001 gains `--safe-mode`, which Claude Code documents
+  as starting with every customization disabled (CLAUDE.md, skills,
+  plugins, hooks, MCP servers, custom commands and agents) while auth,
+  model selection, built-in tools and permissions work normally;
+  verified on claude 2.1.312 with a subscription login in print mode.
+  The prompt, cwd, add-dirs, model flag and stream handling are
+  unchanged.
+tests_old_behavior:
+  - the argv still starts with --print --output-format stream-json --verbose --permission-mode bypassPermissions and lists every add-dir
+tests_new_behavior:
+  - to:build-stage:EXT-001
+test_obligation:
+  predicate: |
+    claudeArgv yields --safe-mode after the permission flag and before
+    the add-dirs, with and without a model.
+  test_template: unit
+  boundary_classes:
+    - with model
+    - without model
+  failure_scenarios:
+    - the flag dropped when addDirs is empty
+---
+```
 
 ---
 

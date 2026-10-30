@@ -22,6 +22,7 @@ export interface CliResult {
   readonly outputTokens: number;
   readonly durationMs: number;
   readonly resultText: string;
+  readonly dominantModel: string | null;
 }
 
 export interface CliRoleOutcome {
@@ -48,7 +49,8 @@ export function signalLanes(signal: "SIGINT" | "SIGTERM"): void {
 }
 
 export function claudeArgv(request: CliRoleRequest): string[] {
-  const argv = ["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"];
+  /* build-stage:DLT-002: --safe-mode keeps the operator's CLAUDE.md, skills, hooks and MCP servers out of the lane. */
+  const argv = ["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--safe-mode"];
   for (const dir of request.addDirs) {
     argv.push("--add-dir", dir);
   }
@@ -64,6 +66,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/* build-stage:DLT-001: Claude Code lists every model it used; the one with the most output tokens names the inference. */
+function dominantModelOf(modelUsage: unknown): string | null {
+  if (!isRecord(modelUsage)) {
+    return null;
+  }
+  let best: { readonly model: string; readonly outputTokens: number } | null = null;
+  for (const [model, usage] of Object.entries(modelUsage)) {
+    const outputTokens = isRecord(usage) ? numberOr(usage["outputTokens"] ?? usage["output_tokens"], 0) : 0;
+    if (best === null || outputTokens > best.outputTokens) {
+      best = { model, outputTokens };
+    }
+  }
+  return best?.model ?? null;
 }
 
 export function parseStreamJsonLine(line: string): { readonly kind: "tool_use"; readonly toolUse: CliToolUse } | { readonly kind: "result"; readonly result: CliResult } | { readonly kind: "other" } {
@@ -87,6 +104,7 @@ export function parseStreamJsonLine(line: string): { readonly kind: "tool_use"; 
         outputTokens: numberOr(usage["output_tokens"], 0),
         durationMs: numberOr(parsed["duration_ms"], 0),
         resultText: typeof parsed["result"] === "string" ? parsed["result"] : "",
+        dominantModel: dominantModelOf(parsed["modelUsage"]),
       },
     };
   }

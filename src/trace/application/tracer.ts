@@ -38,6 +38,8 @@ export interface RuntimeEventInput {
   readonly loopId: string | null;
   readonly model: string | null;
   readonly tokenUsage: TokenCounts | null;
+  /* From the `lane` capability: the participant's cost comes from its task event (trace:BEH-005), not from this inference. */
+  readonly isLane: boolean;
 }
 
 interface OpenInference {
@@ -307,6 +309,9 @@ export class Tracer {
   private closeInference(input: RuntimeEventInput, inferenceKey: string, model: string | null, occurredAtMs: number): void {
     const started = this.openInferences.get(inferenceKey);
     this.openInferences.delete(inferenceKey);
+    if (input.isLane) {
+      return;
+    }
     const tokens: TokenCounts = input.tokenUsage ?? { inputTokens: 0, outputTokens: 0 };
     const costUsd = input.tokenUsage === null ? null : costOf(this.deps.pricing, model, tokens);
     if (input.tokenUsage === null) {

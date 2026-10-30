@@ -105,10 +105,10 @@ describe("test-writer invocation", () => {
   it("retries exactly once after a rate-limited result and publishes the second result", async () => {
     const cliRoles = scriptedCliRoles(async (request, invocation) => {
       if (invocation === 1) {
-        return { result: { isError: true, costUsd: 0, inputTokens: 1, outputTokens: 1, durationMs: 10, resultText: "API Error: 429 rate_limit_error" } };
+        return { result: { isError: true, costUsd: 0, inputTokens: 1, outputTokens: 1, durationMs: 10, resultText: "API Error: 429 rate_limit_error", dominantModel: null } };
       }
       await writeHandoff(handoffPathFromWorktree(request.cwd, "test-writer", 1), completeHandoff());
-      return { result: { isError: false, costUsd: 0.07, inputTokens: 9, outputTokens: 4, durationMs: 20, resultText: "ok" } };
+      return { result: { isError: false, costUsd: 0.07, inputTokens: 9, outputTokens: 4, durationMs: 20, resultText: "ok", dominantModel: null } };
     });
     const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
     const lane = await provisionLane(harness);

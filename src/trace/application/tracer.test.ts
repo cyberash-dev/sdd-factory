@@ -35,6 +35,10 @@ function laneDone(seq: number, costUsd: number | null): DeliveredEvent<EventType
   return delivered(seq, "task.impl_done", "implementer", { taskId: "T-001", attempt: 1, handoffPath: "h.md", costUsd, inputTokens: 100, outputTokens: 10, durationMs: 1000 });
 }
 
+function typeOf(parsed: unknown): string {
+  return typeof parsed === "object" && parsed !== null && "type" in parsed && typeof parsed.type === "string" ? parsed.type : "";
+}
+
 function startLane(tracer: Tracer): void {
   tracer.recordBusEvent(delivered(1, "run.started", "foreman", { specPath: "spec.md", slug: "todo-cli", operator: "cyberash", mode: "autonomous" }));
   tracer.recordBusEvent(delivered(2, "task.ready", "foreman", { taskId: "T-001", worktree: "/wt/T-001", baseSha: SHA, covers: [], writes: [] }));
@@ -45,6 +49,25 @@ interface CostsFile {
 }
 
 describe("Tracer lane cost entries", () => {
+  // @covers trace:DLT-003
+  // @covers trace:BEH-004
+  // @covers trace:BEH-005
+  it("records a lane's inference events in the trace without pricing them, so the task is costed once from its lane event", async () => {
+    const { tracer, dir } = await tracerInTempDir();
+    startLane(tracer);
+    const lane = { producerId: "lane-1", participant: "implementer", taskId: "T-001", loopId: null, isLane: true } as const;
+    tracer.recordRuntimeEvent({ ...lane, type: "inference.started", occurredAt: new Date("2026-10-29T12:03:00.000Z"), model: "claude-code", tokenUsage: null });
+    tracer.recordRuntimeEvent({ ...lane, type: "inference.completed", occurredAt: new Date("2026-10-29T12:04:00.000Z"), model: "claude-opus-5-5", tokenUsage: { inputTokens: 500, outputTokens: 120 } });
+    tracer.recordBusEvent(laneDone(5, 0.42));
+    tracer.recordBusEvent(delivered(6, "task.approved", "foreman", { taskId: "T-001", implSha: SHA }));
+    await tracer.idle();
+
+    const costs: CostsFile = JSON.parse(await readFile(join(dir, "costs.json"), "utf8"));
+    const traceTypes = (await readFile(join(dir, "trace.jsonl"), "utf8")).split("\n").filter((line) => line.length > 0).map((line) => typeOf(JSON.parse(line)));
+    const traceMd = await readFile(join(dir, "trace.md"), "utf8");
+    expect([costs.entries.map((entry) => [entry.participant, entry.taskId, entry.costUsd]), traceTypes.filter((type) => type.startsWith("inference")), traceMd.includes("no price for model")]).toEqual([[["implementer", "T-001", 0.42]], ["inference.started", "inference.completed"], false]);
+  });
+
   // @covers trace:BEH-005
   it("copies costUsd 0.42 from task.impl_done into one entry for the implementer with model null and stage build", async () => {
     const { tracer, dir } = await tracerInTempDir();

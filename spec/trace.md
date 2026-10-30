@@ -112,7 +112,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: trace
 name: trace-files
-version: "0.3.0"
+version: "0.3.1"
 boundary_type: public_storage
 members:
   - trace:CTR-001
@@ -1415,6 +1415,65 @@ test_obligation:
   failure_scenarios:
     - header item missing
     - drift still reported
+---
+```
+
+```yaml
+---
+id: trace:DLT-003
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T17:12:29.436Z
+    change_request: build stage shakedown after run 9
+    scope: first-time-approval
+partition_id: trace
+title: trace-files 0.3.0 -> 0.3.1 - lane inference events are recorded, not priced
+target_ids:
+  - trace:SUR-001
+  - trace:BEH-004
+  - trace:BEH-005
+  - trace:BEH-010
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: trace:SUR-001
+    intended_version: "0.3.1"
+description: |
+  With build-stage:DLT-001 the lane participants publish
+  inference.started / inference.completed for their claude -p
+  subprocess. The tracer writes those events to trace.jsonl like any
+  runtime event and mirrors them to Mozaik Cloud (trace:BEH-010), but
+  trace:BEH-004 pricing applies only to inferences of participants that
+  are not lane roles: the cost of a lane stays the costUsd of its task
+  event (trace:BEH-005), so costs.json and trace.md count every lane
+  once. An inference.completed from a lane participant therefore adds
+  no cost entry and raises no "no price for model" warning. trace.jsonl
+  gains lines of an existing kind only; patch bump.
+tests_old_behavior:
+  - an API role's inference.completed is still priced from its token usage and the pricing table
+tests_new_behavior:
+  - to:trace:BEH-004
+  - to:trace:BEH-005
+test_obligation:
+  predicate: |
+    Given inference.completed{model: claude-opus-5-5, tokenUsage: {500,
+    120}} from a participant named test-writer with capability
+    task:T-001 followed by task.tests_written{costUsd: 0.42}, costs.json
+    holds exactly one entry for T-001 and test-writer with costUsd 0.42
+    and no warning; trace.jsonl holds both the inference line and the
+    task line.
+  test_template: integration
+  boundary_classes:
+    - lane inference followed by its task event
+    - API role inference (still priced)
+  failure_scenarios:
+    - the lane inference priced from the table
+    - a "no price for model claude-opus-5-5" warning for a lane
 ---
 ```
 

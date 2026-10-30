@@ -56,14 +56,14 @@ export async function runImplementer(slice: SliceContext, deps: LaneDeps, contex
   const frozen = await frozenTestFiles(deps, inputs.task.worktree, requireSha(inputs.task.baseSha, "baseSha"), requireSha(inputs.task.testsSha, "testsSha"));
   const instruction = slice.prompts.render(await slice.prompts.load("implementer"), instructionVariables(base));
   let lastRun: CliRoleOutcome | null = null;
-  await withLaneParticipant(slice, "implementer", run.taskId, async () => {
+  await withLaneParticipant(slice, "implementer", run.taskId, async (lane) => {
     const result = await runWithHandoffRetry(
       {
         role: "implementer",
         handoffPath,
         maxReruns: slice.config.caps.handoffRerun,
         invoke: async (message) => {
-          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message });
+          lastRun = await runCliLane(slice, deps, { worktree: inputs.task.worktree, handoffPath, instruction, message }, lane);
           return lastRun;
         },
         parse: async () => {

@@ -23,9 +23,17 @@ describe("trace-files surface after the member and cloud deltas", () => {
   });
 
   // @covers trace:DLT-002
-  it("carries the cloud mirror behaviour as a member at version 0.3.0", async () => {
+  it("carries the cloud mirror behaviour as a member past version 0.2.0", async () => {
     const surface = await surfaceRecord("trace.md", "trace:SUR-001");
 
-    expect([surface.version, surface.members.includes("trace:BEH-010")]).toEqual(["0.3.0", true]);
+    const [major, minor] = surface.version.split(".").map(Number);
+    expect([major, (minor ?? 0) >= 3, surface.members.includes("trace:BEH-010")]).toEqual([0, true, true]);
+  });
+
+  // @covers trace:DLT-003
+  it("carries version 0.3.1 after lane inference events joined the trace unpriced", async () => {
+    const surface = await surfaceRecord("trace.md", "trace:SUR-001");
+
+    expect(surface.version).toBe("0.3.1");
   });
 });

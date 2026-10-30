@@ -29,11 +29,16 @@ async function npmInstall(request: ToolingInstallRequest, flags: readonly string
   return request.commands.run({ file: "npm", args: ["install", "--no-audit", "--no-fund", ...flags, ...packages], cwd: request.productDir, timeoutMs: request.timeoutMs });
 }
 
-async function overwriteCompilerOptions(productDir: string, compilerOptions: Readonly<Record<string, unknown>>): Promise<void> {
-  const path = join(productDir, "tsconfig.json");
+async function overwriteCompilerOptions(request: ToolingInstallRequest, compilerOptions: Readonly<Record<string, unknown>>): Promise<void> {
+  const path = join(request.productDir, "tsconfig.json");
   const current: unknown = JSON.parse((await readTextOrNull(path)) ?? "{}");
   const base = isRecord(current) ? current : {};
-  await writeTextAtomic(path, `${JSON.stringify({ ...base, compilerOptions }, null, 2)}\n`);
+  /* design-stage:DLT-002: this tsconfig type-checks src and tests together; a rootDir would reject every test file. */
+  const { rootDir, ...applied } = compilerOptions;
+  if (rootDir !== undefined) {
+    request.log("design-stage: tsconfig rootDir dropped");
+  }
+  await writeTextAtomic(path, `${JSON.stringify({ ...base, compilerOptions: applied }, null, 2)}\n`);
 }
 
 async function git(request: ToolingInstallRequest, args: readonly string[]): Promise<CommandResult> {
@@ -76,7 +81,7 @@ export async function installTooling(request: ToolingInstallRequest): Promise<To
     }
   }
   if (tooling.tsconfig !== null) {
-    await overwriteCompilerOptions(request.productDir, tooling.tsconfig);
+    await overwriteCompilerOptions(request, tooling.tsconfig);
   }
   if (steps.length === 0 && tooling.tsconfig === null) {
     return { ok: true, committed: false };

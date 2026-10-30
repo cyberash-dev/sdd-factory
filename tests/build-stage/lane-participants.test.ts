@@ -9,6 +9,7 @@ import { handoffPathFromWorktree, laneState, provisionLane, RED_TEST } from "./s
 import { aProductRepo, writeProductFile } from "./support/product.js";
 import { scriptedCliRoles, writeHandoff } from "./support/runners.js";
 import { aTask, buildingState } from "./support/state.js";
+import { isRecord } from "../../src/trace/domain/guards.js";
 
 interface LaneRosterEntry {
   readonly id: string;
@@ -82,6 +83,35 @@ describe("lane participants", () => {
     await runTestWriterThroughRuntime(harness, "T-001", laneState(lane));
 
     expect([rosterDuringRun.map((roster) => roster.map((entry) => entry.capabilities)), testWriterRoster(harness), senders]).toEqual([[[["lane", "task:T-001"]]], [], [rosterDuringRun[0]?.[0]?.id]]);
+  });
+
+  // @covers build-stage:BEH-017
+  // @covers build-stage:DLT-001
+  it("reports the subprocess as inference.started and inference.completed from the lane participant with the model and tokens Claude Code returned", async () => {
+    const cliRoles = scriptedCliRoles(async (request) => {
+      await writeCompleteHandoff(request.cwd);
+      return { result: { isError: false, costUsd: 0.5, inputTokens: 500, outputTokens: 120, durationMs: 1500, resultText: "done", dominantModel: "claude-opus-5-5" } };
+    });
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles });
+    const observed: (readonly [string, string, unknown, unknown])[] = [];
+    harness.context.runtime.join(
+      createRuntimeObserver("inference-probe", (event) => {
+        if (event.type === "inference.started" || event.type === "inference.completed" || event.type === "task.tests_written") {
+          const payload = isRecord(event.payload) ? event.payload : {};
+          observed.push([event.type, event.producerId, payload["model"], payload["tokenUsage"]]);
+        }
+      }),
+    );
+    const lane = await provisionLane(harness);
+
+    await runTestWriterThroughRuntime(harness, "T-001", laneState(lane));
+
+    const laneId = observed[0]?.[1] ?? "";
+    expect(observed).toEqual([
+      ["inference.started", laneId, "claude-code", undefined],
+      ["inference.completed", laneId, "claude-opus-5-5", { inputTokens: 500, outputTokens: 120 }],
+      ["task.tests_written", laneId, undefined, undefined],
+    ]);
   });
 
   it("leaves the lane participant without publishing when the lane is cancelled while the subprocess runs", async () => {

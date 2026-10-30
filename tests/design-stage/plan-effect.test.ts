@@ -128,6 +128,18 @@ describe("design.plan effect", () => {
   });
 
   // @covers design-stage:BEH-003
+  // @covers design-stage:DLT-002
+  it("drops rootDir from the architect's compilerOptions so the typecheck keeps covering tests", async () => {
+    const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS)] } });
+    await seedDesign(h.productDir, techMdText({ tsconfig: '{ strict: true, rootDir: "src", outDir: "dist" }' }));
+
+    await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), h.slice, h.commandRunner);
+
+    const tsconfig: unknown = JSON.parse(await readFile(join(h.productDir, "tsconfig.json"), "utf8"));
+    expect([tsconfig, h.log.includes("design-stage: tsconfig rootDir dropped")]).toEqual([{ compilerOptions: { strict: true, outDir: "dist" }, include: ["src"] }, true]);
+  });
+
+  // @covers design-stage:BEH-003
   it("installs nothing and commits nothing when both lists are empty and there is no tsconfig key", async () => {
     const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS)] } });
     await seedDesign(h.productDir, techMdText());

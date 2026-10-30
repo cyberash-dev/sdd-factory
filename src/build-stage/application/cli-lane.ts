@@ -1,10 +1,11 @@
 import { dirname } from "node:path";
-import type { LaneRole } from "../../bus/adapters/mozaik/roster.js";
+import type { LaneParticipant, LaneRole } from "../../bus/adapters/mozaik/roster.js";
 import { laneEnvironment, type CliRoleOutcome } from "../../shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../shared/slice.js";
 import type { LaneDeps } from "./lane-deps.js";
 
 export const CLAUDE_BINARY = "claude";
+export const LANE_MODEL_FALLBACK = "claude-code";
 export const RATE_LIMIT_RETRY_DELAY_MS = 30_000;
 const RATE_LIMITED = /rate.?limit|429|overloaded/i;
 
@@ -34,19 +35,22 @@ export function costFieldsOf(outcome: CliRoleOutcome): CostFields {
 }
 
 /* build-stage:BEH-017: the lane participant lives from before the subprocess starts to after the last event. */
-export async function withLaneParticipant<T>(slice: SliceContext, role: LaneRole, taskId: string, body: () => Promise<T>): Promise<T> {
+export async function withLaneParticipant<T>(slice: SliceContext, role: LaneRole, taskId: string, body: (lane: LaneParticipant) => Promise<T>): Promise<T> {
   const lane = slice.runtime.joinLane(role, taskId);
   try {
-    return await body();
+    return await body(lane);
   } finally {
     slice.runtime.leaveLane(lane);
   }
 }
 
 /* build-stage:EXT-001: one retry after a rate-limited result, without counting an attempt. */
-export async function runCliLane(slice: SliceContext, deps: LaneDeps, request: CliLaneRequest): Promise<CliRoleOutcome> {
-  const run = (): Promise<CliRoleOutcome> =>
-    slice.cliRoles.run({
+export async function runCliLane(slice: SliceContext, deps: LaneDeps, request: CliLaneRequest, lane: LaneParticipant): Promise<CliRoleOutcome> {
+  const configuredModel = slice.config.models.lane ?? LANE_MODEL_FALLBACK;
+  const run = async (): Promise<CliRoleOutcome> => {
+    /* build-stage:DLT-001: the subprocess is reported like a loop inference so Mozaik Cloud counts lane work. */
+    slice.runtime.publishRuntimeEvent(lane.id, "inference.started", { model: configuredModel });
+    const outcome = await slice.cliRoles.run({
       binary: CLAUDE_BINARY,
       cwd: request.worktree,
       prompt: `${request.instruction}\n\n---\n\n${request.message}`,
@@ -55,6 +59,14 @@ export async function runCliLane(slice: SliceContext, deps: LaneDeps, request: C
       timeoutMs: slice.config.timeouts.cliRoleMs,
       env: laneEnvironment(process.env),
     });
+    const cost = costFieldsOf(outcome);
+    slice.runtime.publishRuntimeEvent(lane.id, "inference.completed", {
+      model: outcome.result?.dominantModel ?? configuredModel,
+      tokenUsage: { inputTokens: cost.inputTokens, outputTokens: cost.outputTokens },
+      items: [],
+    });
+    return outcome;
+  };
   const first = await run();
   if (!isRateLimited(first)) {
     return first;
