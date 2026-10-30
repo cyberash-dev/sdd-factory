@@ -7,7 +7,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "factory": "tsx src/cli.ts"
+    "factory": "node --env-file-if-exists=.env --import tsx src/cli.ts"
   },
   "license": "MIT",
   "type": "module",
