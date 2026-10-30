@@ -13,6 +13,7 @@ import { createExecFileCommandRunner } from "../../src/assembly-stage/adapters/o
 import type { CommandInvocation, CommandResult, CommandRunner } from "../../src/assembly-stage/ports/outbound/command-runner.js";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../../src/shared/config.js";
 import type { ApiRoleRequest, ApiRoleRunner, ApiRoleUsage } from "../../src/shared/llm/api-role-runner.js";
+import type { CliRoleRunner } from "../../src/shared/llm/cli-role-runner.js";
 import { createPromptLibrary } from "../../src/shared/prompts.js";
 import type { SliceContext } from "../../src/shared/slice.js";
 import { createTraceSlice } from "../../src/trace/index.js";
@@ -175,9 +176,13 @@ function handoffPathOf(request: ApiRoleRequest): string {
   return match[1];
 }
 
+/* Tests that predate assembly-stage:DLT-001 describe the path after the simple-fixer is exhausted. */
+export const NO_SIMPLE_FIXES_CONFIG: FactoryConfig = { ...DEFAULT_CONFIG, caps: { ...DEFAULT_CONFIG.caps, simpleFixes: 0 } };
+
 export interface TestSliceInput {
   readonly root: string;
   readonly apiRoles?: ApiRoleRunner;
+  readonly cliRoles?: CliRoleRunner;
   readonly config?: FactoryConfig;
   readonly push?: boolean;
   readonly log?: string[];
@@ -187,7 +192,7 @@ export function sliceContext(input: TestSliceInput): SliceContext {
   const runDir = join(input.root, "run");
   const log = input.log ?? [];
   return {
-    config: input.config ?? DEFAULT_CONFIG,
+    config: input.config ?? NO_SIMPLE_FIXES_CONFIG,
     runId: RUN_ID,
     slug: SLUG,
     operator: "cyberash",
@@ -204,7 +209,7 @@ export function sliceContext(input: TestSliceInput): SliceContext {
     },
     runtime: createFactoryRuntime(RUN_ID),
     apiRoles: input.apiRoles ?? silentApiRoles(),
-    cliRoles: { run: () => Promise.reject(new Error("cli role not expected")) },
+    cliRoles: input.cliRoles ?? { run: () => Promise.reject(new Error("cli role not expected")) },
     prompts: createPromptLibrary(join(process.cwd(), "prompts")),
     log: (line) => log.push(line),
     now: () => new Date("2026-10-29T12:00:00.000Z"),

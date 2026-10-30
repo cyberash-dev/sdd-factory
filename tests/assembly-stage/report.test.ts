@@ -51,7 +51,7 @@ describe("assembly report contract", () => {
 
     const frontmatter = frontmatterOf(report);
     expect([Object.keys(frontmatter), frontmatter["verdict"], frontmatter["rounds"], frontmatter["published"], frontmatter["reworks"]]).toEqual([
-      ["run_id", "slug", "rounds", "verdict", "task_order", "merges", "verification", "sdd_ready", "triage", "reworks", "published"],
+      ["run_id", "slug", "rounds", "verdict", "task_order", "merges", "verification", "sdd_ready", "triage", "reworks", "fixes", "published"],
       "published",
       2,
       { commit_sha: SHA, output_dir: "hidden/todo-cli/", pushed: true },

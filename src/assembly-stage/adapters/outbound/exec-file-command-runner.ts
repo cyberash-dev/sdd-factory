@@ -9,7 +9,7 @@ export function createExecFileCommandRunner(env: NodeJS.ProcessEnv = process.env
       return new Promise((resolve, reject) => {
         const startedAt = Date.now();
         const [binary, ...args] = invocation.argv;
-        execFile(binary, args, { cwd: invocation.cwd, timeout: invocation.timeoutMs, maxBuffer: MAX_OUTPUT_BYTES, killSignal: "SIGKILL", env }, (error, stdout, stderr) => {
+        execFile(binary, args, { cwd: invocation.cwd, timeout: invocation.timeoutMs, maxBuffer: MAX_OUTPUT_BYTES, killSignal: "SIGKILL", env: invocation.env ?? env }, (error, stdout, stderr) => {
           const durationMs = Date.now() - startedAt;
           if (error === null) {
             resolve({ exitCode: 0, stdout, stderr, durationMs, timedOut: false });

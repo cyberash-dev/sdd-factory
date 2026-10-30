@@ -1,9 +1,12 @@
 import { isAbsolute, join, relative } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+import { withSimpleFix } from "../../bus/domain/run-state.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
+import { createGitWorkingTree, fixScopeOf, runSimpleFix, type AssemblyTrigger, type SimpleFixRun, type WorkingTree } from "../../shared/fixer/index.js";
 import { ensureDir, readTextOrNull, writeTextAtomic } from "../../shared/fs/text.js";
 import type { EffectHandler, SliceContext } from "../../shared/slice.js";
 import { coversMarkersIn } from "../domain/covers-markers.js";
-import type { AssemblyLedger, MergeEntry, MergeResult, RoundFailingTest, StepResult, VerificationEntry } from "../domain/ledger.js";
+import type { AssemblyLedger, FixEntry, MergeEntry, MergeResult, RoundFailingTest, StepResult, VerificationEntry } from "../domain/ledger.js";
 import { integerField, stringArrayField } from "../domain/payload.js";
 import { redactSecrets, secretValuesOf } from "../domain/redaction.js";
 import { WRITE_SET_CONFLICT } from "../domain/rework-reasons.js";
@@ -14,14 +17,23 @@ import { parseTokenEnvelope } from "../domain/sdd-token.js";
 import { INSTALL_ARGV, NETWORK_FAILURE, OFFLINE_INSTALL_ARGV, VERIFICATION_SEQUENCE, VITEST_REPORT_FILE, stepArgv, type AssemblyStep } from "../domain/verification-steps.js";
 import { parseVitestReport } from "../domain/vitest-report.js";
 import type { Argv, CommandResult, CommandRunner } from "../ports/outbound/command-runner.js";
-import { captureCommand, evidenceDirFor } from "./evidence.js";
-import { gitIn, type GitRunner } from "./git.js";
+import { captureCommand, commandLog, evidenceDirFor } from "./evidence.js";
+import { fixerCommandsOf, gitIn, type GitRunner } from "./git.js";
 import { REPORT_FILE, updateLedger, writeProductReport, type LedgerIdentity } from "./ledger-store.js";
 
 const INTEGRATION_BRANCH = "integration";
 const SDD_READY_REPORT_FILE = "sdd_ready.json";
 const SPEC_FILE = join("spec", "spec.md");
 const TOKEN_ARGV: Argv = ["npx", "sdd", "token", "--format=json"];
+const FIXER_AUTHOR = "simple-fixer <simple-fixer@sdd-factory.local>";
+const FIXER_OWNER = "assembler";
+const FIXER_UNIT = "run";
+
+/* context.state is the snapshot taken when the effect started; fixer runs of this effect are not in it yet. */
+interface FixerSession {
+  readonly tree: WorkingTree;
+  runsInEffect: number;
+}
 
 interface VerifyRun {
   readonly slice: SliceContext;
@@ -32,6 +44,7 @@ interface VerifyRun {
   readonly evidenceDir: string;
   readonly secrets: readonly string[];
   readonly identity: LedgerIdentity;
+  readonly fixer: FixerSession;
 }
 
 interface StepOutcome {
@@ -39,6 +52,8 @@ interface StepOutcome {
   readonly failingCovers: readonly string[];
   readonly failingTests: readonly RoundFailingTest[];
   readonly sddReady: AssemblyLedger["sdd_ready"] | null;
+  readonly fixTrigger: AssemblyTrigger | null;
+  readonly failureOutput: string;
 }
 
 function execute(run: VerifyRun, argv: Argv): Promise<CommandResult> {
@@ -49,8 +64,8 @@ function entryOf(run: VerifyRun, step: AssemblyStep, argv: Argv, result: Command
   return { round: run.round, step, argv: [...argv], exit_code: result.exitCode ?? -1, duration_ms: result.durationMs, result: verdict, evidence_path: evidencePath };
 }
 
-function plainOutcome(entry: VerificationEntry): StepOutcome {
-  return { entry, failingCovers: [], failingTests: [], sddReady: null };
+function plainOutcome(run: VerifyRun, entry: VerificationEntry, result: CommandResult, fixTrigger: AssemblyTrigger | null): StepOutcome {
+  return { entry, failingCovers: [], failingTests: [], sddReady: null, fixTrigger: entry.result === "red" ? fixTrigger : null, failureOutput: commandLog(result, run.secrets) };
 }
 
 async function mergeTask(run: VerifyRun, taskId: string): Promise<MergeEntry> {
@@ -80,21 +95,22 @@ async function mergeTask(run: VerifyRun, taskId: string): Promise<MergeEntry> {
 async function runInstall(run: VerifyRun): Promise<StepOutcome> {
   let argv: Argv = INSTALL_ARGV;
   let result = await execute(run, argv);
-  if (result.exitCode !== 0 && NETWORK_FAILURE.test(result.stdout + result.stderr)) {
+  const isNetworkFailure = result.exitCode !== 0 && NETWORK_FAILURE.test(result.stdout + result.stderr);
+  if (isNetworkFailure) {
     await captureCommand(run.evidenceDir, "install-online", result, run.secrets);
     argv = OFFLINE_INSTALL_ARGV;
     const retry = await execute(run, argv);
     result = { ...retry, durationMs: result.durationMs + retry.durationMs };
   }
   const evidencePath = await captureCommand(run.evidenceDir, "install", result, run.secrets);
-  return plainOutcome(entryOf(run, "install", argv, result, result.exitCode === 0 ? "green" : "red", evidencePath));
+  return plainOutcome(run, entryOf(run, "install", argv, result, result.exitCode === 0 ? "green" : "red", evidencePath), result, isNetworkFailure ? null : "assembly_install");
 }
 
 async function runTypecheck(run: VerifyRun): Promise<StepOutcome> {
   const argv = stepArgv("typecheck", run.evidenceDir);
   const result = await execute(run, argv);
   const evidencePath = await captureCommand(run.evidenceDir, "typecheck", result, run.secrets);
-  return plainOutcome(entryOf(run, "typecheck", argv, result, result.exitCode === 0 ? "green" : "red", evidencePath));
+  return plainOutcome(run, entryOf(run, "typecheck", argv, result, result.exitCode === 0 ? "green" : "red", evidencePath), result, "assembly_typecheck");
 }
 
 function productRelative(run: VerifyRun, file: string): string {
@@ -113,11 +129,14 @@ async function runTest(run: VerifyRun): Promise<StepOutcome> {
   const evidencePath = join(run.evidenceDir, VITEST_REPORT_FILE);
   const summary = parseVitestReport((await readTextOrNull(evidencePath)) ?? "");
   const verdict: StepResult = result.exitCode === 0 && summary !== null && summary.success ? "green" : "red";
+  const isLoadFailureOnly = verdict === "red" && summary !== null && summary.loadFailures.length > 0 && summary.failedAssertions === 0;
   return {
     entry: entryOf(run, "test", argv, result, verdict, evidencePath),
     failingCovers: await markersOf(run, summary?.failingFiles ?? []),
     failingTests: (summary?.failingTests ?? []).map((test) => ({ ...test, file: productRelative(run, test.file), round: run.round })),
     sddReady: null,
+    fixTrigger: isLoadFailureOnly ? "assembly_load_failure" : null,
+    failureOutput: commandLog(result, run.secrets),
   };
 }
 
@@ -167,6 +186,8 @@ async function runSddReady(run: VerifyRun): Promise<StepOutcome> {
     failingCovers: summary === null ? [] : failingCoversOf(summary),
     failingTests: [],
     sddReady: summary === null ? { ok: false, violations: [] } : { ok: summary.ok, violations: summary.violations.map((violation) => ({ kind: violation.kind, id: violation.id ?? "", file: violation.file ?? "" })) },
+    fixTrigger: null,
+    failureOutput: commandLog(result, run.secrets),
   };
 }
 
@@ -191,6 +212,91 @@ async function commitReport(run: VerifyRun, ledger: AssemblyLedger): Promise<voi
   await updateLedger(run.identity, (current) => ({ ...current, verified_head: head }));
 }
 
+async function settleStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutcome): Promise<void> {
+  const ledger = await updateLedger(run.identity, (current) => ({
+    ...current,
+    verification: [...current.verification, outcome.entry],
+    failing_tests: [...current.failing_tests, ...outcome.failingTests],
+    sdd_ready: outcome.sddReady ?? current.sdd_ready,
+  }));
+  if (step === "sdd_ready" && outcome.entry.result === "green") {
+    await commitReport(run, ledger);
+  }
+  run.context.publish({
+    type: "assembly.verified",
+    producer: "assembler",
+    payload: { result: outcome.entry.result, step, evidencePath: outcome.entry.evidence_path, failingCovers: [...outcome.failingCovers] },
+  });
+}
+
+async function commitFix(run: VerifyRun, fixed: SimpleFixRun): Promise<string | null> {
+  if (fixed.filesChanged.length === 0) {
+    return null;
+  }
+  const ledger = await updateLedger(run.identity, (current) => current);
+  const fixNumber = ledger.fixes.filter((entry) => entry.round === run.round && entry.commit_sha !== null).length + 1;
+  await run.git.output(["add", "-A", "--", ...fixed.filesChanged]);
+  await run.git.output(["commit", "-m", `fix assembly round ${run.round} ${fixNumber}`, `--author=${FIXER_AUTHOR}`]);
+  return run.git.output(["rev-parse", "HEAD"]);
+}
+
+function fixerContext(run: VerifyRun): EffectContext {
+  let state = run.context.state;
+  for (let runs = 0; runs < run.fixer.runsInEffect; runs += 1) {
+    state = withSimpleFix(state, FIXER_OWNER, FIXER_UNIT);
+  }
+  return { state, publish: (pending) => run.context.publish(pending) };
+}
+
+/* factory:BEH-012 assembly row: null once the fixer's change is committed, else the step's last red outcome. */
+async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutcome, trigger: AssemblyTrigger): Promise<StepOutcome | null> {
+  const directory = run.slice.paths.productDir;
+  let latest = outcome;
+  const snapshot = await run.fixer.tree.snapshot(directory);
+  const result = await runSimpleFix(run.slice, { tree: run.fixer.tree, delay: (ms) => sleep(ms) }, fixerContext(run), {
+    trigger,
+    owner: FIXER_OWNER,
+    unit: FIXER_UNIT,
+    taskId: null,
+    directory,
+    scope: fixScopeOf({ trigger }),
+    formatOnly: [],
+    failureOutput: outcome.failureOutput,
+    check: async () => {
+      latest = await runStep(run, step);
+      return { passed: latest.fixTrigger === null, output: latest.failureOutput };
+    },
+  });
+  run.fixer.runsInEffect += result.runs.length;
+  const fixed = result.runs.find((fixRun) => fixRun.outcome === "fixed");
+  const commitSha = fixed === undefined ? null : await commitFix(run, fixed);
+  if (fixed === undefined) {
+    /* the unfixed runs leave their edits in the tree; triage and the next round start from the merged head */
+    await run.fixer.tree.restore(directory, snapshot, await run.fixer.tree.changesSince(directory, snapshot));
+  }
+  const entries: readonly FixEntry[] = result.runs.map((fixRun) => ({ round: run.round, attempt: fixRun.attempt, trigger, outcome: fixRun.outcome, commit_sha: fixRun === fixed ? commitSha : null, files: [...fixRun.filesChanged] }));
+  await updateLedger(run.identity, (current) => ({ ...current, fixes: [...current.fixes, ...entries] }));
+  return fixed === undefined ? latest : null;
+}
+
+async function runSequence(run: VerifyRun): Promise<"restart" | "done"> {
+  for (const step of VERIFICATION_SEQUENCE) {
+    let outcome = await runStep(run, step);
+    if (outcome.fixTrigger !== null) {
+      const unrepaired = await repairStep(run, step, outcome, outcome.fixTrigger);
+      if (unrepaired === null) {
+        return "restart";
+      }
+      outcome = unrepaired;
+    }
+    await settleStep(run, step, outcome);
+    if (outcome.entry.result === "red") {
+      return "done";
+    }
+  }
+  return "done";
+}
+
 export function verifyEffect(runner: CommandRunner): EffectHandler {
   return async (effect, context, slice) => {
     const round = integerField(effect, "round");
@@ -205,6 +311,7 @@ export function verifyEffect(runner: CommandRunner): EffectHandler {
       evidenceDir: evidenceDirFor(slice.paths.handoffsDir, round),
       secrets: secretValuesOf(process.env),
       identity,
+      fixer: { tree: createGitWorkingTree(fixerCommandsOf(runner, slice.config.timeouts.verifierMs)), runsInEffect: 0 },
     };
     await ensureDir(run.evidenceDir);
     await updateLedger(identity, (ledger) => ({ ...ledger, rounds: round, task_order: taskOrder }));
@@ -218,25 +325,8 @@ export function verifyEffect(runner: CommandRunner): EffectHandler {
         return;
       }
     }
-    for (const step of VERIFICATION_SEQUENCE) {
-      const outcome = await runStep(run, step);
-      const ledger = await updateLedger(identity, (current) => ({
-        ...current,
-        verification: [...current.verification, outcome.entry],
-        failing_tests: [...current.failing_tests, ...outcome.failingTests],
-        sdd_ready: outcome.sddReady ?? current.sdd_ready,
-      }));
-      if (step === "sdd_ready" && outcome.entry.result === "green") {
-        await commitReport(run, ledger);
-      }
-      context.publish({
-        type: "assembly.verified",
-        producer: "assembler",
-        payload: { result: outcome.entry.result, step, evidencePath: outcome.entry.evidence_path, failingCovers: [...outcome.failingCovers] },
-      });
-      if (outcome.entry.result === "red") {
-        return;
-      }
+    while ((await runSequence(run)) === "restart") {
+      slice.log(`assembly round ${round}: simple-fixer repaired the tree, restarting at install`);
     }
   };
 }

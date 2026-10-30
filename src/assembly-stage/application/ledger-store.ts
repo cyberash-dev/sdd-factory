@@ -17,7 +17,9 @@ export async function loadLedger(identity: LedgerIdentity): Promise<AssemblyLedg
   if (text === null) {
     return emptyLedger(identity.runId, identity.slug);
   }
-  const parsed: unknown = JSON.parse(text);
+  const stored: unknown = JSON.parse(text);
+  /* A ledger written before assembly-stage:DLT-001 has no fixes list; a resumed run keeps it. */
+  const parsed = typeof stored === "object" && stored !== null && !Array.isArray(stored) && !("fixes" in stored) ? { ...stored, fixes: [] } : stored;
   if (!isLedger(parsed)) {
     throw new Error(`${LEDGER_FILE} is not an assembly ledger`);
   }

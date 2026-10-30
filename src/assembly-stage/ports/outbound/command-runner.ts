@@ -4,6 +4,7 @@ export interface CommandInvocation {
   readonly argv: Argv;
   readonly cwd: string;
   readonly timeoutMs: number;
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface CommandResult {

@@ -1,5 +1,6 @@
 import YAML from "yaml";
 import { ASSEMBLY_TARGETS } from "../../bus/domain/catalogue.js";
+import type { AssemblyTrigger, FixOutcome } from "../../shared/fixer/index.js";
 import type { AssemblyStep } from "./verification-steps.js";
 import type { FailingTest } from "./vitest-report.js";
 
@@ -49,6 +50,15 @@ export interface ReworkEntry {
   readonly source: ReworkSource;
 }
 
+export interface FixEntry {
+  readonly round: number;
+  readonly attempt: number;
+  readonly trigger: AssemblyTrigger;
+  readonly outcome: FixOutcome;
+  readonly commit_sha: string | null;
+  readonly files: readonly string[];
+}
+
 export interface PublishedEntry {
   readonly commit_sha: string | null;
   readonly output_dir: string;
@@ -69,6 +79,7 @@ export interface AssemblyLedger {
   readonly sdd_ready: SddReadyEntry;
   readonly triage: readonly TriageEntry[];
   readonly reworks: readonly ReworkEntry[];
+  readonly fixes: readonly FixEntry[];
   readonly verified_head: string | null;
   readonly failing_tests: readonly RoundFailingTest[];
 }
@@ -78,7 +89,7 @@ export type ReportOutcome =
   | { readonly verdict: "failed"; readonly detail: string };
 
 export function emptyLedger(runId: string, slug: string): AssemblyLedger {
-  return { run_id: runId, slug, rounds: 0, task_order: [], merges: [], verification: [], sdd_ready: { ok: false, violations: [] }, triage: [], reworks: [], verified_head: null, failing_tests: [] };
+  return { run_id: runId, slug, rounds: 0, task_order: [], merges: [], verification: [], sdd_ready: { ok: false, violations: [] }, triage: [], reworks: [], fixes: [], verified_head: null, failing_tests: [] };
 }
 
 export function isLedger(value: unknown): value is AssemblyLedger {
@@ -95,6 +106,7 @@ export function isLedger(value: unknown): value is AssemblyLedger {
     Array.isArray(record["verification"]) &&
     Array.isArray(record["triage"]) &&
     Array.isArray(record["reworks"]) &&
+    Array.isArray(record["fixes"]) &&
     Array.isArray(record["failing_tests"])
   );
 }
@@ -107,7 +119,8 @@ function roundSection(ledger: AssemblyLedger, round: number): string {
   const failingTests = ledger.failing_tests.filter((entry) => entry.round === round).map((entry) => `- failing test ${entry.file} › ${entry.name}: ${entry.message.split("\n")[0] ?? ""}`);
   const triage = ledger.triage.filter((entry) => entry.round === round).map((entry) => `- triage ${entry.task_id ?? "(no task)"} → ${entry.target}: ${entry.reason}`);
   const reworks = ledger.reworks.filter((entry) => entry.round === round).map((entry) => `- rework ${entry.task_id} → ${entry.target} (${entry.source})`);
-  return [`## Round ${round}`, "", ...merges, ...verification, ...failingTests, ...triage, ...reworks, ""].join("\n");
+  const fixes = ledger.fixes.filter((entry) => entry.round === round).map((entry) => `- fix ${entry.attempt} ${entry.trigger}: ${entry.outcome} (${entry.files.join(", ")})`);
+  return [`## Round ${round}`, "", ...merges, ...verification, ...fixes, ...failingTests, ...triage, ...reworks, ""].join("\n");
 }
 
 function outcomeSection(outcome: ReportOutcome): string {
@@ -131,6 +144,7 @@ export function renderReport(ledger: AssemblyLedger, outcome: ReportOutcome): st
     sdd_ready: { ok: ledger.sdd_ready.ok, violations: ledger.sdd_ready.violations.map((entry) => ({ ...entry })) },
     triage: ledger.triage.map((entry) => ({ ...entry })),
     reworks: ledger.reworks.map((entry) => ({ ...entry })),
+    fixes: ledger.fixes.map((entry) => ({ ...entry, files: [...entry.files] })),
     published: outcome.verdict === "published" ? outcome.published : null,
   };
   const rounds = Array.from({ length: ledger.rounds }, (_, index) => roundSection(ledger, index + 1));
