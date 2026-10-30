@@ -121,13 +121,13 @@ discovery_scope:
   - tsconfig.json
 coverage_evidence:
   - kind: git_tree_hash_v1
-    reference: b061c2ed78f2bdb1c362c0021e96e5adb082d3ee
+    reference: 37d38bcab7ddfff5a9a2f84020011c02eb0ac4ec
     note: |
       Token computed by `sdd token --format=json` at the first implementation
       commit (bus engine, toolchain, tests). Refreshed on every
       scope-touching commit via `sdd check` / `sdd refresh`.
-freshness_token: a7dd700dc6309323c993ae17054fafbed9a30d8b5aaafa47a87327c76bb9e26d
-baseline_commit_sha: b061c2ed78f2bdb1c362c0021e96e5adb082d3ee
+freshness_token: 2c256adc7fc8741de480e0037ffe9069c4e204e976e6c6d2382af509263562fc
+baseline_commit_sha: 37d38bcab7ddfff5a9a2f84020011c02eb0ac4ec
 mechanism: git_tree_hash_v1
 notes: |
   The baseline carries no preserved as-is behaviour: there is no prior code.
