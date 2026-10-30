@@ -93,6 +93,34 @@ export function writeFileTool(root: string, trace: ToolTrace): Tool {
   };
 }
 
+export function editFileTool(root: string, trace: ToolTrace): Tool {
+  return {
+    type: "function",
+    name: "edit_file",
+    description: "Replace one exact text fragment inside an existing file of the product directory. Arguments: path, old_text (must occur exactly once), new_text.",
+    strict: false,
+    parameters: { type: "object", properties: { path: { type: "string" }, old_text: { type: "string" }, new_text: { type: "string" } }, required: ["path", "old_text", "new_text"], additionalProperties: false },
+    invoke: async (args: unknown) => {
+      const path = argumentString(args, "path");
+      const oldText = argumentString(args, "old_text");
+      const newText = argumentString(args, "new_text");
+      trace({ tool: "edit_file", path, argv: null });
+      try {
+        const absolute = resolveInside(root, path);
+        const current = await readFile(absolute, "utf8");
+        const occurrences = oldText.length === 0 ? 0 : current.split(oldText).length - 1;
+        if (occurrences !== 1) {
+          return `ERROR: old_text occurs ${occurrences} time(s) in ${path}; it must occur exactly once`;
+        }
+        await writeFile(absolute, current.replace(oldText, () => newText), "utf8");
+        return `edited ${path} (${oldText.length} -> ${newText.length} chars)`;
+      } catch (error) {
+        return `ERROR: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+  };
+}
+
 export function listDirTool(root: string, trace: ToolTrace): Tool {
   return {
     type: "function",

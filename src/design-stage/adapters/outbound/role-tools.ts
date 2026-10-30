@@ -1,6 +1,6 @@
 import { relative, resolve, sep } from "node:path";
 import type { Tool } from "@mozaik-ai/core";
-import { listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../../shared/llm/tools.js";
+import { editFileTool, listDirTool, readFileTool, writeFileTool, type ToolTrace } from "../../../shared/llm/tools.js";
 
 export interface PathScope {
   readonly base: string;
@@ -54,6 +54,7 @@ export function fileTools(options: RoleToolOptions): readonly Tool[] {
   return [
     scopedTool(readFileTool(options.repoRoot, options.trace), { base, allowed: options.reads, denied: options.deniedReads }, "read", options.trace),
     scopedTool(writeFileTool(options.repoRoot, options.trace), { base, allowed: options.writes, denied: [] }, "write", options.trace),
+    scopedTool(editFileTool(options.repoRoot, options.trace), { base, allowed: options.writes, denied: [] }, "write", options.trace),
     scopedTool(listDirTool(options.repoRoot, options.trace), { base, allowed: options.lists, denied: options.deniedReads }, "list", options.trace),
   ];
 }

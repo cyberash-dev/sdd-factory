@@ -1,5 +1,5 @@
 import { rename } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describeHandoffError, parseHandoff, type ParsedHandoff } from "../../bus/domain/handoff.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 import type { SliceContext } from "../../shared/slice.js";
@@ -99,7 +99,7 @@ export async function runStageRole(slice: SliceContext, request: StageRoleReques
   let message = request.message;
   let reruns = 0;
   for (;;) {
-    const run = await slice.apiRoles.run({ role: request.role, instruction, message, model, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: MAX_OUTPUT_TOKENS });
+    const run = await slice.apiRoles.run({ role: request.role, instruction, message, model, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), `tools-run${reruns + 1}.jsonl`) });
     usage = addUsage(usage, run);
     const violations = firewall.violations();
     if (violations.length > 0) {

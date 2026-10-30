@@ -1,3 +1,5 @@
+import { appendFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { createAgent, type SemanticEvent, type Tool } from "@mozaik-ai/core";
 import type { FactoryRuntime } from "../../bus/adapters/mozaik/runtime.js";
 import { createRuntimeObserver } from "../../bus/adapters/mozaik/runtime.js";
@@ -14,6 +16,41 @@ export interface ApiRoleRequest {
   readonly timeoutMs: number;
   readonly maxOutputTokens: number;
   readonly taskId?: string;
+  readonly toolTracePath?: string;
+}
+
+const TRACE_HEAD_CHARS = 400;
+
+function head(text: string): string {
+  return text.length <= TRACE_HEAD_CHARS ? text : `${text.slice(0, TRACE_HEAD_CHARS)}…`;
+}
+
+async function appendTraceLine(path: string, line: Record<string, unknown>): Promise<void> {
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    await appendFile(path, `${JSON.stringify(line)}\n`, "utf8");
+  } catch {
+    return;
+  }
+}
+
+/* Every tool call of the role lands as one JSON line next to its handoff, for post-mortems without the provider's transcript. */
+function tracedTools(tools: readonly Tool[], path: string): Tool[] {
+  return tools.map((tool) => ({
+    ...tool,
+    invoke: async (args: unknown): Promise<unknown> => {
+      const startedAt = Date.now();
+      let result: unknown;
+      try {
+        result = await tool.invoke(args);
+      } catch (error) {
+        await appendTraceLine(path, { at: new Date(startedAt).toISOString(), tool: tool.name, args: head(JSON.stringify(args)), result: `THROWN: ${error instanceof Error ? error.message : String(error)}`, durationMs: Date.now() - startedAt });
+        throw error;
+      }
+      await appendTraceLine(path, { at: new Date(startedAt).toISOString(), tool: tool.name, args: head(JSON.stringify(args)), result: head(typeof result === "string" ? result : JSON.stringify(result)), durationMs: Date.now() - startedAt });
+      return result;
+    },
+  }));
 }
 
 export const TASK_CAPABILITY_PREFIX = "task:";
@@ -72,7 +109,8 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
         let outputTokens = 0;
         let inferenceCount = 0;
         const capabilities = request.taskId === undefined ? ["inference"] : ["inference", `${TASK_CAPABILITY_PREFIX}${request.taskId}`];
-        const agent = createAgent({ name: request.role, capabilities, instruction: request.instruction, tools: [...request.tools], handlers: [] });
+        const tools = request.toolTracePath === undefined ? [...request.tools] : tracedTools(request.tools, request.toolTracePath);
+        const agent = createAgent({ name: request.role, capabilities, instruction: request.instruction, tools, handlers: [] });
         const agentId = agent.getId();
         const observer = createRuntimeObserver(`${request.role}-observer`, (event: SemanticEvent) => {
           if (event.producerId !== agentId) {
@@ -127,7 +165,7 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
             model: request.model,
             maxOutputTokens: request.maxOutputTokens,
             context: agent.getMemory().getContext(),
-            tools: [...request.tools],
+            tools,
             ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
           });
         } catch (error) {

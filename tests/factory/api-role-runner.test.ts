@@ -1,4 +1,7 @@
 import { FunctionCallItem, InputTokenDetails, ModelMessageItem, OutputTokenDetails, TokenUsage, type InferenceInput, type InferenceOutput, type InferenceRunner, type SemanticEvent, type Tool } from "@mozaik-ai/core";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createFactoryRuntime, createRuntimeObserver } from "../../src/bus/adapters/mozaik/runtime.js";
 import { ApiRoleTimeoutError, createApiRoleRunner } from "../../src/shared/llm/api-role-runner.js";
@@ -62,6 +65,21 @@ describe("API role runner on the Mozaik loop", () => {
     });
 
     expect([calls, result.inputTokens, result.outputTokens, result.inferenceCount, result.costUsd, result.answer]).toEqual([["spec/spec.md"], 150, 30, 2, 0.0045, "handoff written"]);
+  });
+
+  it("appends one JSON line per tool call to the trace file when toolTracePath is given", async () => {
+    const runtime = createFactoryRuntime(RUN_ID, {
+      inferenceRunner: scriptedRunner([
+        { items: [FunctionCallItem.rehydrate({ callId: "c1", name: "write_file", args: JSON.stringify({ path: "spec/spec.md" }) })], tokenUsage: usage(10, 2), rowResponse: null },
+        { items: [ModelMessageItem.rehydrate({ text: "done" })], tokenUsage: usage(5, 1), rowResponse: null },
+      ]),
+    });
+    const tracePath = join(await mkdtemp(join(tmpdir(), "roles-")), "spec-analyst", "tools-run1.jsonl");
+
+    await createApiRoleRunner(runtime, {}).run({ role: "spec-analyst", instruction: "a", message: "m", model: "m", tools: [echoTool([])], timeoutMs: 5000, maxOutputTokens: 100, toolTracePath: tracePath });
+
+    const lines = (await readFile(tracePath, "utf8")).trim().split("\n").map((line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>);
+    expect(lines.map((line) => [line["tool"], line["args"], line["result"]])).toEqual([["write_file", '{"path":"spec/spec.md"}', "written"]]);
   });
 
   // @covers factory:EXT-001

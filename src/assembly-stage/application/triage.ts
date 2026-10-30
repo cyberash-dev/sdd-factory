@@ -145,6 +145,7 @@ export function triageEffect(runner: CommandRunner): EffectHandler {
         tools: [readFileTool(slice.paths.productDir, trace), listDirTool(slice.paths.productDir, trace), writeFileTool(slice.paths.runDir, trace)],
         timeoutMs: slice.config.timeouts.apiRoleMs,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
+        toolTracePath: join(dirname(handoffPath), `tools-run${attempt}.jsonl`),
       });
       slice.log(`triage attempt ${attempt}: ${usage.inferenceCount} inferences, ${usage.inputTokens}/${usage.outputTokens} tokens, cost ${usage.costUsd === null ? "n/a" : String(usage.costUsd)}`);
       const route = routeOf(parseHandoff("triage", await readTextOrNull(handoffPath)), context.state.tasks);

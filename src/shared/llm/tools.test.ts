@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { listDirTool, readFileTool, runSddTool, writeFileTool, type ToolTraceEntry } from "./tools.js";
+import { editFileTool, listDirTool, readFileTool, runSddTool, writeFileTool, type ToolTraceEntry } from "./tools.js";
 
 async function sandbox(): Promise<{ root: string; trace: ToolTraceEntry[] }> {
   const root = await mkdtemp(join(tmpdir(), "tools-"));
@@ -33,6 +33,26 @@ describe("product directory tools", () => {
     await writeFileTool(root, (entry) => trace.push(entry)).invoke({ path: "design/tech.md", content: "# tech\n" });
 
     expect(await readFile(join(root, "design", "tech.md"), "utf8")).toBe("# tech\n");
+  });
+
+  it("replaces a unique fragment of an existing file in place", async () => {
+    const { root, trace } = await sandbox();
+
+    const reply = await editFileTool(root, (entry) => trace.push(entry)).invoke({ path: "spec.md", old_text: "# spec", new_text: "# product spec" });
+
+    expect([reply, await readFile(join(root, "spec.md"), "utf8"), trace]).toEqual(["edited spec.md (6 -> 14 chars)", "# product spec\n", [{ tool: "edit_file", path: "spec.md", argv: null }]]);
+  });
+
+  it.each([
+    ["absent", "gamma", 0],
+    ["ambiguous", "alpha", 2],
+  ])("refuses an edit whose fragment is %s and leaves the file unchanged", async (_label, oldText, count) => {
+    const { root, trace } = await sandbox();
+    await writeFile(join(root, "notes.md"), "alpha beta alpha\n", "utf8");
+
+    const reply = await editFileTool(root, (entry) => trace.push(entry)).invoke({ path: "notes.md", old_text: oldText, new_text: "x" });
+
+    expect([reply, await readFile(join(root, "notes.md"), "utf8")]).toEqual([`ERROR: old_text occurs ${count} time(s) in notes.md; it must occur exactly once`, "alpha beta alpha\n"]);
   });
 
   it("lists directory entries marking directories with a slash", async () => {

@@ -84,7 +84,7 @@ export async function runReviewer(slice: SliceContext, deps: LaneDeps, context: 
       handoffPath: worktreeHandoff,
       maxReruns: slice.config.caps.handoffRerun,
       invoke: (text) =>
-        slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model: reviewerModel(slice.config.models), tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS }),
+        slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model: reviewerModel(slice.config.models), tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), "tools.jsonl") }),
       parse: () => parseReviewOutputs(worktree, worktreeHandoff, run, implSha),
     },
     message,
