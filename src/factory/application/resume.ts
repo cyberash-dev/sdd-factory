@@ -39,6 +39,12 @@ interface LaneEntry {
   readonly taskBefore: TaskState | undefined;
 }
 
+/* factory:DLT-007: the failure chain is what the fix between runs addresses, so the replay ends at its first event. */
+const REPLAY_END_EVENTS: readonly EventType[] = ["task.failed", "spec.blocked", "design.blocked", "run.failed", "run.published"];
+
+/* factory:BEH-009: a resumed run never re-runs the bootstrap on the existing product directory, so run.started is not redone. */
+const NON_REDO_EVENTS: readonly EventType[] = ["run.started"];
+
 const IN_FLIGHT_TASK_STATUSES: readonly TaskStatus[] = ["tests_pending", "impl_pending", "verify_pending", "review_pending"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -156,7 +162,7 @@ export function planReplay(rules: readonly TransitionRule[], initialState: RunSt
   let latest: ReplayPoint | null = null;
   const laneEntries = new Map<string, LaneEntry>();
   for (const event of events) {
-    if (event.type === "run.failed" || event.type === "run.published") {
+    if (REPLAY_END_EVENTS.includes(event.type)) {
       break;
     }
     const outcome = reduce(rules, state, event, consumed);
@@ -167,7 +173,7 @@ export function planReplay(rules: readonly TransitionRule[], initialState: RunSt
     if (outcome.kind !== "applied") {
       continue;
     }
-    if (outcome.result.effects.length > 0) {
+    if (outcome.result.effects.length > 0 && !NON_REDO_EVENTS.includes(event.type)) {
       latest = { state, event };
       const taskId = taskIdOf(event);
       if (taskId !== null) {

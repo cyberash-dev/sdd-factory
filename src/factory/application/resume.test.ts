@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { EventType } from "../../bus/domain/catalogue.js";
 import type { DeliveredEvent, Producer } from "../../bus/domain/envelope.js";
 import { createRunState, createTaskState, type RunState, type TaskState } from "../../bus/domain/run-state.js";
-import type { TransitionRule } from "../../bus/domain/transition.js";
+import { reduce, type TransitionRule } from "../../bus/domain/transition.js";
 import { planReplay, readResumeSource, ResumeError } from "./resume.js";
 
 const RULES: readonly TransitionRule[] = [
@@ -152,6 +152,86 @@ describe("multi-lane resume replay plan", () => {
     const plan = planReplay(TASK_RULES, initial(), events);
 
     expect(plan.redo.map((event) => [event.type, event.seq])).toEqual([["spec.approved", 1]]);
+  });
+});
+
+const FAILURE_CHAIN_RULES: readonly TransitionRule[] = [
+  ...TASK_RULES,
+  {
+    name: "impl done",
+    eventType: "task.impl_done",
+    acceptsTaskStatus: ["tests_pending"],
+    apply: ({ state, event }) => ({ state: withTaskChange(state, taskIdOf(event.payload), (task) => ({ ...task, status: "verify_pending", attempts: { ...task.attempts, implementer: 1 } })), emits: [], effects: [{ kind: "build.verify" }] }),
+  },
+  {
+    name: "verified",
+    eventType: "task.verified",
+    acceptsTaskStatus: ["verify_pending"],
+    apply: ({ state, event }) => ({ state: withTaskChange(state, taskIdOf(event.payload), (task) => ({ ...task, status: "review_pending", implSha: typeof event.payload["implSha"] === "string" ? event.payload["implSha"] : null })), emits: [], effects: [{ kind: "build.reviewer" }] }),
+  },
+  {
+    name: "task failed",
+    eventType: "task.failed",
+    acceptsTaskStatus: ["tests_pending", "review_pending"],
+    apply: ({ state, event }) => ({ state: withTaskChange(state, taskIdOf(event.payload), (task) => ({ ...task, status: "failed" })), emits: [], effects: [{ kind: "build.terminate-lanes" }] }),
+  },
+  { name: "drafted", eventType: "spec.drafted", apply: ({ state }) => ({ state: { ...state, status: "spec_review" }, emits: [], effects: [{ kind: "spec.review" }] }) },
+  { name: "spec blocked", eventType: "spec.blocked", apply: ({ state }) => ({ state, emits: [], effects: [{ kind: "factory.finalize" }] }) },
+];
+
+describe("failure chain cut", () => {
+  const reviewerDropped = [
+    delivered(1, "task.ready", "foreman", { taskId: "T-007" }),
+    delivered(2, "task.impl_done", "implementer", { taskId: "T-007", attempt: 1 }),
+    delivered(3, "task.verified", "foreman", { taskId: "T-007", result: "green", implSha: "ef".repeat(20) }),
+    delivered(4, "task.failed", "foreman", { taskId: "T-007", reason: "unparseable_handoff", detail: "reviewer" }),
+    delivered(5, "run.failed", "foreman"),
+  ];
+
+  // @covers factory:DLT-007
+  it("redoes the failed task's lane entry instead of task.failed", () => {
+    const plan = planReplay(FAILURE_CHAIN_RULES, buildingWith(["T-007"]), reviewerDropped);
+
+    expect(plan.redo.map((event) => [event.type, taskIdOf(event.payload), event.seq])).toEqual([["task.verified", "T-007", 3]]);
+  });
+
+  // @covers factory:DLT-008
+  it("seeds the failed task at its state before its lane entry", () => {
+    const plan = planReplay(FAILURE_CHAIN_RULES, buildingWith(["T-007"]), reviewerDropped);
+
+    const task = plan.state.tasks["T-007"];
+    expect([task?.status, task?.implSha, task?.attempts.implementer]).toEqual(["verify_pending", null, 1]);
+  });
+
+  // @covers factory:DLT-008
+  it("applies the republished lane entry of the failed task to the seeded state", () => {
+    const plan = planReplay(FAILURE_CHAIN_RULES, buildingWith(["T-007"]), reviewerDropped);
+
+    const outcomes = plan.redo.map((event) => reduce(FAILURE_CHAIN_RULES, plan.state, event, new Set()).kind);
+    expect(outcomes).toEqual(["applied"]);
+  });
+
+  // @covers factory:DLT-007
+  it("redoes the event before spec.blocked and never spec.blocked itself", () => {
+    const events = [delivered(1, "spec.drafted", "spec-analyst"), delivered(2, "spec.blocked", "foreman", { reason: "lint_cap", detail: "3 cycles" }), delivered(3, "run.failed", "foreman")];
+
+    const plan = planReplay(FAILURE_CHAIN_RULES, { ...initial(), status: "spec_drafting" }, events);
+
+    expect(plan.redo.map((event) => [event.type, event.seq])).toEqual([["spec.drafted", 1]]);
+  });
+
+  // @covers factory:DLT-007
+  it("rejects a trace of run.started and run.failed only", () => {
+    const events = [delivered(1, "run.started", "foreman"), delivered(2, "run.failed", "foreman")];
+
+    expect(() => planReplay(RULES, initial(), events)).toThrow(new ResumeError("nothing to resume: no replayed event produced an effect"));
+  });
+
+  // @covers factory:DLT-008
+  it("never redoes run.started even though its transition carries the bootstrap effect", () => {
+    const events = [delivered(1, "run.started", "foreman"), delivered(2, "human.intervention", "foreman", { kind: "launch" }), delivered(3, "run.failed", "foreman")];
+
+    expect(() => planReplay(RULES, initial(), events)).toThrow(new ResumeError("nothing to resume: no replayed event produced an effect"));
   });
 });
 
