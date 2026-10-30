@@ -102,7 +102,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: design-stage
 name: design-files
-version: "0.1.1"
+version: "0.2.1"
 boundary_type: public_storage
 members:
   - design-stage:CTR-001
@@ -984,6 +984,147 @@ test_obligation:
     - the other role's file
   failure_scenarios:
     - src/ readable
+---
+```
+
+```yaml
+---
+id: design-stage:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:10.558Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: design-stage
+title: design-files 0.1.1 -> 0.2.0 - the task graph is bounded in depth and task size
+target_ids:
+  - design-stage:SUR-001
+  - design-stage:CTR-001
+  - design-stage:CTR-003
+  - design-stage:BEH-002
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact:
+  - id: design-stage:SUR-001
+    intended_version: "0.2.0"
+description: |
+  Run 11 cut a 63-record todo CLI into 12 tasks on a 6-level dependency
+  chain. A lane level costs about 30 minutes of subprocess work, so the
+  build alone would take three hours while the hackathon window is two.
+  The planner cut by the letter of its rules (one task per module,
+  modules capped at 7 exports and 8 ids); the rules, not the planner,
+  were wrong for the time budget. design-stage:CTR-003 gains two
+  validation rules, checked mechanically like the existing ones and
+  routed to the planner as design.rework on failure:
+  `graph_too_deep` when the longest dependsOn chain exceeds
+  `caps.graphDepth` tasks (configuration, default 3; the chain is the
+  offending ids), and `task_too_small` when a task covers fewer than
+  `caps.minCoversPerTask` ids (default 3) while the cover set holds at
+  least that many, the only exception being the task that owns
+  src/index.ts (the composition root wires rather than covers). Adding a
+  validation rule is a major change under CTR-003's own compatibility
+  rule, expressed as 0.2.0 under 0.x semver. design-stage:CTR-001 keeps
+  its shape; the architect's module guidance moves from 7 exports / 8
+  ids / 40 tests to 12 exports / 16 ids / 80 tests and asks for the
+  fewest modules whose chain fits the depth cap. design-stage:BEH-002:
+  the planner merges modules along depends_on edges from the leaves up
+  until the graph fits (a merged task takes the union of owns globs,
+  covers and designRefs), and maxTests is bounded to [4, 80].
+tests_old_behavior:
+  - every existing validation rule still fires with its rule name and offending ids
+tests_new_behavior:
+  - to:design-stage:CTR-003
+  - to:design-stage:BEH-002
+test_obligation:
+  predicate: |
+    Given tasks.json with a four-task chain and graphDepth 3, the
+    validator reports graph_too_deep with the four ids in chain order
+    and the plan effect publishes design.rework{target: planner} naming
+    the rule; a task covering one id while nine are eligible reports
+    task_too_small unless its writes own src/index.ts; a three-level
+    graph of tasks covering three or more ids each passes; graphDepth
+    and minCoversPerTask load from factory.config.json with the defaults
+    3 and 3.
+  test_template: unit
+  boundary_classes:
+    - chain one longer than the cap
+    - chain exactly at the cap
+    - one-cover task that owns src/index.ts
+    - one-cover task elsewhere
+  failure_scenarios:
+    - the chain reported without its order
+    - the composition root reported as too small
+---
+```
+
+```yaml
+---
+id: design-stage:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:14.178Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: design-stage
+title: design-files 0.2.0 -> 0.2.1 - an unparseable design file goes to the simple-fixer before the author rework
+target_ids:
+  - design-stage:CTR-001
+  - design-stage:CTR-002
+  - design-stage:CTR-003
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact:
+  - id: design-stage:SUR-001
+    intended_version: "0.2.1"
+description: |
+  design-stage:DLT-001 sends an unparseable design/tech.md or
+  design/verification.md back to its author once; that rework costs a
+  full architect or verification-designer run for a quoting mistake.
+  factory:BEH-012 puts the simple-fixer in front of that route: when
+  design/tech.md or design/verification.md fails to parse, or
+  design/tasks.json is not JSON, and simpleFixes(author, design) is below
+  factory:CST-005, the fixer runs with trigger design_file_invalid
+  (allowed path: the failing file, format only), the file is parsed
+  again after each run and a parseable file continues the usual
+  validation; when the fixer is exhausted the DLT-001 route applies
+  unchanged (one author rework, then design.blocked), and for tasks.json
+  the existing design.rework{target: planner}.
+  The error_taxonomy rows of design-stage:CTR-001 and CTR-002 for
+  "unparseable file" and of CTR-003 for "not JSON" gain the prefix
+  "simple-fixer per factory:BEH-012, then". A missing file still blocks
+  at once (nothing to repair). design-stage:SUR-001 0.2.0 -> 0.2.1.
+tests_old_behavior:
+  - a missing design file still ends in design.blocked at once; a parseable tech.md with an unpinned dependency still goes to the architect without a fixer run
+tests_new_behavior:
+  - to:factory:BEH-012
+test_obligation:
+  predicate: |
+    Given a verification-designer whose output has an unterminated quoted
+    scalar and a fake fixer that closes it, the effect publishes
+    design.verification.ready after one fix.attempted and the designer
+    was invoked once; given a fixer that never repairs, two fix.attempted
+    events precede design.rework{target: verification-designer} with the
+    parser message; given a tasks.json with a trailing comma, the fixer
+    runs before any design.rework{target: planner}.
+  test_template: integration
+  boundary_classes:
+    - verification.md fixed
+    - verification.md unfixed at the cap
+    - tasks.json not JSON
+    - missing file (no fixer)
+  failure_scenarios:
+    - author rework before the fixer cap
+    - fixer run for a missing file
 ---
 ```
 

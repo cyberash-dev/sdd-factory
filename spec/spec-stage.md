@@ -1162,6 +1162,69 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-006
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:13.848Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: spec-stage
+title: a yaml_invalid lint diagnostic goes to the simple-fixer before the stage blocks
+target_ids:
+  - spec-stage:BEH-001
+  - spec-stage:BEH-003
+  - spec-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  spec-stage:DLT-005 made a record fence the yaml parser rejects visible
+  as a yaml_invalid diagnostic; the analyst repairs it inside its lint
+  cycles, and when the cycles run out the stage blocks over a quoting
+  mistake. factory:BEH-012 adds a cheaper repair step: every foreman lint
+  of the product spec (after the analyst handoff in spec-stage:BEH-001,
+  including a handoff with blocked_reason lint_cap; after a revision in
+  spec-stage:BEH-003; before approval) whose diagnostics include at least
+  one yaml_invalid entry invokes the simple-fixer with trigger
+  spec_yaml_invalid (allowed paths spec/spec.md and spec/assumptions.md,
+  format only) up to factory:CST-005, re-running the lint after each
+  run. A lint that exits 0 after a fix continues the flow (spec.drafted,
+  spec.revised or the approval); a lint that still fails follows the
+  existing paths (spec.blocked with lint_cap or lint_failed). The
+  analyst's own lint cycles and spec-stage:CST-001 are unchanged.
+  spec-stage:CTR-001 error_taxonomy row for yaml_invalid gains
+  "=> simple-fixer per factory:BEH-012, then the existing route".
+tests_old_behavior:
+  - a lint failure without yaml_invalid diagnostics still blocks with the existing reasons and never invokes the fixer
+tests_new_behavior:
+  - to:factory:BEH-012
+test_obligation:
+  predicate: |
+    Given an analyst handoff with status complete and a spec whose one
+    fence has an unquoted colon, and a fake fixer that quotes it, the
+    stage publishes spec.drafted{lintExit: 0} after one fix.attempted;
+    given a handoff with blocked_reason lint_cap over the same defect, the
+    stage publishes spec.drafted instead of spec.blocked; given a lint
+    failing on a missing required field only, no fixer runs and
+    spec.blocked carries lint_failed.
+  test_template: integration
+  boundary_classes:
+    - yaml_invalid after a complete handoff
+    - yaml_invalid after a lint_cap handoff
+    - semantic lint failure (no fixer)
+  failure_scenarios:
+    - fixer invoked without a yaml_invalid diagnostic
+    - spec.drafted published while lint still fails
+---
+```
+
 ---
 
 ## 16. Implementation bindings

@@ -121,7 +121,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: assembly-stage
 name: assembly-files
-version: "0.1.0"
+version: "0.2.0"
 boundary_type: public_storage
 members:
   - assembly-stage:CTR-001
@@ -1307,7 +1307,73 @@ none
 
 ## 15. Deltas
 
-none
+```yaml
+id: assembly-stage:DLT-001
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:13.518Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: assembly-stage
+title: assembly-files 0.1.0 -> 0.2.0 - mechanical red steps go to the simple-fixer before triage
+target_ids:
+  - assembly-stage:BEH-003
+  - assembly-stage:BEH-005
+  - assembly-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: assembly-stage:SUR-001
+    intended_version: "0.2.0"
+description: |
+  A typecheck error or a test file that fails to load on the integration
+  branch is a mechanical defect of the merged tree, yet today it goes to
+  triage and back to a lane for a full rework round. factory:BEH-012
+  inserts the simple-fixer in front of assembly-stage:BEH-005.
+  assembly-stage:BEH-003: when a step ends red with trigger
+  assembly_install (exit code not 0 and not NETWORK_FAILURE),
+  assembly_typecheck, or assembly_load_failure (load failures with zero
+  failed tests) and simpleFixes(assembler, run) is below factory:CST-005,
+  the foreman invokes the fixer in the integration checkout (allowed
+  paths: every file outside tests/** and spec/**); on outcome fixed the
+  changes are committed on integration as "fix assembly round <n> <k>"
+  with author simple-fixer and the sequence restarts at step install in
+  the same round; assembly.verified{result: red} for the repaired step is
+  published only when the fixer is exhausted. assembly-stage:BEH-005 is
+  then entered as before. assembly-stage:INV-001 holds: the assembler
+  authors none of the fix commits.
+  assembly-stage:CTR-001 report frontmatter gains
+  `fixes: [{round, attempt, trigger, outcome, commit_sha | null, files}]`
+  and the round section of the body lists each fix with its trigger and
+  outcome; assembly-stage:SUR-001 0.1.0 -> 0.2.0.
+tests_old_behavior:
+  - a red test step with failed assertions still routes by attribution (BEH-004) or triage (BEH-005) without a fixer run; NETWORK_FAILURE at install still takes the offline fallback
+tests_new_behavior:
+  - to:factory:BEH-012
+  - to:assembly-stage:CTR-001
+test_obligation:
+  predicate: |
+    With a scripted command runner whose first typecheck fails and passes
+    after a fake fixer edit under src/, the integration branch carries a
+    commit "fix assembly round 1 1" authored simple-fixer, the sequence
+    runs install, typecheck, test and sdd_ready again, no assembly.triaged
+    is published and the report frontmatter lists one fix with outcome
+    fixed; with a fixer that never repairs, two fix.attempted events
+    precede assembly.verified{result: red, step: typecheck} and triage.
+  test_template: unit
+  boundary_classes:
+    - typecheck fixed on the first run
+    - typecheck unfixed at the cap
+    - failed assertion (no fixer)
+  failure_scenarios:
+    - fix commit authored by the assembler
+    - triage invoked before the fixer cap
+```
 
 ---
 

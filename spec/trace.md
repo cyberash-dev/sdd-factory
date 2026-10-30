@@ -112,7 +112,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: trace
 name: trace-files
-version: "0.3.1"
+version: "0.4.0"
 boundary_type: public_storage
 members:
   - trace:CTR-001
@@ -1474,6 +1474,67 @@ test_obligation:
   failure_scenarios:
     - the lane inference priced from the table
     - a "no price for model claude-opus-5-5" warning for a lane
+---
+```
+
+```yaml
+---
+id: trace:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:14.510Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: trace
+title: trace-files 0.3.1 -> 0.4.0 - fixer runs are costed and listed in the report
+target_ids:
+  - trace:SUR-001
+  - trace:BEH-005
+  - trace:CTR-002
+  - trace:CTR-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: trace:SUR-001
+    intended_version: "0.4.0"
+description: |
+  The simple-fixer (factory:BEH-012) is a subprocess role whose cost
+  arrives in the fix.attempted payload (bus:CTR-009). trace:BEH-005 also
+  covers fix.attempted: one cost entry with participant simple-fixer,
+  stage and taskId copied from the payload, model null and the payload's
+  costUsd, inputTokens, outputTokens and durationMs verbatim.
+  trace:CTR-002 trace.md: the per-task table gains a "fixes" column with
+  the count and the task section lists every fix as
+  "fix <attempt> <trigger> -> <outcome> (<files>, <cost>)"; the spec,
+  design and assembly stage sections list their fixes the same way, so a
+  judge sees where the factory repaired itself and what it cost.
+  trace:CTR-004 costs.json: participant gains the value simple-fixer.
+  trace:SUR-001 0.3.1 -> 0.4.0.
+tests_old_behavior:
+  - task.tests_written and task.impl_done entries are unchanged; a run without fixer events renders the same trace.md as before except for a zero fixes column
+tests_new_behavior:
+  - to:trace:BEH-005
+  - to:trace:CTR-002
+test_obligation:
+  predicate: |
+    A fix.attempted event with costUsd 0.07 for T-002 produces one ledger
+    entry {participant: simple-fixer, taskId: T-002, costUsd: 0.07, model:
+    null}, trace.md shows 1 in the fixes column of T-002 and a line with
+    the trigger and outcome in its section, and totals equal the ledger
+    sum (trace:INV-002).
+  test_template: unit
+  boundary_classes:
+    - one fixer event on a task
+    - fixer event on the assembly stage (taskId null)
+    - no fixer events
+  failure_scenarios:
+    - fixer cost re-priced from the table
+    - fixer cost missing from totals
 ---
 ```
 

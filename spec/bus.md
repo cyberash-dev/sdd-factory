@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.4.0"
+version: "0.5.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -127,6 +127,7 @@ members:
   - bus:BEH-005
   - bus:BEH-006
   - bus:BEH-007
+  - bus:CTR-009
 consumer_compat_policy: semver_per_surface
 notes: |
   Consumers are every participant of the runtime and the tracer. Adding
@@ -1318,6 +1319,74 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: bus:CTR-009
+type: Contract
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:12.524Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: bus
+title: fixer events
+surface_ref: bus:SUR-001
+schema:
+  fix.attempted:
+    stage: string, spec | design | build | assembly
+    taskId: string or null, ^T-[0-9]{3}$ for lane triggers
+    unit: string, the task id | spec | design | run
+    owner: string, spec-analyst | architect | verification-designer | planner | test-writer | implementer | assembler
+    trigger: string, spec_yaml_invalid | design_file_invalid | red_suite_error | green_typecheck | green_load_failure | assembly_install | assembly_typecheck | assembly_load_failure
+    attempt: integer, 1-based per (owner, unit)
+    outcome: string, fixed | unfixed | discarded
+    filesChanged: array of string, paths relative to the fixer's directory
+    answerPath: string, handoffs/<unit>/simple-fixer/answer-run<n>.md
+    costUsd: number or null
+    inputTokens: integer
+    outputTokens: integer
+    durationMs: integer
+preconditions:
+  - the triggering check of factory:BEH-012 ended red and simpleFixes(owner, unit) was below factory:CST-005 before the run
+postconditions:
+  - exactly one fix.attempted per fixer subprocess run
+  - the producer is simple-fixer and the sender is the fixer participant joined for the unit (bus:BEH-007)
+external_identifiers:
+  - event type fix.attempted and the enum values of stage, owner, trigger and outcome
+compatibility_rules:
+  - adding a trigger value, an owner value or a payload field => minor bump
+  - removing or renaming => major bump
+error_taxonomy:
+  - "envelope_invalid — see bus:CTR-001"
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: multi_per_resource
+  read_consistency: strong
+  idempotency: "exactly_once_with_key:(owner,unit,attempt)"
+  time_source: monotonic
+data_scope: new_writes_only
+policy_refs:
+  - factory:POL-002
+  - factory:POL-003
+test_obligation:
+  predicate: |
+    A fix.attempted payload with every field passes envelope validation;
+    a payload with an unknown trigger or without outcome is rejected with
+    envelope_invalid.
+  test_template: contract
+  boundary_classes:
+    - full payload
+    - unknown trigger
+    - missing outcome
+  failure_scenarios:
+    - unknown trigger accepted
+---
+```
+
 ---
 
 ## 8. Invariants
@@ -1927,6 +1996,68 @@ test_obligation:
     - a value outside the enum
   failure_scenarios:
     - the enum widened to any string
+---
+```
+
+```yaml
+---
+id: bus:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:12.854Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.4.0 -> 0.5.0 - simple-fixer producer, fix.attempted event, fix counters in state.json
+target_ids:
+  - bus:SUR-001
+  - bus:CTR-001
+  - bus:CTR-008
+  - bus:BEH-007
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.5.0"
+description: |
+  factory:BEH-012 introduces the simple-fixer, a Claude Code subprocess
+  that repairs mechanical failures (broken yaml, missing imports,
+  typecheck errors, load failures) before the owning role is re-run.
+  bus:CTR-001 gains the producer `simple-fixer`; bus:BEH-007 treats it
+  like a lane role: a participant named simple-fixer with capabilities
+  `lane` and `unit:<unit>` is joined for each fixer run and left when the
+  run ends, and the fix.attempted event is sent by that participant.
+  bus:CTR-009 (fixer events) joins the members of bus:SUR-001.
+  bus:CTR-008 state.json gains `simpleFixes: object, key "<owner>:<unit>"
+  -> integer` holding the attempts per factory:CST-005 pair; the
+  counters are monotonic like every other attempt counter (bus:INV-002).
+  Existing event types, producers and payloads are unchanged.
+tests_old_behavior:
+  - bus:CTR-001 envelope test stays green for every existing producer; bus:CTR-005 payloads are unchanged
+tests_new_behavior:
+  - to:bus:CTR-009
+  - to:factory:BEH-012
+test_obligation:
+  predicate: |
+    A fix.attempted event published by producer simple-fixer while a fixer
+    participant for its unit is joined passes validation and is delivered
+    with that participant's producerId; the same publication without a
+    joined fixer participant fails with producer_not_joined; after the
+    event state.json carries simpleFixes["<owner>:<unit>"] incremented by
+    one.
+  test_template: contract
+  boundary_classes:
+    - joined fixer participant
+    - no fixer participant
+    - counter after one and two attempts
+  failure_scenarios:
+    - fix.attempted accepted from an unjoined producer
+    - counter reset between attempts
 ---
 ```
 

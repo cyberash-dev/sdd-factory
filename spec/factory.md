@@ -909,6 +909,114 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:BEH-012
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:12.196Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: factory
+title: simple-fixer repairs a mechanical failure in place before the owning role is re-run or the stage blocks
+given: |
+  - a stage check ended red with one of the triggers of the table below
+  - simpleFixes(owner, unit) < caps.simpleFixes (factory:CST-005)
+when: the foreman invokes the simple-fixer
+then: |
+  - the simple-fixer runs as one Claude Code CLI subprocess
+    (build-stage:EXT-001, same argv and environment allow-list as the
+    lanes, model models.lane) in the directory of the failure; its prompt
+    carries the failing command's output verbatim, the allowed paths and
+    the forbidden actions; for the duration of the run a Mozaik
+    participant named simple-fixer with capabilities lane and
+    "unit:<unit>" is joined and the event below is sent by it (bus:BEH-007)
+  - trigger table (closed list):
+      | trigger | owner | unit | directory | allowed paths |
+      | spec_yaml_invalid: a foreman lint of the product spec reports at least one yaml_invalid diagnostic | spec-analyst | spec | product dir | spec/spec.md and spec/assumptions.md, format only |
+      | design_file_invalid: design/tech.md or design/verification.md fails to parse, or design/tasks.json is not JSON | architect, verification-designer or planner | design | product dir | the failing file, format only |
+      | red_suite_error: red check typecheck exit code not 0 or a load failure | test-writer | task id | worktree of T | files matching T.writes |
+      | green_typecheck, green_load_failure: green check typecheck exit code not 0, or a load failure with zero failed tests | implementer | task id | worktree of T | files matching T.writes outside tests/** |
+      | assembly_install (exit not 0 and not NETWORK_FAILURE), assembly_typecheck, assembly_load_failure (load failures with zero failed tests) | assembler | run | integration checkout | every file outside tests/** and spec/** |
+  - format only means that every record or block that parsed before the
+    run parses to identical data after it and every record id present
+    before is present after; records that were unparseable before are
+    free to become parseable
+  - after the subprocess exits the foreman diffs the directory against the
+    pre-run snapshot; when a changed file lies outside the allowed paths
+    or a format-only rule is violated, every change is reverted (tracked
+    files restored, untracked files deleted) and the outcome is
+    discarded; otherwise the triggering check is re-run and the outcome
+    is fixed when it passes, unfixed when it still fails
+  - per trigger, a fixed outcome is recorded as follows: red_suite_error
+    commits the changes outside tests/** as "fix <T.id> red <n>" and that
+    commit becomes T.baseSha for the red check; green_* changes stay in
+    the working tree as part of the implementer attempt; assembly_*
+    changes are committed on integration as "fix assembly round <n> <k>"
+    with author simple-fixer and the verification sequence restarts at
+    step install inside the same round; spec and design files stay in
+    place for the usual lint or parse
+  - the fixer writes no handoff; its final answer is saved as
+    handoffs/<unit>/simple-fixer/answer-run<n>.md and
+    fix.attempted{stage, taskId, unit, owner, trigger, attempt, outcome,
+    filesChanged, answerPath, costUsd, inputTokens, outputTokens,
+    durationMs} (bus:CTR-009) is published after every run;
+    simpleFixes(owner, unit) is incremented
+  - outcome fixed: the owning role's flow continues as if the check had
+    passed; outcome unfixed or discarded below the cap: the fixer runs
+    again with the new output; at the cap: the stage's original failure
+    path applies (rejection, rework, triage or block) and the owner's
+    attempt counts once, as before
+negative_cases:
+  - fixer edits an assertion of a frozen test on a green trigger => tests/** is outside the allowed paths => discarded and the tests restored
+  - fixer changes a field value of a record that already parsed => format-only violated => discarded
+  - the test run has failed assertions => no trigger: the failure goes to the owning role as before
+  - fixer adds a dependency to package.json inside a lane => outside T.writes => discarded (factory:CST-004 unchanged)
+  - the failing command is a missing runner => build-stage:BEH-011 re-provision applies, not the fixer
+out_of_scope:
+  - failures of an LLM role itself (timeouts, missing handoffs) - factory:BEH-011 and bus:BEH-003
+  - assertion failures, review findings, design contradictions and planner re-cuts
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: single
+  read_consistency: strong
+  idempotency: "exactly_once_with_key:(owner,unit,attempt)"
+  time_source: monotonic
+data_scope: all_data
+policy_refs:
+  - factory:POL-001
+  - factory:POL-002
+test_obligation:
+  predicate: |
+    With a fake CLI runner scripted per case: (a) a red_suite_error whose
+    fixer adds the missing import to a stub yields outcome fixed, a new
+    baseSha commit and task.tests_red; (b) a green_typecheck whose fixer
+    edits a test file yields outcome discarded, the test file byte-equal
+    to testsSha and a second fixer run; (c) a spec_yaml_invalid whose
+    fixer changes a field of a parseable record yields discarded and the
+    file equal to the snapshot; (d) an assembly_typecheck whose fixer
+    repairs src/ yields a fix commit authored simple-fixer and the
+    sequence restarting at install; every case publishes one
+    fix.attempted per run with the cost fields of the subprocess.
+  test_template: integration
+  boundary_classes:
+    - fixed red trigger
+    - discarded by allowed paths
+    - discarded by format-only
+    - fixed assembly trigger
+    - unfixed at the cap
+  failure_scenarios:
+    - a change outside the allowed paths survives
+    - the owner's attempt counted twice around a fix
+    - fix.attempted missing for a discarded run
+---
+```
+
 ---
 
 ## 7. Data contracts
@@ -1840,6 +1948,46 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:CST-005
+type: Constraint
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:11.865Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: factory
+title: simple fixes per owning role and unit
+constraint: |
+  The simple-fixer (factory:BEH-012) runs at most caps.simpleFixes times
+  for one pair (owner role, unit), where unit is the task id for lane
+  triggers, the stage name for spec and design triggers and the literal
+  "run" for assembly triggers; the shipped value is 2 and the key lives
+  in factory.config.json next to the other caps.
+rationale: |
+  A repair loop without a cap turns a wrong design into an endless series
+  of cosmetic edits; two attempts cover the observed classes (one missing
+  import, one broken yaml scalar) while keeping the stage budget bounded.
+test_obligation:
+  predicate: |
+    With caps.simpleFixes = 2 and a fixer that never repairs the failure,
+    exactly two fix.attempted events are published for the pair before
+    the original failure path runs; a third invocation never happens, and
+    the counter of another task stays at zero.
+  test_template: unit
+  boundary_classes:
+    - cap reached
+    - fixed outcome below the cap
+  failure_scenarios:
+    - third fixer run
+    - counter shared between two tasks
+---
+```
+
 ---
 
 ## 14. Migrations
@@ -2135,6 +2283,70 @@ test_obligation:
     - terminated reason in the manifest
   failure_scenarios:
     - the signal handler installed before the run has a state to report
+---
+```
+
+```yaml
+---
+id: factory:DLT-006
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:11.534Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: factory
+title: resume restarts every lane that was in flight, not only the last effectful event
+target_ids:
+  - factory:BEH-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  factory:BEH-009 redoes a single event: the latest one whose
+  transition produced an effect. In the build stage several lanes run
+  at once, so when run 11 failed, T-003 was waiting for its lane
+  restart, T-002 had a test-writer subprocess dropped and T-007 a
+  reviewer that never returned; a resume that redoes only the last
+  event leaves the other tasks in an in-flight status with no lane
+  behind them, and the run hangs. The redo set now holds, in sequence
+  order: the latest effectful event, and for every task whose status
+  in the seeded state is tests_pending, impl_pending, verify_pending or
+  review_pending and that the latest event does not already restart,
+  the last applied event of that task whose transition produced an
+  effect (its lane entry: task.ready, task.tests_red, task.impl_done or
+  task.verified). The seeded state is the state before the latest
+  effectful event with each such task's own state rolled back to what
+  it was before its lane entry event, so re-applying the entry event
+  numbers the attempt as the original run did. Run-level fields are not
+  touched by the roll-back. The fix_between_runs note lists every
+  redone event as "<type> seq <n>".
+tests_old_behavior:
+  - a failed run with no task in flight resumes exactly as before (one redo event)
+tests_new_behavior:
+  - to:factory:BEH-009
+test_obligation:
+  predicate: |
+    Given a trace in which T-001 is approved, T-002's task.ready was
+    applied with a test-writer effect, T-003's task.tests_rejected was
+    the latest effectful event and run.failed followed, the plan's redo
+    events are task.ready(T-002) then task.tests_rejected(T-003) in seq
+    order, the seeded state has T-002 at status ready with its attempt
+    counters as before task.ready, T-003 at its state before the
+    rejection, and T-001 approved; a trace whose latest effectful event
+    is spec.approved yields a single redo event.
+  test_template: unit
+  boundary_classes:
+    - two lanes in flight
+    - no lane in flight
+    - the in-flight task is the one the latest event restarts
+  failure_scenarios:
+    - a task rolled back past an approval
+    - redo events published out of sequence order
 ---
 ```
 

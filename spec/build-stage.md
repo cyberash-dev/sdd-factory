@@ -135,7 +135,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: build-stage
 name: lane-files
-version: "0.1.0"
+version: "0.2.0"
 boundary_type: public_storage
 members:
   - build-stage:CTR-001
@@ -2257,6 +2257,213 @@ test_obligation:
     - without model
   failure_scenarios:
     - the flag dropped when addDirs is empty
+---
+```
+
+```yaml
+---
+id: build-stage:DLT-003
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:10.881Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: build-stage
+title: stubs keep the import lines of the module interface
+target_ids:
+  - build-stage:BEH-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The architect's public interface for a module legitimately imports
+  types from another module's entry (`import type { Result } from
+  "../errors/index.js"`); run 11's stub for src/cli/index.ts dropped
+  that line, referenced `Result` anyway, failed `tsc --noEmit` in every
+  worktree that carried it and the red check reported suite_error for
+  tests that were fine. The stub of build-stage:BEH-001 now starts with
+  every `import` line of the interface block, verbatim, before the
+  throwing exports; an interface without imports yields the same stub as
+  before. The imported module is always available: a task depends on
+  the tasks whose interfaces it imports, so their code is merged before
+  its worktree is created, and for a module of the same task the stub
+  exists in the same scaffold. The architect prompt names the rule: a
+  type from another module is imported from that module's entry with
+  `import type`, never redeclared.
+tests_old_behavior:
+  - an interface without import lines produces the same stub as today
+tests_new_behavior:
+  - to:build-stage:BEH-001
+test_obligation:
+  predicate: |
+    Given a module whose interface block is `import type { Result } from
+    "../errors/index.js";` followed by one exported function returning
+    `Result<string>`, the stub source starts with that import line and
+    the function throws not implemented; an interface without imports
+    yields a stub without import lines.
+  test_template: unit
+  boundary_classes:
+    - one type import
+    - no imports
+  failure_scenarios:
+    - the import duplicated per export
+    - a value import turned into a type import
+---
+```
+
+```yaml
+---
+id: build-stage:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:11.207Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: build-stage
+title: a reviewer that produces no handoff falls back to the default model, then approves on evidence as advisory
+target_ids:
+  - build-stage:BEH-012
+  - build-stage:BEH-013
+  - build-stage:BEH-015
+  - build-stage:BEH-016
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  In run 11 the reviewer (z-ai/glm-5.3-flash) answered the T-007 review
+  three times in prose without calling a tool, so no handoff appeared,
+  build-stage:BEH-015 ran out of re-runs and build-stage:BEH-016 failed
+  the whole run over a task whose tests were green, frozen and inside
+  its write-set. The review is a quality layer on top of the Verifier,
+  not the gate, so a reviewer that cannot produce a handoff must not
+  end the run. After the BEH-015 re-runs the foreman invokes the
+  reviewer once more with `models.default` when it differs from the
+  configured reviewer model (model fallback, same message plus the
+  re-run note); when that run also yields no parseable handoff the
+  foreman itself publishes `task.reviewed{taskId, decision:
+  "advisory_only", target: "none", reportPath: "", specIds: [],
+  findingText: "review unavailable: reviewer produced no handoff after
+  <N> runs"}` with the usage of the last run, and BEH-013 approves the
+  task on the Verifier's green evidence; the trace carries the advisory
+  text so the gap is visible in trace.md. The missing-handoff path of
+  BEH-015 is unchanged for the test-writer and the implementer, whose
+  output cannot be replaced by evidence. For every API role the runner
+  also keeps the model's final answer as `answer-run<N>.md` next to the
+  tool trace, so a run that ends without a handoff can be read
+  afterwards.
+tests_old_behavior:
+  - a reviewer handoff on the first or second run still routes per BEH-013; a test-writer without a handoff still fails the task per BEH-015
+tests_new_behavior:
+  - to:build-stage:BEH-012
+  - to:build-stage:BEH-013
+test_obligation:
+  predicate: |
+    Given a reviewer runner that writes no handoff on every invocation
+    while the configured reviewer model differs from the default, the
+    effect invokes the role handoffRerun + 2 times, the last with
+    models.default, then publishes task.reviewed{decision: advisory_only,
+    target: none} with findingText starting "review unavailable" and no
+    task.failed; given the same models, no extra invocation happens; the
+    reviewer's final answer text is on disk next to its tool trace.
+  test_template: integration
+  boundary_classes:
+    - no handoff, distinct reviewer model
+    - no handoff, same model
+    - handoff on the fallback run
+  failure_scenarios:
+    - task.failed published for a reviewer without a handoff
+    - the fallback invoked with the reviewer model
+---
+```
+
+```yaml
+---
+id: build-stage:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T19:08:13.184Z
+    change_request: "run 11: task graph size, stub imports, reviewer fallback, multi-lane resume, simple-fixer"
+    scope: first-time-approval
+partition_id: build-stage
+title: lane-files 0.1.0 -> 0.2.0 - mechanical red and green failures go to the simple-fixer before the lane is restarted or reworked
+target_ids:
+  - build-stage:BEH-003
+  - build-stage:BEH-004
+  - build-stage:BEH-006
+  - build-stage:BEH-007
+  - build-stage:BEH-017
+  - build-stage:SUR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: build-stage:SUR-001
+    intended_version: "0.2.0"
+description: |
+  In run 11 task T-003 was rejected with suite_error because the stub
+  lacked one import line: a 5-minute, $3 test-writer lane was restarted
+  over a one-line mechanical defect. factory:BEH-012 inserts the
+  simple-fixer in front of both lane failure paths.
+  build-stage:BEH-003 "on fail": when the reason is suite_error and
+  simpleFixes(test-writer, T) is below factory:CST-005 the foreman
+  invokes the fixer (trigger red_suite_error, allowed paths T.writes);
+  on outcome fixed its changes outside tests/** are committed as
+  "fix <T.id> red <n>", T.baseSha moves to that commit so rule (e) is
+  evaluated against it, and the red check continues from "the check
+  passes iff"; at the cap task.tests_rejected is published as before
+  and build-stage:BEH-004 restarts the lane.
+  build-stage:BEH-006 "on fail": when the typecheck exit code is not 0,
+  or the report shows load failures with zero failed tests, and
+  simpleFixes(implementer, T) is below the cap, the fixer runs (triggers
+  green_typecheck, green_load_failure, allowed paths T.writes outside
+  tests/**); on fixed the whole green check re-runs; at the cap
+  task.verified{result: red} is published as before and
+  build-stage:BEH-007 routes to the implementer. A test run with failed
+  assertions never invokes the fixer. testsUnchanged, writeSetOk and
+  build-stage:INV-001 keep their checks; a fixer edit to a frozen test
+  is discarded by factory:BEH-012 before they run.
+  build-stage:BEH-017: the simple-fixer joins a lane-style participant
+  for the task during each fixer run.
+  build-stage:SUR-001 lane-files gains the file
+  handoffs/<taskId>/simple-fixer/answer-run<n>.md (the fixer's final
+  answer); no change to CTR-001 or CTR-002.
+tests_old_behavior:
+  - rejections vacuous, missing_covers, orphan_covers and outside_write_set still restart the lane without a fixer run; a green check red on failed assertions still routes to the implementer without a fixer run
+tests_new_behavior:
+  - to:factory:BEH-012
+  - to:factory:CST-005
+test_obligation:
+  predicate: |
+    Given a red check whose first typecheck fails on a missing stub import
+    and a fake fixer that adds it, task.tests_red is published with
+    testsSha on top of a "fix T-001 red 1" commit and no
+    task.tests_rejected; given a fixer that never repairs, two
+    fix.attempted events precede task.tests_rejected{reason: suite_error};
+    given a green check red on one failed assertion, no fixer runs and
+    task.verified{result: red} is published at once.
+  test_template: integration
+  boundary_classes:
+    - red suite_error fixed on the first run
+    - red suite_error unfixed at the cap
+    - green typecheck fixed
+    - green failed assertion (no fixer)
+  failure_scenarios:
+    - fixer run for a vacuous rejection
+    - testsSha recorded without the fix commit as its parent
 ---
 ```
 
