@@ -10,6 +10,9 @@ export interface Caps {
   readonly criticAssumptionsPerId: number;
   readonly assemblyRounds: number;
   readonly handoffRerun: number;
+  readonly graphDepth: number;
+  readonly minCoversPerTask: number;
+  readonly simpleFixes: number;
 }
 
 export interface Timeouts {
@@ -60,6 +63,9 @@ export const DEFAULT_CONFIG: FactoryConfig = {
     criticAssumptionsPerId: 1,
     assemblyRounds: 2,
     handoffRerun: 1,
+    graphDepth: 3,
+    minCoversPerTask: 3,
+    simpleFixes: 2,
   },
   timeouts: {
     specStageMs: 20 * 60 * 1000,
@@ -150,6 +156,9 @@ export function mergeConfig(base: FactoryConfig, override: unknown): FactoryConf
       criticAssumptionsPerId: pickInteger(caps, "criticAssumptionsPerId", base.caps.criticAssumptionsPerId),
       assemblyRounds: pickInteger(caps, "assemblyRounds", base.caps.assemblyRounds),
       handoffRerun: pickInteger(caps, "handoffRerun", base.caps.handoffRerun),
+      graphDepth: pickInteger(caps, "graphDepth", base.caps.graphDepth),
+      minCoversPerTask: pickInteger(caps, "minCoversPerTask", base.caps.minCoversPerTask),
+      simpleFixes: pickInteger(caps, "simpleFixes", base.caps.simpleFixes),
     },
     timeouts: {
       specStageMs: pickInteger(timeouts, "specStageMs", base.timeouts.specStageMs),

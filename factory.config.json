@@ -8,7 +8,10 @@
     "architectRepairs": 2,
     "criticAssumptionsPerId": 1,
     "assemblyRounds": 2,
-    "handoffRerun": 2
+    "handoffRerun": 2,
+    "graphDepth": 3,
+    "minCoversPerTask": 3,
+    "simpleFixes": 2
   },
   "timeouts": {
     "specStageMs": 2400000,

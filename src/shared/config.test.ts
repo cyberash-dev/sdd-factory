@@ -24,6 +24,14 @@ describe("factory config", () => {
     ]);
   });
 
+  // @covers factory:CST-005
+  // @covers design-stage:DLT-004
+  it("reads the graph depth, task size and simple-fix caps with their shipped defaults", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { caps: { graphDepth: 4, simpleFixes: 1 } });
+
+    expect([merged.caps.graphDepth, merged.caps.minCoversPerTask, merged.caps.simpleFixes, DEFAULT_CONFIG.caps.graphDepth, DEFAULT_CONFIG.caps.minCoversPerTask, DEFAULT_CONFIG.caps.simpleFixes]).toEqual([4, 3, 1, 3, 3, 2]);
+  });
+
   // @covers factory:DLT-002
   it("reads the reviewer model and falls back to the default model while it is unset", () => {
     const withReviewer = mergeConfig(DEFAULT_CONFIG, { models: { default: "claude-opus-5-5", reviewer: "gpt-6.1-sol" } });
