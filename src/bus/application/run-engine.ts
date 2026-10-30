@@ -13,7 +13,12 @@ export interface RunEngineDeps {
   readonly publisher: EventPublisher;
   readonly effects: EffectRunner;
   readonly log: (line: string) => void;
+  readonly quiescenceMs?: number;
 }
+
+const DEFAULT_QUIESCENCE_MS = 2000;
+
+type EngineFailureReason = "runtime_error" | "trace_write_failed" | "terminated" | "stalled";
 
 export type ConsumeOutcome = ReduceOutcome["kind"] | "terminal_ignored";
 
@@ -21,10 +26,21 @@ function errorText(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
+function stallDetailOf(state: RunState): string {
+  const open = Object.entries(state.tasks)
+    .filter(([, task]) => task.status !== "approved" && task.status !== "failed")
+    .map(([taskId, task]) => `${taskId} ${task.status} last=${task.lastEvent}`);
+  return open.length === 0 ? state.status : open.join("; ");
+}
+
 export class RunEngine {
   private current: RunState;
   private readonly consumed = new Set<string>();
   private queue: Promise<unknown> = Promise.resolve();
+  private eventsQueued = 0;
+  private effectsInFlight = 0;
+  private stallTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasPublishedFailure = false;
 
   constructor(private readonly deps: RunEngineDeps) {
     this.current = deps.initialState;
@@ -35,7 +51,12 @@ export class RunEngine {
   }
 
   consume(event: DeliveredEvent<EventType>): Promise<ConsumeOutcome> {
-    const next = this.queue.then(() => this.handle(event));
+    this.eventsQueued += 1;
+    this.disarmStallWatchdog();
+    const next = this.queue.then(() => this.handle(event)).finally(() => {
+      this.eventsQueued -= 1;
+      this.armStallWatchdog();
+    });
     this.queue = next.catch(() => undefined);
     return next;
   }
@@ -44,12 +65,13 @@ export class RunEngine {
     this.deps.publisher.publish(pending);
   }
 
-  fail(stageHint: RunState["status"] | null, reason: "runtime_error" | "trace_write_failed" | "terminated", detail: string): void {
+  fail(stageHint: RunState["status"] | null, reason: EngineFailureReason, detail: string): void {
     if (isTerminalStatus(this.current.status)) {
       this.deps.log(`warning after terminal event: ${reason}: ${detail}`);
       return;
     }
     const stage = stageOf(stageHint ?? this.current.status, this.current.failure);
+    this.hasPublishedFailure = true;
     this.deps.publisher.publish({ type: "run.failed", producer: "foreman", payload: { stage, reason, detail } });
   }
 
@@ -87,8 +109,41 @@ export class RunEngine {
 
   private runEffect(effect: Parameters<EffectRunner["run"]>[0]): void {
     const context = { state: this.current, publish: (pending: PendingEvent) => this.publish(pending) };
-    this.deps.effects.run(effect, context).catch((error: unknown) => {
-      this.fail(null, "runtime_error", `effect ${effect.kind}: ${errorText(error)}`);
-    });
+    this.effectsInFlight += 1;
+    this.disarmStallWatchdog();
+    this.deps.effects
+      .run(effect, context)
+      .catch((error: unknown) => {
+        this.fail(null, "runtime_error", `effect ${effect.kind}: ${errorText(error)}`);
+      })
+      .finally(() => {
+        this.effectsInFlight -= 1;
+        this.armStallWatchdog();
+      });
+  }
+
+  private isQuiescent(): boolean {
+    return this.eventsQueued === 0 && this.effectsInFlight === 0 && !this.hasPublishedFailure && !isTerminalStatus(this.current.status);
+  }
+
+  /* bus:DLT-007: a ref'd timer, so the process stays alive while Mozaik delivers late events; any event or effect start disarms it. */
+  private armStallWatchdog(): void {
+    if (this.stallTimer !== null || !this.isQuiescent()) {
+      return;
+    }
+    const armedAtSeq = this.current.lastSeq;
+    this.stallTimer = setTimeout(() => {
+      this.stallTimer = null;
+      if (this.isQuiescent() && this.current.lastSeq === armedAtSeq) {
+        this.fail(null, "stalled", stallDetailOf(this.current));
+      }
+    }, this.deps.quiescenceMs ?? DEFAULT_QUIESCENCE_MS);
+  }
+
+  private disarmStallWatchdog(): void {
+    if (this.stallTimer !== null) {
+      clearTimeout(this.stallTimer);
+      this.stallTimer = null;
+    }
   }
 }

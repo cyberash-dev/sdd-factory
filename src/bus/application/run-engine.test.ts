@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { EventType } from "../domain/catalogue.js";
 import type { DeliveredEvent, EventPayload } from "../domain/envelope.js";
 import { createRunState, type RunState, type TaskState } from "../domain/run-state.js";
@@ -44,7 +44,7 @@ const explodingRule: TransitionRule = {
   },
 };
 
-function harness(options: { readonly failWriteOn?: number; readonly failEffect?: boolean; readonly initial?: RunState } = {}): Harness {
+function harness(options: { readonly failWriteOn?: number; readonly failEffect?: boolean; readonly initial?: RunState; readonly effectRuns?: () => Promise<void> } = {}): Harness {
   const published: PendingEvent[] = [];
   const journal: string[] = [];
   const snapshots: RunState[] = [];
@@ -77,9 +77,11 @@ function harness(options: { readonly failWriteOn?: number; readonly failEffect?:
         if (options.failEffect === true) {
           throw new Error("verifier crashed");
         }
+        await options.effectRuns?.();
       },
     },
     log: () => undefined,
+    quiescenceMs: 2000,
   });
   let delivered = 41;
   return {
@@ -197,5 +199,98 @@ describe("RunEngine", () => {
     h.engine.fail(null, "runtime_error", "late error");
 
     expect(h.published).toEqual([]);
+  });
+});
+
+describe("RunEngine stalled watchdog", () => {
+  function withFakeClock(): void {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+  }
+
+  // @covers bus:DLT-007
+  // @covers bus:BEH-006
+  it("fails a quiescent non-terminal run as stalled naming the open task, its status and its last event", async () => {
+    withFakeClock();
+    const h = harness();
+    await h.deliver("task.verified", verifiedGreen);
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(h.published.filter((event) => event.type === "run.failed").map((event) => event.payload)).toEqual([
+      { stage: "build", reason: "stalled", detail: "T-001 review_pending last=task.verified" },
+    ]);
+  });
+
+  // @covers bus:DLT-007
+  it("publishes no second run.failed after its own failure was delivered back without ending the run", async () => {
+    withFakeClock();
+    const h = harness();
+    await h.deliver("task.verified", verifiedGreen);
+    await vi.advanceTimersByTimeAsync(2000);
+    await h.deliver("run.failed", { stage: "build", reason: "stalled", detail: "T-001 review_pending last=task.verified" });
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(h.published.filter((event) => event.type === "run.failed")).toHaveLength(1);
+  });
+
+  // @covers bus:DLT-007
+  it("publishes no stalled failure while an effect is still running", async () => {
+    withFakeClock();
+    const h = harness({ effectRuns: () => new Promise<void>(() => undefined) });
+    await h.deliver("task.verified", verifiedGreen);
+
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(h.published.map((event) => event.type)).toEqual(["task.reviewed"]);
+  });
+
+  // @covers bus:DLT-007
+  it("publishes nothing for a run in a terminal status", async () => {
+    withFakeClock();
+    const h = harness({ initial: { ...buildingState("verify_pending"), status: "published" as const } });
+    await h.deliver("task.verified", verifiedGreen);
+
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(h.published).toEqual([]);
+  });
+
+  // @covers bus:DLT-007
+  it("leaves no watchdog timer pending once the run is terminal so the process can exit", async () => {
+    withFakeClock();
+    const h = harness({ initial: { ...buildingState("verify_pending"), status: "failed" as const } });
+
+    await h.deliver("task.verified", verifiedGreen);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  // @covers bus:DLT-007
+  it("publishes no stalled failure when a new event arrives inside the quiescence window", async () => {
+    withFakeClock();
+    const h = harness({ initial: buildingState("tests_pending") });
+    await h.deliver("task.verified", verifiedGreen);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.deliver("task.verified", verifiedGreen);
+
+    await vi.advanceTimersByTimeAsync(1500);
+
+    expect(h.published).toEqual([]);
+  });
+
+  // @covers bus:DLT-007
+  it("names the run status in the detail when no task exists", async () => {
+    withFakeClock();
+    const base = buildingState("verify_pending");
+    const h = harness({ initial: { ...base, status: "designing", tasks: {} } });
+    await h.deliver("design.tech.ready", { path: "design/tech.md" });
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(h.published.map((event) => event.payload)).toEqual([{ stage: "design", reason: "stalled", detail: "designing" }]);
   });
 });
