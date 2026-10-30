@@ -9,6 +9,7 @@ import type { RunState } from "../../../src/bus/domain/run-state.js";
 import type { Effect, PendingEvent } from "../../../src/bus/domain/transition.js";
 import type { EffectContext } from "../../../src/bus/ports/outbound/effect-runner.js";
 import { createBuildStageSlice, type DesignBundle } from "../../../src/build-stage/index.js";
+import type { DesignSource } from "../../../src/build-stage/ports/outbound/design-source.js";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../../../src/shared/config.js";
 import type { ApiRoleRunner } from "../../../src/shared/llm/api-role-runner.js";
 import type { CliRoleRunner } from "../../../src/shared/llm/cli-role-runner.js";
@@ -21,6 +22,7 @@ import { RUN_ID } from "./state.js";
 export interface HarnessOptions {
   readonly productDir: string;
   readonly design: DesignBundle;
+  readonly designSource?: DesignSource;
   readonly cliRoles?: CliRoleRunner;
   readonly apiRoles?: ApiRoleRunner;
   readonly commands?: RoutingOptions;
@@ -72,7 +74,7 @@ export async function aLaneHarness(options: HarnessOptions): Promise<LaneHarness
     },
     now: () => new Date("2026-10-29T12:00:00.000Z"),
   };
-  const slice = createBuildStageSlice({ commands, design: { load: async () => options.design }, delay: async () => undefined })(context);
+  const slice = createBuildStageSlice({ commands, design: options.designSource ?? { load: async () => options.design }, delay: async () => undefined })(context);
   return {
     context,
     slice,

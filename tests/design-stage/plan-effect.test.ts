@@ -259,6 +259,39 @@ describe("design.plan effect", () => {
     expect(h.published.map((event) => [event.type, event.payload["reason"]])).toEqual([["design.rework", "unrelated_task_changed: T-001"]]);
   });
 
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-009
+  it("on a re-cut during build reports the task whose finding caused it as changed even when its record is unchanged", async () => {
+    const previous: TaskInput[] = [
+      { id: "T-001", covers: ["todo-cli:CTR-001"], writes: ["src/cli/**", "tests/cli/**"] },
+      { id: "T-002", covers: ["todo-cli:BEH-002"], writes: ["src/store/**", "tests/store/**"] },
+      { id: "T-003", covers: ["todo-cli:CST-001"], writes: ["src/index.ts", "package.json", "tsconfig.json", "tests/e2e/**"], designRefs: ["M-02"] },
+    ];
+    const h = await harness({ scripts: { planner: [plannerWriting(previous)] } });
+    await seedDesign(h.productDir, techMdText({ devDependencies: ["typescript@7.0.2"] }));
+    await writeFile(join(h.productDir, "design", "tasks.json"), tasksJsonText(previous), "utf8");
+
+    await runPlanEffect({ kind: "design.plan", attempt: 2, reworkFinding: "TASK-OVERFLOW from T-001: budget exceeded", originTaskId: "T-001" }, h.context(stateIn("building")), h.slice, h.commandRunner);
+
+    expect(h.published.map((event) => [event.type, event.payload["changedTaskIds"]])).toEqual([["design.tasks.ready", ["T-001"]]]);
+  });
+
+  // @covers build-stage:DLT-008
+  it("keeps the origin task on the design.rework of a re-cut that failed validation", async () => {
+    const previous: TaskInput[] = [
+      { id: "T-001", covers: ["todo-cli:CTR-001"], writes: ["src/cli/**", "tests/cli/**"] },
+      { id: "T-002", covers: ["todo-cli:BEH-002"], writes: ["src/store/**", "tests/store/**"] },
+    ];
+    const overlapping: TaskInput[] = [previous[0] ?? { id: "", covers: [], writes: [] }, { id: "T-002", covers: ["todo-cli:BEH-002"], writes: ["src/cli/**", "src/store/**", "tests/store/**"] }];
+    const h = await harness({ scripts: { planner: [plannerWriting(overlapping)] } });
+    await seedDesign(h.productDir, techMdText());
+    await writeFile(join(h.productDir, "design", "tasks.json"), tasksJsonText(previous), "utf8");
+
+    await runPlanEffect({ kind: "design.plan", attempt: 2, reworkFinding: "TASK-OVERFLOW from T-002: needs src/cli/**", originTaskId: "T-002" }, h.context(stateIn("building")), h.slice, h.commandRunner);
+
+    expect(h.published.map((event) => [event.type, event.payload["originTaskId"]])).toEqual([["design.rework", "T-002"]]);
+  });
+
   it("blocks the design with planner_blocked when the planner reports status blocked", async () => {
     const h = await harness({ scripts: { planner: [plannerWriting(VALID_TASKS, ["status: blocked", "tasks_path: design/tasks.json", "task_count: 0", "uncovered_ids: [todo-cli:CST-001]"])] } });
     await seedDesign(h.productDir, techMdText());

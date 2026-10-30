@@ -11,10 +11,12 @@ export function taskReadyRule(): TransitionRule {
     apply({ state, event }) {
       const taskId = stringField(event.payload, "taskId");
       const task = taskOf(state, taskId);
+      /* bus:INV-002: a task that returns to ready after a re-cut keeps its counters; the next attempt follows them. */
+      const testWriter = task.attempts.testWriter + 1;
       const next = {
         ...task,
         status: "tests_pending" as const,
-        attempts: { implementer: 0, testWriter: 1 },
+        attempts: { ...task.attempts, testWriter },
         worktree: stringField(event.payload, "worktree"),
         baseSha: stringField(event.payload, "baseSha"),
         testsSha: null,
@@ -23,7 +25,7 @@ export function taskReadyRule(): TransitionRule {
         writes: stringsField(event.payload, "writes"),
         lastEvent: event.type,
       };
-      return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.testWriter, { taskId, attempt: 1, reworkFinding: null })] };
+      return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.testWriter, { taskId, attempt: testWriter, reworkFinding: null })] };
     },
   };
 }

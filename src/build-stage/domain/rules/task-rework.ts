@@ -1,5 +1,5 @@
 import type { TransitionRule, TransitionResult } from "../../../bus/domain/transition.js";
-import type { RunState, TaskState } from "../../../bus/domain/run-state.js";
+import { withCriticAttempt, type RunState, type TaskState } from "../../../bus/domain/run-state.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { PayloadFieldError, stringField, stringOrNullField } from "../payload.js";
 import { capExhausted, designReworkAttempt, findingTextOf, foreman, laneEffect, specAssumeEffect, specIdsOf, tasksCovering, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
@@ -15,7 +15,7 @@ function laneRestart(state: RunState, task: TaskState, taskId: string, caps: Rul
     return { state: withTask(state, taskId, { ...task, lastEvent }), emits: [capExhausted(taskId, "test-writer")], effects: [] };
   }
   const attempt = task.attempts.testWriter + 1;
-  const next = { ...task, status: "tests_pending" as const, attempts: { implementer: 0, testWriter: attempt }, testsSha: null, implSha: null, lastEvent };
+  const next = { ...task, status: "tests_pending" as const, attempts: { ...task.attempts, testWriter: attempt }, implementerAtRestart: task.attempts.implementer, testsSha: null, implSha: null, lastEvent };
   return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.restartLane, { taskId, attempt, reworkFinding })] };
 }
 
@@ -25,14 +25,14 @@ function criticRoute(state: RunState, taskId: string, specIds: readonly string[]
   for (const id of specIds) {
     assumptionsByRecord[id] = (assumptionsByRecord[id] ?? 0) + 1;
   }
-  return { state: { ...state, assumptionsByRecord }, emits: [], effects: [specAssumeEffect(taskId, specIds, finding, findingPath, tasksCovering(state, specIds))] };
+  return { state: withTask({ ...state, assumptionsByRecord }, taskId, withCriticAttempt(taskOf(state, taskId))), emits: [], effects: [specAssumeEffect(taskId, specIds, finding, findingPath, tasksCovering(state, specIds))] };
 }
 
 export function taskReworkRule(deps: RuleDeps): TransitionRule {
   return {
     name: "task.rework -> re-run the target role",
     eventType: "task.rework",
-    acceptsTaskStatus: ["tests_pending", "impl_pending", "verify_pending", "review_pending"],
+    acceptsTaskStatus: ["tests_pending", "impl_pending", "verify_pending", "review_pending", "approved"],
     apply({ state, event }) {
       const taskId = stringField(event.payload, "taskId");
       const task = taskOf(state, taskId);
@@ -47,9 +47,9 @@ export function taskReworkRule(deps: RuleDeps): TransitionRule {
         case "test-writer":
           return laneRestart(state, task, taskId, deps.caps, reworkFinding, event.type);
         case "planner":
-          return { state: stamped, emits: [foreman("design.rework", { target: "planner", reason, attempt: designReworkAttempt(state) })], effects: [] };
+          return { state: stamped, emits: [foreman("design.rework", { target: "planner", reason, attempt: designReworkAttempt(state), originTaskId: taskId })], effects: [] };
         case "architect":
-          return { state: stamped, emits: [foreman("design.rework", { target: "architect", reason, attempt: designReworkAttempt(state), specIds: specIdsOf(event.payload) })], effects: [] };
+          return { state: stamped, emits: [foreman("design.rework", { target: "architect", reason, attempt: designReworkAttempt(state), originTaskId: taskId, specIds: specIdsOf(event.payload) })], effects: [] };
         case "critic":
           return criticRoute(stamped, taskId, specIdsOf(event.payload), findingTextOf(event.payload, "finding", `${reason}; see ${findingPath ?? "the review report"}`), findingPath);
         default:

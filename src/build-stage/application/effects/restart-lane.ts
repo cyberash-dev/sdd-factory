@@ -11,7 +11,7 @@ export interface RestartLaneRun {
   readonly reworkFinding: ReworkFinding | null;
 }
 
-/* build-stage:BEH-004: back to baseSha, untracked files gone, then the test-writer again with the finding. */
+/* build-stage:BEH-004: back to baseSha, untracked files gone, then the test-writer again with the finding and the current design (design-stage:BEH-004). */
 export async function runRestartLane(slice: SliceContext, deps: LaneDeps, context: EffectContext, run: RestartLaneRun): Promise<void> {
   deps.lanes.cancel(run.taskId);
   const task = taskStateOf(context.state, run.taskId);
@@ -22,5 +22,6 @@ export async function runRestartLane(slice: SliceContext, deps: LaneDeps, contex
     context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "blocked", detail: `worktree_error: ${errorText(error)}` } });
     return;
   }
+  await deps.design.reload();
   await runTestWriter(slice, deps, context, run);
 }

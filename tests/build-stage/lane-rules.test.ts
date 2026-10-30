@@ -36,6 +36,19 @@ describe("lane start and test authoring", () => {
     ]);
   });
 
+  // @covers build-stage:DLT-008
+  // @covers bus:INV-002
+  it("keeps the attempt counters of a task that returns to ready after a re-cut and numbers the next test-writer attempt after them", () => {
+    const state = buildingState({ "T-001": aTask({ status: "ready", worktree: "", attempts: { implementer: 2, testWriter: 1, critic: 1 } }) });
+
+    const result = run(state, "task.ready", { taskId: "T-001", worktree: "/run/worktrees/T-001", baseSha: BASE_SHA, covers: ["greeter:BEH-001"], writes: ["src/greet.ts"] });
+
+    expect([result.state.tasks["T-001"]?.attempts, result.effects]).toEqual([
+      { implementer: 2, testWriter: 2, critic: 1 },
+      [{ kind: "build.test-writer", taskId: "T-001", attempt: 2, reworkFinding: null }],
+    ]);
+  });
+
   it("ignores task.ready for a task that already started", () => {
     const state = buildingState({ "T-001": aTask({ status: "impl_pending" }) });
 
@@ -99,7 +112,7 @@ describe("lane start and test authoring", () => {
 
     expect([result.state.tasks["T-001"]?.status, result.state.tasks["T-001"]?.attempts, result.state.tasks["T-001"]?.testsSha, result.state.tasks["T-001"]?.implSha, result.effects]).toEqual([
       "tests_pending",
-      { implementer: 0, testWriter: 2 },
+      { implementer: 2, testWriter: 2 },
       null,
       null,
       [{ kind: "build.restart-lane", taskId: "T-001", attempt: 2, reworkFinding: { reason: "review_changes", findingPath: "reviews/T-001.md" } }],
@@ -287,7 +300,7 @@ describe("findings and arbitration", () => {
 
     expect([first.emits, forwarded.emits, forwarded.state.stageAttempts, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
       [{ type: "task.rework", producer: "foreman", payload: { taskId: "T-001", target: "planner", attempt: 1, reason: "task_overflow", findingPath: "/run/handoffs/tasks/T-001/implementer-1/handoff.md" } }],
-      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "task_overflow", attempt: 2 } }],
+      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "task_overflow", attempt: 2, originTaskId: "T-001" } }],
       { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 1, assemblyRounds: 0 },
       [["task.failed", "planner"]],
     ]);
@@ -302,7 +315,7 @@ describe("findings and arbitration", () => {
 
     expect([first.emits.map((event) => [event.type, event.payload["target"], event.payload["reason"], event.payload["specIds"]]), forwarded.emits, forwarded.state.stageAttempts.architectRepairs, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
       [["task.rework", "architect", "design_repair", ["greeter:BEH-001"]]],
-      [{ type: "design.rework", producer: "foreman", payload: { target: "architect", reason: "design_repair", attempt: 1, specIds: ["greeter:BEH-001"] } }],
+      [{ type: "design.rework", producer: "foreman", payload: { target: "architect", reason: "design_repair", attempt: 1, originTaskId: "T-001", specIds: ["greeter:BEH-001"] } }],
       0,
       [["task.failed", "architect"]],
     ]);
@@ -397,5 +410,106 @@ describe("approval and failure", () => {
       "task.tests_written",
       "task.verified",
     ]);
+  });
+});
+
+describe("lane liveness after restarts, assembly routes and green-check findings", () => {
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-004
+  it("keeps the implementer counter and records it as the restart baseline when a lane restarts", () => {
+    const state = buildingState({ "T-001": aTask({ status: "verify_pending", attempts: { implementer: 1, testWriter: 1 }, baseSha: BASE_SHA, testsSha: TESTS_SHA }) });
+
+    const result = run(state, "task.rework", { taskId: "T-001", target: "test-writer", attempt: 2, reason: "tests_wrong", findingPath: null });
+
+    expect([result.state.tasks["T-001"]?.attempts, result.state.tasks["T-001"]?.implementerAtRestart]).toEqual([{ implementer: 1, testWriter: 2 }, 1]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-004
+  it("records the restart baseline when a rejection restarts the lane", () => {
+    const state = buildingState({ "T-001": aTask({ status: "tests_pending", attempts: { implementer: 2, testWriter: 1 }, baseSha: BASE_SHA }) });
+
+    const result = run(state, "task.tests_rejected", { taskId: "T-001", reason: "vacuous", detail: "no tests" });
+
+    expect([result.state.tasks["T-001"]?.attempts, result.state.tasks["T-001"]?.implementerAtRestart]).toEqual([{ implementer: 2, testWriter: 2 }, 2]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-003
+  it("starts implementer attempt 2 on tests_red after a restart that followed attempt 1", () => {
+    const state = buildingState({ "T-001": aTask({ status: "tests_pending", attempts: { implementer: 1, testWriter: 2 }, implementerAtRestart: 1, baseSha: BASE_SHA }) });
+
+    const result = run(state, "task.tests_red", { taskId: "T-001", testsSha: TESTS_SHA, testFiles: ["tests/greet.test.ts"] });
+
+    expect(result.effects).toEqual([{ kind: "build.implementer", taskId: "T-001", attempt: 2, reworkFinding: null }]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-007
+  // @covers build-stage:CST-001
+  it.each([
+    [2, ["task.rework", 3]],
+    [3, ["task.rework", 4]],
+    [4, ["task.failed", undefined]],
+  ] as const)("counts the implementer cap from the restart baseline 1 (counter %i)", (implementer, expected) => {
+    const state = buildingState({ "T-001": aTask({ status: "verify_pending", attempts: { implementer, testWriter: 2 }, implementerAtRestart: 1 }) });
+
+    const result = run(state, "task.verified", verifiedRed("T-001"));
+
+    expect(result.emits.map((event) => [event.type, event.payload["attempt"]])).toEqual([expected]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-009
+  it("sends an approved task routed back to the implementer into impl_pending without its merged sha and runs the implementer", () => {
+    const state = buildingState({ "T-001": aTask({ status: "approved", attempts: { implementer: 1, testWriter: 1 }, baseSha: BASE_SHA, testsSha: TESTS_SHA, implSha: IMPL_SHA }) });
+
+    const result = run(state, "task.rework", { taskId: "T-001", target: "implementer", attempt: 2, reason: "assembly_red", findingPath: "/run/handoffs/assembly/round-1.md" });
+
+    expect([result.state.tasks["T-001"]?.status, result.state.tasks["T-001"]?.implSha, result.effects]).toEqual([
+      "impl_pending",
+      null,
+      [{ kind: "build.implementer", taskId: "T-001", attempt: 2, reworkFinding: { reason: "assembly_red", findingPath: "/run/handoffs/assembly/round-1.md" } }],
+    ]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-009
+  it("restarts the lane of an approved task routed back to the test-writer", () => {
+    const state = buildingState({ "T-001": aTask({ status: "approved", attempts: { implementer: 1, testWriter: 1 }, baseSha: BASE_SHA, testsSha: TESTS_SHA, implSha: IMPL_SHA }) });
+
+    const result = run(state, "task.rework", { taskId: "T-001", target: "test-writer", attempt: 2, reason: "triage", findingPath: null });
+
+    expect([result.state.tasks["T-001"]?.status, result.effects.map((effect) => effect.kind)]).toEqual(["tests_pending", ["build.restart-lane"]]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-009
+  it("forwards an approved task routed back to the planner as design.rework", () => {
+    const state = buildingState({ "T-001": aTask({ status: "approved", attempts: { implementer: 1, testWriter: 1 }, implSha: IMPL_SHA }) });
+
+    const result = run(state, "task.rework", { taskId: "T-001", target: "planner", attempt: 1, reason: "triage", findingPath: null });
+
+    expect(result.emits.map((event) => [event.type, event.payload["target"]])).toEqual([["design.rework", "planner"]]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-011
+  it("re-provisions on a TOOLING-BROKEN from the green check while the task is in verify_pending", () => {
+    const state = buildingState({ "T-001": aTask({ status: "verify_pending", attempts: { implementer: 2, testWriter: 1 } }) });
+
+    const result = run(state, "task.finding", { taskId: "T-001", type: "TOOLING-BROKEN", specIds: [], detail: "vitest: command not found", origin: "green-check" });
+
+    expect(result.effects).toEqual([{ kind: "build.reprovision", taskId: "T-001", origin: "green-check", attempt: 2 }]);
+  });
+
+  // @covers build-stage:DLT-008
+  // @covers build-stage:BEH-011
+  it("carries the test-writer attempt on a TOOLING-BROKEN from the red check", () => {
+    const state = buildingState({ "T-001": aTask({ status: "tests_pending", attempts: { implementer: 1, testWriter: 2 } }) });
+
+    const result = run(state, "task.finding", { taskId: "T-001", type: "TOOLING-BROKEN", specIds: [], detail: "tsc: command not found", origin: "red-check" });
+
+    expect(result.effects).toEqual([{ kind: "build.reprovision", taskId: "T-001", origin: "red-check", attempt: 2 }]);
   });
 });

@@ -1,5 +1,5 @@
 import type { EventPayload, Producer } from "../../../bus/domain/envelope.js";
-import type { CostEntry, RunState, TaskState } from "../../../bus/domain/run-state.js";
+import { criticAttempts, type CostEntry, type RunState, type TaskState } from "../../../bus/domain/run-state.js";
 import type { Effect, PendingEvent } from "../../../bus/domain/transition.js";
 import type { Caps } from "../../../shared/config.js";
 import { BUILD_EFFECT_KINDS, FOREIGN_EFFECT_KINDS } from "../../effect-kinds.js";
@@ -40,8 +40,13 @@ export function capExhausted(taskId: string, role: string): PendingEvent {
   return foreman("task.failed", { taskId, reason: "cap_exhausted", detail: role });
 }
 
+/* build-stage:DLT-008: the counter stays monotonic across lane restarts, so the cap counts from the restart baseline. */
+export function implementerAttemptsSinceRestart(task: TaskState): number {
+  return task.attempts.implementer - (task.implementerAtRestart ?? 0);
+}
+
 export function implementerRework(task: TaskState, taskId: string, caps: Caps, reason: string, findingPath: string | null): PendingEvent {
-  if (task.attempts.implementer >= caps.implementerAttempts) {
+  if (implementerAttemptsSinceRestart(task) >= caps.implementerAttempts) {
     return capExhausted(taskId, "implementer");
   }
   return foreman("task.rework", { taskId, target: "implementer", attempt: task.attempts.implementer + 1, reason, findingPath });
@@ -75,7 +80,7 @@ export function criticRework(state: RunState, taskId: string, caps: Caps, specId
   if (minted.some((count) => count >= caps.criticAssumptionsPerId)) {
     return capExhausted(taskId, "critic");
   }
-  return foreman("task.rework", { taskId, target: "critic", attempt: Math.max(0, ...minted) + 1, reason: "spec_contradiction", findingPath, specIds, finding });
+  return foreman("task.rework", { taskId, target: "critic", attempt: criticAttempts(taskOf(state, taskId)) + 1, reason: "spec_contradiction", findingPath, specIds, finding });
 }
 
 export function findingTextOf(payload: EventPayload, key: string, fallback: string): string {

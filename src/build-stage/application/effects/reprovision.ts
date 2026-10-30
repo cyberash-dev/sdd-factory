@@ -4,6 +4,7 @@ import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js
 import type { SliceContext } from "../../../shared/slice.js";
 import { argvOf } from "../../domain/command-line.js";
 import { taskHandoffDir } from "../../domain/handoff-paths.js";
+import { implementerAttemptsSinceRestart } from "../../domain/rules/support.js";
 import type { LaneDeps } from "../lane-deps.js";
 import { taskStateOf } from "../lane-inputs.js";
 import { runVerifierCommand } from "../verifier-runner.js";
@@ -49,7 +50,7 @@ async function refreshWorktreeLinks(slice: SliceContext, context: EffectContext)
 
 function rejectClaim(slice: SliceContext, context: EffectContext, taskId: string): void {
   const task = taskStateOf(context.state, taskId);
-  if (task.attempts.implementer >= slice.config.caps.implementerAttempts) {
+  if (implementerAttemptsSinceRestart(task) >= slice.config.caps.implementerAttempts) {
     context.publish({ type: "task.failed", producer: "foreman", payload: { taskId, reason: "cap_exhausted", detail: "implementer" } });
     return;
   }

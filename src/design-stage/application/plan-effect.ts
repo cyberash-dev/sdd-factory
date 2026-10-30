@@ -130,8 +130,19 @@ async function readTechDesign(slice: SliceContext): Promise<TechDesign> {
   return parseTechMd(text);
 }
 
-function publishRework(context: EffectContext, reason: string, usage: RoleUsage, reruns: number): void {
-  context.publish(pending("design.rework", { target: "planner", reason, attempt: designReworkAttempt(context.state), usage, handoffReruns: reruns }));
+function originTaskIdOf(effect: Effect): string | null {
+  const value = effect["originTaskId"];
+  return typeof value === "string" ? value : null;
+}
+
+/* build-stage:DLT-008: the task whose finding caused the re-cut restarts even when its record is unchanged. */
+function withOriginTask(changed: readonly string[], next: TasksFile, originTaskId: string | null): readonly string[] {
+  const isOriginKept = originTaskId !== null && next.tasks.some((task) => task.id === originTaskId);
+  return isOriginKept && !changed.includes(originTaskId) ? [...changed, originTaskId] : changed;
+}
+
+function publishRework(context: EffectContext, reason: string, usage: RoleUsage, reruns: number, originTaskId: string | null): void {
+  context.publish(pending("design.rework", { target: "planner", reason, attempt: designReworkAttempt(context.state), originTaskId, usage, handoffReruns: reruns }));
 }
 
 /* design-stage:BEH-002/BEH-003: run the planner, validate tasks.json mechanically, install TD-TOOLING once, then announce the tasks. */
@@ -159,12 +170,12 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
   }
   const uncovered = uncoveredIdsOf(outcome.handoff.frontmatter);
   if (uncovered.length > 0) {
-    publishRework(context, `uncovered_ids: ${uncovered.join(", ")}`, outcome.usage, outcome.reruns);
+    publishRework(context, `uncovered_ids: ${uncovered.join(", ")}`, outcome.usage, outcome.reruns, originTaskIdOf(effect));
     return;
   }
   const verdict = await judgeTasks(slice, commands, tech, previous, finding, createDesignFileFixer(slice, fix, context));
   if (verdict.kind === "invalid") {
-    publishRework(context, verdict.reason, outcome.usage, outcome.reruns);
+    publishRework(context, verdict.reason, outcome.usage, outcome.reruns, originTaskIdOf(effect));
     return;
   }
   if (context.state.status === "planning") {
@@ -175,5 +186,5 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     }
   }
   const tasks = verdict.tasks.tasks.map((task) => ({ id: task.id, covers: task.covers, writes: task.writes, dependsOn: task.dependsOn }));
-  context.publish(pending("design.tasks.ready", { path: TASKS_JSON, taskCount: tasks.length, tasks, changedTaskIds: changedTaskIds(previous, verdict.tasks), usage: outcome.usage, handoffReruns: outcome.reruns }));
+  context.publish(pending("design.tasks.ready", { path: TASKS_JSON, taskCount: tasks.length, tasks, changedTaskIds: withOriginTask(changedTaskIds(previous, verdict.tasks), verdict.tasks, originTaskIdOf(effect)), usage: outcome.usage, handoffReruns: outcome.reruns }));
 }

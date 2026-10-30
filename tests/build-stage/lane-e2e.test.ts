@@ -142,6 +142,7 @@ describe("build lane end to end", () => {
 
   // @covers build-stage:SCN-003
   // @covers build-stage:BEH-004
+  // @covers build-stage:DLT-008
   it("arbitrates a test-contract conflict to the test-writer, restarts the lane at baseSha and approves after the rewritten tests", async () => {
     const restart: { head: string | null; status: string | null } = { head: null, status: null };
     const { engine } = await scenario(
@@ -178,10 +179,10 @@ describe("build lane end to end", () => {
     ]).toEqual([
       ["task.ready", "task.tests_written", "task.tests_red", "task.finding", "task.reviewed", "task.rework", "task.tests_written", "task.tests_red", "task.impl_done", "task.verified", "task.reviewed", "task.approved"],
       [["request_changes", "test-writer"], ["approve", "none"]],
-      [1],
+      [2],
       true,
       "",
-      { implementer: 1, testWriter: 2 },
+      { implementer: 2, testWriter: 2 },
     ]);
   }, LANE_TIMEOUT);
 

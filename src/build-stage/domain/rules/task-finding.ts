@@ -20,7 +20,7 @@ export function taskFindingRule(deps: RuleDeps): TransitionRule {
   return {
     name: "task.finding -> arbitration, planner, architect or re-provision",
     eventType: "task.finding",
-    acceptsTaskStatus: ["tests_pending", "impl_pending"],
+    acceptsTaskStatus: ["tests_pending", "impl_pending", "verify_pending"],
     apply({ state, event }) {
       const taskId = stringField(event.payload, "taskId");
       const task = taskOf(state, taskId);
@@ -42,7 +42,7 @@ export function taskFindingRule(deps: RuleDeps): TransitionRule {
           return { state: stamped, emits: [architectRework(state, taskId, deps.caps, "design_repair", findingPath, stringsField(event.payload, "specIds"))], effects: [] };
         case "TOOLING-BROKEN": {
           const origin = typeof event.payload["origin"] === "string" ? event.payload["origin"] : "implementer";
-          return toolingRoute(stamped, taskId, attempt, origin, detail);
+          return toolingRoute(stamped, taskId, origin === "red-check" ? task.attempts.testWriter : attempt, origin, detail);
         }
         default:
           throw new PayloadFieldError(`task.finding.type: unexpected ${type}`);

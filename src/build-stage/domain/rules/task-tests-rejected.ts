@@ -17,7 +17,7 @@ export function taskTestsRejectedRule(deps: RuleDeps): TransitionRule {
       }
       const attempt = task.attempts.testWriter + 1;
       const reworkFinding: ReworkFinding = { reason: `${stringField(event.payload, "reason")}: ${stringField(event.payload, "detail")}`, findingPath: null };
-      const next = { ...task, attempts: { implementer: 0, testWriter: attempt }, testsSha: null, implSha: null, lastEvent: event.type };
+      const next = { ...task, attempts: { ...task.attempts, testWriter: attempt }, implementerAtRestart: task.attempts.implementer, testsSha: null, implSha: null, lastEvent: event.type };
       return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.restartLane, { taskId, attempt, reworkFinding })] };
     },
   };

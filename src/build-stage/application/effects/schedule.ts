@@ -77,7 +77,10 @@ export async function startLane(slice: SliceContext, deps: LaneDeps, context: Ef
 export const DESIGN_ARTEFACTS_COMMIT = "spec and design artefacts";
 
 /* Worktrees branch from the integration head, so spec/ and design/ must be committed there first. */
-export async function scheduleLanes(slice: SliceContext, deps: LaneDeps, context: EffectContext): Promise<void> {
+export async function scheduleLanes(slice: SliceContext, deps: LaneDeps, context: EffectContext, removedTaskIds: readonly string[]): Promise<void> {
+  for (const taskId of removedTaskIds) {
+    deps.lanes.cancel(taskId);
+  }
   const startable = startableTasks(context.state, slice.config.maxParallelLanes);
   if (startable.length === 0) {
     return;

@@ -36,8 +36,13 @@ function withRoleAccounting(state: RunState, event: { readonly payload: EventPay
   return { ...state, costLedger: ledgerWithUsage(state.costLedger, event.payload, role), stageHandoffReruns: withStageReruns(state, role, reruns) };
 }
 
-function planEffect(attempt: number, reworkFinding: string): Effect {
-  return { kind: "design.plan", attempt, reworkFinding };
+function planEffect(attempt: number, reworkFinding: string, originTaskId: string | null = null): Effect {
+  return originTaskId === null ? { kind: "design.plan", attempt, reworkFinding } : { kind: "design.plan", attempt, reworkFinding, originTaskId };
+}
+
+function originTaskIdOf(payload: EventPayload): string | null {
+  const value = payload["originTaskId"];
+  return typeof value === "string" ? value : null;
 }
 
 function readyRule(eventType: "design.tech.ready" | "design.verification.ready"): TransitionRule {
@@ -97,24 +102,24 @@ function tasksReadyRule(deps: DesignRuleDeps): TransitionRule {
       const summaries = taskSummariesOf(event.payload);
       const path = stringOf(event.payload, "path");
       const base = withRoleAccounting(state, event, "planner");
-      const effects: Effect[] = [{ kind: "build.schedule", tasksPath: path }];
       if (state.status === "building") {
         const merged = mergeTasks(state, summaries, stringListOf(event.payload, "changedTaskIds"), deps.worktreesDir);
-        return { state: { ...base, design: { ...state.design, tasksPath: path }, tasks: merged.tasks }, emits: merged.emits, effects };
+        const removedTaskIds = Object.keys(state.tasks).filter((taskId) => merged.tasks[taskId] === undefined);
+        return { state: { ...base, design: { ...state.design, tasksPath: path }, tasks: merged.tasks }, emits: merged.emits, effects: [{ kind: "build.schedule", tasksPath: path, removedTaskIds }] };
       }
       const tasks = Object.fromEntries(summaries.map((summary) => [summary.id, taskStateFrom(summary, deps.worktreesDir)]));
-      return { state: { ...base, status: "building", design: { ...state.design, tasksPath: path }, tasks }, emits: [], effects };
+      return { state: { ...base, status: "building", design: { ...state.design, tasksPath: path }, tasks }, emits: [], effects: [{ kind: "build.schedule", tasksPath: path }] };
     },
   };
 }
 
-function plannerRework(deps: DesignRuleDeps, state: RunState, reason: string): TransitionResult {
+function plannerRework(deps: DesignRuleDeps, state: RunState, reason: string, originTaskId: string | null): TransitionResult {
   const recuts = state.stageAttempts.plannerRecuts + 1;
   if (recuts > deps.caps.plannerRecuts) {
     return { state, emits: [designBlocked("planner_cap")], effects: [] };
   }
   const next: RunState = { ...state, status: state.status === "building" ? "building" : "planning", stageAttempts: { ...state.stageAttempts, plannerRecuts: recuts } };
-  return { state: next, emits: [], effects: [planEffect(recuts + 1, reason)] };
+  return { state: next, emits: [], effects: [planEffect(recuts + 1, reason, originTaskId)] };
 }
 
 function architectRework(deps: DesignRuleDeps, state: RunState, reason: string, specIds: readonly string[]): TransitionResult {
@@ -138,7 +143,7 @@ function reworkRule(deps: DesignRuleDeps): TransitionRule {
       const reason = stringOf(event.payload, "reason");
       const role = target === "architect" ? "architect" : "planner";
       const base = withRoleAccounting(state, event, role);
-      return target === "architect" ? architectRework(deps, base, reason, stringListOf(event.payload, "specIds")) : plannerRework(deps, base, reason);
+      return target === "architect" ? architectRework(deps, base, reason, stringListOf(event.payload, "specIds")) : plannerRework(deps, base, reason, originTaskIdOf(event.payload));
     },
   };
 }

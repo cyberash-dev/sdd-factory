@@ -54,7 +54,7 @@ function arbitrationFindingOf(effect: Effect): ArbitrationFinding | null {
 }
 
 const HANDLERS: Readonly<Record<string, LaneHandler>> = {
-  [BUILD_EFFECT_KINDS.schedule]: (slice, deps, context) => scheduleLanes(slice, deps, context),
+  [BUILD_EFFECT_KINDS.schedule]: (slice, deps, context, effect) => scheduleLanes(slice, deps, context, optionalStringsField(effect, "removedTaskIds")),
   [BUILD_EFFECT_KINDS.worktree]: async (slice, deps, context, effect) => startLane(slice, deps, context, await deps.design.load(), stringField(effect, "taskId")),
   [BUILD_EFFECT_KINDS.testWriter]: (slice, deps, context, effect) =>
     runTestWriter(slice, deps, context, { taskId: stringField(effect, "taskId"), attempt: integerField(effect, "attempt"), reworkFinding: reworkFindingOf(effect) }),
