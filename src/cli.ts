@@ -30,6 +30,17 @@ async function readCosts(traceDir: string): Promise<{ totalUsd: number; midRunIn
   }
 }
 
+/* Mozaik core's built-in cloud client warns on every agent loop once the key is blanked; the warning carries no information here. */
+function silenceCoreCloudWarning(): void {
+  const warn = console.warn.bind(console);
+  console.warn = (...args: unknown[]): void => {
+    if (typeof args[0] === "string" && args[0].startsWith("mozaik cloud: no API key")) {
+      return;
+    }
+    warn(...args);
+  };
+}
+
 async function runCommand(argv: readonly string[]): Promise<number> {
   const command = parseArgv(argv);
   const repoRoot = process.cwd();
@@ -41,6 +52,7 @@ async function runCommand(argv: readonly string[]): Promise<number> {
   const env: Readonly<Record<string, string | undefined>> = { ...process.env };
   /* trace:EXT-001 keeps one cloud transport per runtime: Mozaik core would otherwise open a cloud session per agent loop. */
   process.env["MOZAIK_API_KEY"] = "";
+  silenceCoreCloudWarning();
   const baseConfig = await loadConfig(join(repoRoot, "factory.config.json"));
   const checked = await preflight({
     specPath: command.specPath,
