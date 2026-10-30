@@ -2575,6 +2575,87 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-008
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T22:40:19.561Z
+    change_request: "run 16 hang audit: collision-free dedupe keys, stalled watchdog, lane liveness"
+    scope: first-time-approval
+partition_id: build-stage
+title: attempt numbers of a task never repeat; re-cuts and findings always leave a running lane behind
+target_ids:
+  - build-stage:BEH-004
+  - build-stage:BEH-007
+  - build-stage:BEH-009
+  - build-stage:BEH-011
+  - build-stage:BEH-014
+  - build-stage:CST-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  An audit after run 16 found four ways a task is left with nothing
+  running. Changes:
+  - build-stage:BEH-004: a lane restart no longer resets the
+    implementer attempt counter of T to 0 (bus:INV-002 forbids it and
+    the dedupe key of task.impl_done would repeat). The counter stays
+    monotonic and the restart records implementerAtRestart(T) = the
+    counter at that moment; build-stage:CST-001 and BEH-007/BEH-014
+    count the cap from implementerAtRestart(T), so a restarted lane
+    still gets the full number of implementer attempts. Attempt
+    directories and evidence files (implementer-<n>, verifier-green-<n>,
+    reviewer-<n>, transcript.jsonl) therefore never overwrite an earlier
+    attempt.
+  - build-stage:BEH-009 and the assembly routes (assembly-stage:BEH-004,
+    BEH-005): task.rework for implementer, test-writer and planner is
+    accepted for a task in status approved (an assembly round or a
+    re-cut sends approved tasks back), and a planner re-cut always
+    reworks the task whose finding caused it even when its record is
+    unchanged, and cancels the lanes of tasks the re-cut removed. A merge
+    conflict found in the build stage before any assembly round routes
+    straight to task.rework{target: planner} instead of an
+    assembly.rework with round 0.
+  - build-stage:BEH-011: task.finding{TOOLING-BROKEN} from the green
+    check is accepted for a task in verify_pending; a TOOLING-BROKEN
+    raised by the red check carries the test-writer attempt number.
+  - design-stage:BEH-004 is unchanged in text; the design cache is
+    reloaded before a lane restarts so a repaired design reaches the
+    restarted lanes.
+tests_old_behavior:
+  - a first implementer attempt after tests_red still starts at 1 for a lane that was never restarted; CST-002 and the test-writer counter are unchanged
+tests_new_behavior:
+  - to:build-stage:BEH-004
+  - to:build-stage:BEH-009
+test_obligation:
+  predicate: |
+    Given a lane restarted after one implementer attempt, the next
+    implementer attempt is 2 and its impl_done is applied, the cap still
+    allows CST-001 attempts after the restart, and implementer-2 is a
+    new directory; given an approved task routed back by assembly, the
+    task.rework applies and the implementer runs; given a TASK-OVERFLOW
+    on T-001 and a re-cut that leaves T-001's record unchanged, T-001 is
+    still restarted; given a TOOLING-BROKEN from a green check in
+    verify_pending, the re-provision runs.
+  test_template: unit
+  boundary_classes:
+    - restart after an implementer attempt
+    - approved task routed back
+    - unchanged origin task after re-cut
+    - tooling broken in verify_pending
+  failure_scenarios:
+    - impl_done dropped as a duplicate after a restart
+    - routed approved task left out of order
+    - origin task left in impl_pending after the re-cut
+---
+```
+
 ---
 
 ## 16. Implementation bindings

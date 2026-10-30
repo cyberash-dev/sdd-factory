@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.5.0"
+version: "0.6.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -2058,6 +2058,158 @@ test_obligation:
   failure_scenarios:
     - fix.attempted accepted from an unjoined producer
     - counter reset between attempts
+---
+```
+
+```yaml
+---
+id: bus:DLT-006
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T22:40:18.890Z
+    change_request: "run 16 hang audit: collision-free dedupe keys, stalled watchdog, lane liveness"
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.5.0 -> 0.6.0 - dedupe keys that cannot collide between distinct legitimate events
+target_ids:
+  - bus:SUR-001
+  - bus:BEH-002
+  - bus:BEH-007
+  - bus:CTR-004
+  - bus:CTR-005
+  - bus:CTR-006
+  - bus:CTR-008
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.6.0"
+description: |
+  Run 16 hung on T-003: task.rework{target: implementer, attempt: 2}
+  was followed, after a green re-verification, by task.rework{target:
+  test-writer, attempt: 2}; bus:BEH-002 keys duplicates on type, runId,
+  payload.taskId and payload.attempt, so the second rework was recorded
+  as duplicate_ignored, no lane restarted and the task sat in
+  review_pending with nothing running. An audit found the same class in
+  three more keys. Changes:
+  - bus:BEH-002: the dedupe key is type, runId, scope and counter, where
+    the scope is payload.taskId plus payload.target when the payload
+    carries one (task.rework, assembly.rework), or owner:unit for
+    fix.attempted; events without an attempt or round have no key and
+    are never deduplicated (task.tests_red, task.tests_rejected,
+    task.verified, task.finding, task.reviewed, task.approved,
+    task.failed, assembly.started, assembly.verified, assembly.triaged).
+  - bus:CTR-004 design.rework gains `originTaskId: string or null` (the
+    task whose finding caused a rework routed from the build stage, null
+    for design-stage reworks); its idempotency key is (type, runId,
+    payload.target, payload.originTaskId, payload.attempt), so two
+    findings routed to the planner and the architect, or two tasks
+    routed to the planner, in the same attempt window are distinct
+    events.
+  - bus:CTR-005 task.rework with target critic numbers its attempt from
+    a per-task critic counter kept in state (bus:CTR-008 tasks.<id>.
+    attempts.critic), not from the assumption count of the finding's
+    spec ids, so two contract findings of one task are distinct events;
+    the idempotency entries of bus:CTR-005 and CTR-006 name the key
+    above (taskId plus target plus attempt; assembly events keyed by
+    round and taskId).
+  - bus:BEH-007: the fixer lane participant is keyed by role, owner and
+    unit, so the architect's and the verification-designer's fixers on
+    unit design join and leave independently and fix.attempted of each
+    is sent by its own participant.
+  Redeliveries of the same event stay duplicate_ignored.
+tests_old_behavior:
+  - a second delivery of the same task.impl_done, task.tests_written, task.rework or assembly.rework is still duplicate_ignored; bus:INV-002 holds
+tests_new_behavior:
+  - to:bus:BEH-002
+  - to:bus:BEH-007
+test_obligation:
+  predicate: |
+    Given task.rework{T-003, implementer, 2} consumed, task.rework{T-003,
+    test-writer, 2} applies and a repeat of the first is ignored; given
+    design.rework{planner, originTaskId T-001, attempt 1} consumed,
+    design.rework{planner, originTaskId T-002, attempt 1} applies; two
+    task.rework{target: critic} for one task carry attempts 1 and 2 and
+    both apply; two fixer participants on unit design with owners
+    architect and verification-designer both deliver fix.attempted.
+  test_template: unit
+  boundary_classes:
+    - same attempt, different target
+    - same attempt, same target (duplicate)
+    - two design reworks from two tasks
+    - two critic reworks of one task
+    - two fixers on one unit
+  failure_scenarios:
+    - a legitimate routed event dropped as a duplicate
+    - producer_not_joined for the second fixer
+---
+```
+
+```yaml
+---
+id: bus:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T22:40:19.233Z
+    change_request: "run 16 hang audit: collision-free dedupe keys, stalled watchdog, lane liveness"
+    scope: first-time-approval
+partition_id: bus
+title: a run with nothing in flight and nothing pending fails as stalled instead of hanging
+target_ids:
+  - bus:BEH-006
+  - bus:CTR-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  When an event is dropped (duplicate_ignored, out_of_order_ignored,
+  unknown_task_ignored) and no effect is left running, nothing in the
+  factory notices: run 16 sat in building with T-003 in review_pending,
+  no subprocess alive, until the operator killed it. The engine now
+  detects quiescence: it counts effects in flight; whenever a handled
+  event or a settled effect leaves the queue empty, no effect in flight
+  and the run status non-terminal, it arms a short timer (2 s, the
+  timer keeps the process alive while Mozaik delivers late events); if
+  lastSeq has not moved when it fires, the engine publishes
+  run.failed{stage: <stage of the current status>, reason: "stalled",
+  detail: "<taskId> <status> last=<lastEvent>; ..." for every task not
+  approved or failed, or the run status when no task exists}. bus:CTR-002
+  run.failed gains the reason value stalled (minor bump of bus:SUR-001,
+  carried by bus:DLT-006). bus:BEH-006 lists the stall next to runtime
+  errors as a failure that ends the run instead of hanging it. A stalled
+  run resumes like any failed run: the failure chain is cut and the
+  lane entries of in-flight tasks are redone (factory:DLT-006, DLT-007),
+  so the fix for the dropped event is enough to continue.
+tests_old_behavior:
+  - a run whose effects are still running or whose queue holds events is never failed as stalled
+tests_new_behavior:
+  - to:bus:BEH-006
+test_obligation:
+  predicate: |
+    Given an engine whose last applied event leaves T-003 in
+    review_pending with no effect in flight and an empty queue, within
+    the quiescence window run.failed{reason: stalled} is published with
+    T-003 and review_pending in the detail; given an effect still
+    running, no stalled failure is published while it runs; given a
+    terminal status, nothing is published.
+  test_template: unit
+  boundary_classes:
+    - quiescent non-terminal run
+    - effect in flight
+    - terminal run
+  failure_scenarios:
+    - stalled published while an effect runs
+    - a quiescent run left hanging
 ---
 ```
 
