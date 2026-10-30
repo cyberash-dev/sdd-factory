@@ -28,7 +28,7 @@
       "spec-analyst": "high",
       "architect": "medium",
       "verification-designer": "high",
-      "planner": "high"
+      "planner": "medium"
     }
   },
   "pricing": {
