@@ -1,3 +1,4 @@
+import { createGitWorkingTree, type SimpleFixDeps } from "../../shared/fixer/index.js";
 import { CommandFailedError, type CommandRunner } from "../ports/outbound/command-runner.js";
 import type { DesignCache } from "./design-cache.js";
 import type { Git } from "./git.js";
@@ -9,6 +10,10 @@ export interface LaneDeps {
   readonly design: DesignCache;
   readonly lanes: LaneRegistry;
   readonly delay: (ms: number) => Promise<void>;
+}
+
+export function fixerDeps(deps: LaneDeps): SimpleFixDeps {
+  return { tree: createGitWorkingTree(deps.commands), delay: deps.delay };
 }
 
 export async function recordText(deps: LaneDeps, productDir: string, id: string): Promise<string> {

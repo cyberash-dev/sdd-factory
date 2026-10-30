@@ -36,8 +36,10 @@ export interface LaneHarness {
   effectContext(state: RunState, published: PendingEvent[]): EffectContext;
 }
 
+/* simpleFixes 0: lanes take the original failure path unless a test opts into the simple-fixer. */
 export const TEST_CONFIG: FactoryConfig = {
   ...DEFAULT_CONFIG,
+  caps: { ...DEFAULT_CONFIG.caps, simpleFixes: 0 },
   timeouts: { ...DEFAULT_CONFIG.timeouts, cliRoleMs: 10_000, apiRoleMs: 10_000, verifierMs: 60_000 },
 };
 
