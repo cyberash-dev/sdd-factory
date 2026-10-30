@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Effect } from "../bus/domain/transition.js";
 import type { EffectContext } from "../bus/ports/outbound/effect-runner.js";
+import { signalLanes } from "../shared/llm/cli-role-runner.js";
 import type { EffectHandler, SliceContext, SliceFactory } from "../shared/slice.js";
 import { createExecFileCommandRunner } from "./adapters/outbound/exec-file-command-runner.js";
 import { createFileDesignSource } from "./adapters/outbound/file-design-source.js";
@@ -93,6 +94,7 @@ export function createBuildStageSlice(options: BuildStageOptions = {}): SliceFac
       participants: () => [],
       shutdown: async () => {
         deps.lanes.cancelAll();
+        signalLanes("SIGTERM");
       },
     };
   };

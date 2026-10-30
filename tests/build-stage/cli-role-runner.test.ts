@@ -90,6 +90,18 @@ describe("claude -p lane executor", () => {
     expect((await running).signal).toBe("SIGTERM");
   });
 
+  // @covers build-stage:BEH-016
+  it("sends SIGTERM to a running lane subprocess when the build slice shuts down", async () => {
+    const binary = await fakeClaude([], { sleepMs: 2000 });
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign() });
+    const running = createCliRoleRunner().run(request(binary, 20000));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 200));
+
+    await harness.slice.shutdown?.();
+
+    expect((await running).signal).toBe("SIGTERM");
+  });
+
   it("rejects when the binary does not exist", async () => {
     await expect(createCliRoleRunner().run(request("/nonexistent/claude"))).rejects.toThrow();
   });
