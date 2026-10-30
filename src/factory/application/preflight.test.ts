@@ -42,6 +42,7 @@ describe("preflight", () => {
     ["no api key", { env: { PATH: "/usr/bin" } }, "3 ANTHROPIC_API_KEY is not set"],
     ["no openai key for an openai reviewer model", { models: { ...DEFAULT_CONFIG.models, reviewer: "gpt-6.1-sol" } }, "3 OPENAI_API_KEY is not set"],
     ["unknown model id", { models: { ...DEFAULT_CONFIG.models, critic: "gpt-99" } }, "2 unknown model gpt-99: not in the Mozaik supported model list"],
+    ["no openai key for the registered gpt-6.1-terra", { models: { ...DEFAULT_CONFIG.models, critic: "gpt-6.1-terra" } }, "3 OPENAI_API_KEY is not set"],
     ["provider without a key mapping", { models: { ...DEFAULT_CONFIG.models, triage: "gemini-3.5-flash" } }, "2 model gemini-3.5-flash routes to provider google, which has no API key mapping"],
     ["claude missing", { env: { PATH: "/opt/none", ANTHROPIC_API_KEY: "sk" } }, "3 claude not found on PATH"],
   ])("fails %s with the documented exit code", async (_label, overrides, expected) => {

@@ -94,7 +94,7 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
     push: input.push,
     paths,
     runtime,
-    apiRoles: input.roleRunners?.apiRoles ?? createApiRoleRunner(runtime, input.config.pricing),
+    apiRoles: input.roleRunners?.apiRoles ?? createApiRoleRunner(runtime, input.config.pricing, input.config.models.effort),
     cliRoles: input.roleRunners?.cliRoles ?? createCliRoleRunner(),
     prompts: createPromptLibrary(join(input.repoRoot, "prompts")),
     log: input.log,

@@ -32,6 +32,13 @@ describe("factory config", () => {
     expect([DEFAULT_CONFIG.models.reviewer, withReviewer.models.reviewer, reviewerModel(withReviewer.models), reviewerModel(withoutReviewer.models)]).toEqual([null, "gpt-6.1-sol", "gpt-6.1-sol", "claude-opus-5-5"]);
   });
 
+  // @covers factory:ASM-005
+  it("reads per-role reasoning effort and drops values outside the Mozaik effort set", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { models: { effort: { "spec-analyst": "high", planner: "turbo", triage: 5 } } });
+
+    expect([DEFAULT_CONFIG.models.effort, merged.models.effort]).toEqual([{}, { "spec-analyst": "high" }]);
+  });
+
   it("ignores values of the wrong type and keeps the defaults", () => {
     const merged = mergeConfig(DEFAULT_CONFIG, { caps: { implementerAttempts: "many" }, maxParallelLanes: -1, pricing: { m: { inputPerMillion: "x" } } });
 

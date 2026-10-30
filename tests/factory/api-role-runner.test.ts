@@ -76,6 +76,27 @@ describe("API role runner on the Mozaik loop", () => {
     expect(joinedAtAnswer).toEqual([true]);
   });
 
+  // @covers factory:ASM-005
+  it("passes the configured reasoning effort of the role to the loop and none for an unconfigured role", async () => {
+    const efforts: Array<string | undefined> = [];
+    const runner: InferenceRunner = {
+      async run(input: InferenceInput): Promise<InferenceOutput> {
+        efforts.push(input.reasoningEffort);
+        return { items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: usage(1, 1), rowResponse: null };
+      },
+      async *stream(): AsyncGenerator<SemanticEvent> {
+        yield* [];
+      },
+    };
+    const runtime = createFactoryRuntime(RUN_ID, { inferenceRunner: runner });
+    const apiRoles = createApiRoleRunner(runtime, {}, { planner: "high" });
+
+    await apiRoles.run({ role: "planner", instruction: "p", message: "m", model: "m", tools: [], timeoutMs: 5000, maxOutputTokens: 100 });
+    await apiRoles.run({ role: "triage", instruction: "t", message: "m", model: "m", tools: [], timeoutMs: 5000, maxOutputTokens: 100 });
+
+    expect(efforts).toEqual(["high", undefined]);
+  });
+
   it("records cost null when the provider returns no usage", async () => {
     const runtime = createFactoryRuntime(RUN_ID, {
       inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: undefined, rowResponse: null }]),

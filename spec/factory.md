@@ -1914,6 +1914,32 @@ tests:
 ---
 ```
 
+```yaml
+---
+id: factory:ASM-005
+type: ASSUMPTION
+lifecycle:
+  status: proposed
+partition_id: factory
+assumption: |
+  Model ids absent from the Mozaik 4.1.0 bundled list are registered by
+  the factory on the matching provider endpoint with the specification of
+  their closest listed sibling: gpt-6.1-terra on the OpenAI Responses
+  endpoint with the gpt-6.1-sol specification. Preflight (factory:DLT-002)
+  resolves providers through this registry, the bundled list plus the
+  additions. Per-role reasoning effort is factory configuration
+  (`models.effort.<role>`), passed to the loop as `reasoningEffort` and
+  validated by Mozaik against the model's supported efforts.
+source_open_q: not_applicable
+blocking: no
+review_by: "2026-11-30"
+default_if_unresolved: keep_assumption
+tests:
+  - src/shared/llm/model-provider.test.ts
+  - tests/factory/api-role-runner.test.ts
+---
+```
+
 ---
 
 ## 19. Out of scope

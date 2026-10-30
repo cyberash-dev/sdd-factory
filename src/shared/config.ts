@@ -31,6 +31,14 @@ export interface RoleModels {
   readonly triage: string;
   readonly reviewer: string | null;
   readonly lane: string | null;
+  readonly effort: Readonly<Record<string, ReasoningEffort>>;
+}
+
+export const REASONING_EFFORTS = ["max", "xhigh", "high", "medium", "low", "none"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return typeof value === "string" && (REASONING_EFFORTS as readonly string[]).includes(value);
 }
 
 export interface FactoryConfig {
@@ -67,6 +75,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
     triage: "claude-haiku-4-5",
     reviewer: null,
     lane: null,
+    effort: {},
   },
   pricing: {},
 };
@@ -98,6 +107,19 @@ function pickStringOrNull(source: Json, key: string, fallback: string | null): s
     return null;
   }
   return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function pickEfforts(source: Json, fallback: Readonly<Record<string, ReasoningEffort>>): Readonly<Record<string, ReasoningEffort>> {
+  if (Object.keys(source).length === 0) {
+    return fallback;
+  }
+  const efforts: Record<string, ReasoningEffort> = {};
+  for (const [role, effort] of Object.entries(source)) {
+    if (isReasoningEffort(effort)) {
+      efforts[role] = effort;
+    }
+  }
+  return efforts;
 }
 
 function isPricing(value: unknown): value is ModelPricing {
@@ -143,6 +165,7 @@ export function mergeConfig(base: FactoryConfig, override: unknown): FactoryConf
       triage: pickString(models, "triage", base.models.triage),
       reviewer: pickStringOrNull(models, "reviewer", base.models.reviewer),
       lane: pickStringOrNull(models, "lane", base.models.lane),
+      effort: pickEfforts(section(models, "effort"), base.models.effort),
     },
     pricing,
   };

@@ -14,6 +14,7 @@ import { isEventType, TERMINAL_EVENT_TYPES, validateEvent, type EventType } from
 import { BusError, isProducer, type DeliveredEvent, type Producer } from "../../domain/envelope.js";
 import type { PendingEvent } from "../../domain/transition.js";
 import type { EventPublisher } from "../../ports/outbound/event-publisher.js";
+import { FACTORY_MODELS } from "../../../shared/llm/model-provider.js";
 import { ParticipantRoster, type LaneParticipant, type LaneRole } from "./roster.js";
 
 export class FactoryRuntimeState extends RuntimeState {
@@ -126,7 +127,8 @@ function taskIdOf(payload: Record<string, unknown>): string | null {
 export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptions = {}): FactoryRuntime {
   const mozaik = defineRuntime<FactoryRuntimeState>();
   const state = new FactoryRuntimeState(runId);
-  mozaik.initializeRuntime(options.inferenceRunner === undefined ? { state } : { state, inferenceRunnerConfig: { runner: options.inferenceRunner } });
+  const supportedModels = [...FACTORY_MODELS];
+  mozaik.initializeRuntime({ state, inferenceRunnerConfig: options.inferenceRunner === undefined ? { supportedModels } : { supportedModels, runner: options.inferenceRunner } });
   const roster = new ParticipantRoster({ join: (participant) => mozaik.join(participant), leave: (participant) => mozaik.leave(participant) });
   let seq = 0;
   let terminalPublished = false;

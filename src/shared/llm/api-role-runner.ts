@@ -63,7 +63,7 @@ function answerTextOf(payload: unknown): string {
   return isRecord(content) && typeof content["text"] === "string" ? content["text"] : "";
 }
 
-export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<Record<string, ModelPricing>>): ApiRoleRunner {
+export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<Record<string, ModelPricing>>, effortByRole: Readonly<Record<string, string>> = {}): ApiRoleRunner {
   return {
     run(request: ApiRoleRequest): Promise<ApiRoleUsage> {
       return new Promise((resolvePromise, rejectPromise) => {
@@ -122,11 +122,13 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
         runtime.join(observer);
         runtime.mozaik.join(agent);
         try {
+          const reasoningEffort = effortByRole[request.role];
           runtime.mozaik.runLoop(agentId, request.message, {
             model: request.model,
             maxOutputTokens: request.maxOutputTokens,
             context: agent.getMemory().getContext(),
             tools: [...request.tools],
+            ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
           });
         } catch (error) {
           finish({ error: error instanceof Error ? error : new Error(String(error)) });
