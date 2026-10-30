@@ -1,0 +1,10 @@
+plan_id: 2026-10-30T151321Z-xiwas
+created_at: 2026-10-30T15:13:21.069Z
+pending_attestations:
+  - id: spec-stage:DLT-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T15:13:21.068Z
+    change_request: "critic never ends the run"
+    scope: first-time-approval
+    target_status: approved

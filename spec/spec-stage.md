@@ -939,7 +939,13 @@ test_obligation:
 id: spec-stage:DLT-002
 type: Delta
 lifecycle:
-  status: proposed
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T15:13:21.068Z
+    change_request: critic never ends the run
+    scope: first-time-approval
 partition_id: spec-stage
 title: final critic round - approval follows the recorded assumptions directly
 target_ids:
