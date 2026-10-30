@@ -1,14 +1,21 @@
 import type { CliToolUse } from "../../shared/llm/cli-role-runner.js";
+import { shellPathCandidates } from "./shell-paths.js";
 import { isUnderSource } from "./write-set.js";
 
-const TOKEN = /"([^"]*)"|'([^']*)'|(\S+)/g;
+const PATH_FIELDS = ["file_path", "notebook_path", "path", "directory", "glob"];
 
-function tokensOf(value: string): readonly string[] {
-  return [...value.matchAll(TOKEN)].map((match) => match[1] ?? match[2] ?? match[3] ?? "");
+function pathFieldsOf(toolName: string): readonly string[] {
+  return toolName === "Glob" ? [...PATH_FIELDS, "pattern"] : PATH_FIELDS;
 }
 
-function stringValuesOf(input: Readonly<Record<string, unknown>>): readonly string[] {
-  return Object.values(input).filter((value): value is string => typeof value === "string");
+function pathCandidatesOf(toolUse: CliToolUse): readonly string[] {
+  if (toolUse.name === "Bash") {
+    const command = toolUse.input["command"];
+    return typeof command === "string" ? shellPathCandidates(command) : [];
+  }
+  return pathFieldsOf(toolUse.name)
+    .map((field) => toolUse.input[field])
+    .filter((value): value is string => typeof value === "string");
 }
 
 function relativeToWorktree(token: string, worktree: string): string {
@@ -21,12 +28,10 @@ function relativeToWorktree(token: string, worktree: string): string {
 export function firewallViolations(toolUses: readonly CliToolUse[], worktree: string, allowedPaths: readonly string[]): readonly string[] {
   const violations = new Set<string>();
   for (const toolUse of toolUses) {
-    for (const value of stringValuesOf(toolUse.input)) {
-      for (const token of tokensOf(value)) {
-        const path = relativeToWorktree(token, worktree);
-        if (isUnderSource(path) && !allowedPaths.includes(path)) {
-          violations.add(`${toolUse.name}:${path}`);
-        }
+    for (const candidate of pathCandidatesOf(toolUse)) {
+      const path = relativeToWorktree(candidate, worktree);
+      if (isUnderSource(path) && !allowedPaths.includes(path)) {
+        violations.add(`${toolUse.name}:${path}`);
       }
     }
   }
