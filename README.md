@@ -34,6 +34,8 @@ The same variables can live in a `.env` file at the repository root (git-ignored
 
 Flags: `--operator <identity>`, `--no-push` (dry run), `--out <dir>`, `--max-parallel-lanes <1..8>`. Mid-run nudges are recorded, never required: `npm run factory -- nudge <runId> --note "..."`.
 
+A failed run continues after a factory fix instead of restarting: `npm run factory -- resume <runId> [--note "..."] [--force]` starts a new run that reuses the failed run's product directory, replays its bus trace through the pure transition rules up to the last event that produced work, records a `human.intervention{kind: "fix_between_runs"}` and re-publishes that event. `--force` is required when the old run is still marked `running` (its process was killed).
+
 Exit codes: `0` published, `1` run failed (see the terminal report and `.factory/runs/<runId>/`), `2` usage error, `3` environment error.
 
 `factory.config.json` (template: `factory.config.example.json`): rework caps, timeouts, models per role (`default`, `critic`, `triage`, `reviewer`, `lane`; `reviewer` falls back to `default` when absent), per-role reasoning effort (`models.effort.<role>`), parallel lanes, and a price table (`pricing`) used to cost API roles; lanes report their own cost from `claude --print`. Any model id from Mozaik's supported list works per role, plus the ids the factory registers itself: `gpt-6.1-terra` on the OpenAI provider and the OpenRouter ids `deepseek/deepseek-v4.1-flash-1017`, `z-ai/glm-5.3-flash`, `anthropic/claude-opus-5.5`, `openai/gpt-6.1-terra`, `openai/gpt-6-luna` on the `openrouter` provider (`OPENROUTER_API_KEY`); an unknown id or a provider without a key mapping is a configuration error (exit 2).

@@ -1,12 +1,14 @@
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createFactoryRuntime, createReactor } from "../../bus/adapters/mozaik/runtime.js";
+import { isLaneRole } from "../../bus/adapters/mozaik/roster.js";
+import { createFactoryRuntime, createReactor, type FactoryRuntime } from "../../bus/adapters/mozaik/runtime.js";
 import { AtomicJsonStore } from "../../bus/adapters/outbound/atomic-json-store.js";
 import { RunEngine } from "../../bus/application/run-engine.js";
 import { EVENT_TYPES, type EventType } from "../../bus/domain/catalogue.js";
 import { type DeliveredEvent, isProducer } from "../../bus/domain/envelope.js";
 import { createRunState } from "../../bus/domain/run-state.js";
+import type { PendingEvent } from "../../bus/domain/transition.js";
 import type { FactoryConfig } from "../../shared/config.js";
 import { createApiRoleRunner, type ApiRoleRunner } from "../../shared/llm/api-role-runner.js";
 import { createCliRoleRunner, type CliRoleRunner } from "../../shared/llm/cli-role-runner.js";
@@ -16,6 +18,7 @@ import { composeEffectRunner, composeRules, type RunPaths, type Slice, type Slic
 import { runIdOf } from "../domain/run-id.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { createFactorySlice, type TerminalOutcome } from "./factory-slice.js";
+import { planReplay, readResumeSource } from "./resume.js";
 import type { ToolchainVersions } from "./product-scaffold.js";
 
 export interface StartRunInput {
@@ -33,6 +36,7 @@ export interface StartRunInput {
   readonly log: (line: string) => void;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly roleRunners?: { readonly apiRoles?: ApiRoleRunner; readonly cliRoles?: CliRoleRunner };
+  readonly resume?: { readonly fromRunId: string; readonly note: string | null; readonly force: boolean };
 }
 
 export interface RunningFactory {
@@ -40,6 +44,27 @@ export interface RunningFactory {
   readonly paths: RunPaths;
   readonly terminal: Promise<TerminalOutcome>;
   shutdown(): Promise<void>;
+}
+
+function taskIdOf(payload: Readonly<Record<string, unknown>>): string | null {
+  const taskId = payload["taskId"];
+  return typeof taskId === "string" ? taskId : null;
+}
+
+/* The redo event keeps its original producer; a lane producer needs its lane participant around the publication (bus:BEH-007). */
+function republish(runtime: FactoryRuntime, redo: DeliveredEvent<EventType>): void {
+  const pending: PendingEvent = { type: redo.type, producer: redo.producer, payload: redo.payload };
+  const taskId = taskIdOf(redo.payload);
+  if (!isLaneRole(redo.producer) || taskId === null) {
+    runtime.publisher.publish(pending);
+    return;
+  }
+  const lane = runtime.joinLane(redo.producer, taskId);
+  try {
+    runtime.publisher.publish(pending);
+  } finally {
+    runtime.leaveLane(lane);
+  }
 }
 
 export function runPaths(repoRoot: string, runId: string, slug: string, specPath: string, outDir: string | null): RunPaths {
@@ -75,7 +100,10 @@ function watchNudges(runDir: string, publish: (note: string, actor: string) => v
 export async function startRun(input: StartRunInput): Promise<RunningFactory> {
   const startedAt = input.now();
   const runId = runIdOf(input.slug, startedAt);
-  const paths = runPaths(input.repoRoot, runId, input.slug, input.specPath, input.outDir);
+  const source = input.resume === undefined ? null : await readResumeSource(input.repoRoot, input.resume.fromRunId, input.resume.force);
+  const freshPaths = runPaths(input.repoRoot, runId, input.slug, input.specPath, input.outDir);
+  /* factory:BEH-009: a resumed run keeps its own directory but works in the failed run's product, worktrees and handoffs. */
+  const paths: RunPaths = source === null ? freshPaths : { ...freshPaths, productDir: join(source.runDir, "product"), worktreesDir: join(source.runDir, "worktrees"), handoffsDir: join(source.runDir, "handoffs") };
   await mkdir(paths.handoffsDir, { recursive: true });
   await mkdir(paths.traceDir, { recursive: true });
   await mkdir(join(paths.runDir, "nudges"), { recursive: true });
@@ -106,11 +134,15 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
     specPath: input.specPath,
     startedAt: startedAt.toISOString(),
     onTerminal: (outcome) => resolveTerminal(outcome),
+    resumedFrom: input.resume?.fromRunId ?? null,
   });
   const slices: Slice[] = [factorySlice, ...input.stageSlices].map((factory) => factory(context));
+  const rules = composeRules(slices);
+  const freshState = createRunState({ runId, slug: input.slug, operator: input.operator, startedAt: startedAt.toISOString() });
+  const replay = source === null ? null : planReplay(rules, createRunState({ runId: source.manifest.runId, slug: source.manifest.slug, operator: source.manifest.operator, startedAt: source.manifest.startedAt }), source.events);
   const engine = new RunEngine({
-    initialState: createRunState({ runId, slug: input.slug, operator: input.operator, startedAt: startedAt.toISOString() }),
-    rules: composeRules(slices),
+    initialState: replay === null ? freshState : { ...replay.state, runId, startedAt: freshState.startedAt },
+    rules,
     store: new AtomicJsonStore(join(paths.runDir, "state.json")),
     publisher: runtime.publisher,
     effects: composeEffectRunner(slices, context),
@@ -142,6 +174,11 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
   });
 
   runtime.publisher.publish({ type: "run.started", producer: "foreman", payload: { specPath: input.specPath, slug: input.slug, operator: input.operator, mode: "autonomous" } });
+  if (input.resume !== undefined && replay !== null) {
+    const note = `resume of ${input.resume.fromRunId} from ${replay.redo.type} seq ${replay.redo.seq}${input.resume.note === null ? "" : `; ${input.resume.note}`}`;
+    runtime.publisher.publish({ type: "human.intervention", producer: "foreman", payload: { kind: "fix_between_runs", note, actor: input.operator } });
+    republish(runtime, replay.redo);
+  }
 
   return {
     runId,

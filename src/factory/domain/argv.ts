@@ -13,7 +13,17 @@ export interface NudgeCommand {
   readonly note: string;
 }
 
-export type FactoryCommand = RunCommand | NudgeCommand;
+export interface ResumeCommand {
+  readonly kind: "resume";
+  readonly runId: string;
+  readonly note: string | null;
+  readonly force: boolean;
+  readonly push: boolean;
+  readonly outDir: string | null;
+  readonly maxParallelLanes: number | null;
+}
+
+export type FactoryCommand = RunCommand | NudgeCommand | ResumeCommand;
 
 export class UsageError extends Error {
   override readonly name = "UsageError";
@@ -22,6 +32,7 @@ export class UsageError extends Error {
 export const USAGE = [
   "usage: factory run <spec.md> [--operator <identity>] [--no-push] [--out <dir>] [--max-parallel-lanes <1..8>]",
   "       factory nudge <runId> --note <text>",
+  "       factory resume <runId> [--note <text>] [--force] [--no-push] [--out <dir>] [--max-parallel-lanes <1..8>]",
 ].join("\n");
 
 function takeValue(argv: readonly string[], index: number, flag: string): string {
@@ -30,6 +41,14 @@ function takeValue(argv: readonly string[], index: number, flag: string): string
     throw new UsageError(`${flag} requires a value`);
   }
   return value;
+}
+
+function parseMaxParallelLanes(raw: string): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 8) {
+    throw new UsageError(`--max-parallel-lanes must be an integer between 1 and 8, got ${raw}`);
+  }
+  return parsed;
 }
 
 function parseRun(argv: readonly string[]): RunCommand {
@@ -52,16 +71,10 @@ function parseRun(argv: readonly string[]): RunCommand {
         outDir = takeValue(argv, index, argument);
         index += 1;
         break;
-      case "--max-parallel-lanes": {
-        const raw = takeValue(argv, index, argument);
-        const parsed = Number(raw);
-        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 8) {
-          throw new UsageError(`--max-parallel-lanes must be an integer between 1 and 8, got ${raw}`);
-        }
-        maxParallelLanes = parsed;
+      case "--max-parallel-lanes":
+        maxParallelLanes = parseMaxParallelLanes(takeValue(argv, index, argument));
         index += 1;
         break;
-      }
       default:
         if (argument.startsWith("--")) {
           throw new UsageError(`unknown flag ${argument}`);
@@ -103,6 +116,50 @@ function parseNudge(argv: readonly string[]): NudgeCommand {
   return { kind: "nudge", runId, note };
 }
 
+function parseResume(argv: readonly string[]): ResumeCommand {
+  let runId: string | null = null;
+  let note: string | null = null;
+  let force = false;
+  let push = true;
+  let outDir: string | null = null;
+  let maxParallelLanes: number | null = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index] ?? "";
+    switch (argument) {
+      case "--note":
+        note = takeValue(argv, index, argument);
+        index += 1;
+        break;
+      case "--force":
+        force = true;
+        break;
+      case "--no-push":
+        push = false;
+        break;
+      case "--out":
+        outDir = takeValue(argv, index, argument);
+        index += 1;
+        break;
+      case "--max-parallel-lanes":
+        maxParallelLanes = parseMaxParallelLanes(takeValue(argv, index, argument));
+        index += 1;
+        break;
+      default:
+        if (argument.startsWith("--")) {
+          throw new UsageError(`unknown flag ${argument}`);
+        }
+        if (runId !== null) {
+          throw new UsageError(`unexpected positional argument ${argument}`);
+        }
+        runId = argument;
+    }
+  }
+  if (runId === null) {
+    throw new UsageError("missing <runId>");
+  }
+  return { kind: "resume", runId, note, force, push, outDir, maxParallelLanes };
+}
+
 export function parseArgv(argv: readonly string[]): FactoryCommand {
   const [subcommand, ...rest] = argv;
   switch (subcommand) {
@@ -110,6 +167,8 @@ export function parseArgv(argv: readonly string[]): FactoryCommand {
       return parseRun(rest);
     case "nudge":
       return parseNudge(rest);
+    case "resume":
+      return parseResume(rest);
     case undefined:
       throw new UsageError("missing subcommand");
     default:

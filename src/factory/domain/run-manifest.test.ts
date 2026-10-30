@@ -3,6 +3,7 @@ import { createRunManifest, exitCodeOf } from "./run-manifest.js";
 
 describe("run manifest", () => {
   // @covers factory:CTR-003
+  // @covers factory:DLT-004
   it("starts running at the workspace stage with empty counters", () => {
     const manifest = createRunManifest({ runId: "todo-cli-20261029-120000", slug: "todo-cli", specPath: "specs/todo.md", operator: "cyberash", startedAt: "2026-10-29T12:00:00.000Z" });
 
@@ -22,6 +23,7 @@ describe("run manifest", () => {
       outputDir: null,
       pushed: null,
       counters: { tasks: 0, tasksApproved: 0, tasksFailed: 0, reworks: 0 },
+      resumedFrom: null,
     });
   });
 

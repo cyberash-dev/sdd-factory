@@ -42,6 +42,7 @@ async function harness(): Promise<{ context: SliceContext; terminal: TerminalOut
     specPath: "specs/todo.md",
     startedAt: "2026-10-29T12:00:00.000Z",
     onTerminal: (outcome) => terminal.push(outcome),
+    resumedFrom: null,
   })(context);
   const rule = (type: EventType): TransitionRule => {
     const found = slice.rules.find((candidate) => candidate.eventType === type);
@@ -71,6 +72,15 @@ describe("factory slice rules", () => {
       [["human.intervention", "launch", "cyberash"]],
       ["factory.bootstrap"],
     ]);
+  });
+
+  // @covers factory:BEH-009
+  it("records run.started on a seeded state without bootstrapping again", async () => {
+    const { rule } = await harness();
+
+    const result = rule("run.started").apply({ state: { ...initial(), status: "spec_review" }, event: event("run.started", { specPath: "specs/todo.md", slug: "todo-cli", operator: "cyberash", mode: "autonomous" }) });
+
+    expect([result.state.status, result.emits, result.effects.map((effect) => effect.kind)]).toEqual(["spec_review", [], ["factory.manifest"]]);
   });
 
   // @covers factory:BEH-005

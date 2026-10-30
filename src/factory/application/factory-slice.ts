@@ -21,10 +21,12 @@ export interface FactorySliceOptions {
   readonly specPath: string;
   readonly startedAt: string;
   readonly onTerminal: (outcome: TerminalOutcome) => void;
+  readonly resumedFrom: string | null;
 }
 
 export const BOOTSTRAP_EFFECT = "factory.bootstrap";
-export const FINALIZE_EFFECT = "factory.finalize";
+export const MANIFEST_EFFECT = "factory.manifest";
+const FINALIZE_EFFECT = "factory.finalize";
 
 function stringField(effect: Effect | Record<string, unknown>, key: string): string {
   const value = effect[key];
@@ -38,7 +40,7 @@ function failureStage(stage: unknown): RunStage {
 export function createFactorySlice(options: FactorySliceOptions): SliceFactory {
   return (context: SliceContext): Slice => {
     const manifestPath = join(context.paths.runDir, "run.json");
-    let manifest = createRunManifest({ runId: context.runId, slug: context.slug, specPath: options.specPath, operator: context.operator, startedAt: options.startedAt });
+    let manifest = createRunManifest({ runId: context.runId, slug: context.slug, specPath: options.specPath, operator: context.operator, startedAt: options.startedAt, resumedFrom: options.resumedFrom });
 
     const persistManifest = async (next: RunManifest): Promise<void> => {
       manifest = next;
@@ -49,12 +51,15 @@ export function createFactorySlice(options: FactorySliceOptions): SliceFactory {
       {
         name: "run.started -> workspace",
         eventType: "run.started",
-        acceptsRunStatus: ["started"],
-        apply: ({ state }) => ({
-          state: { ...state, status: "workspace" },
-          emits: [{ type: "human.intervention", producer: "foreman", payload: { kind: "launch", note: `run launched; approvals pre-authorised by ${state.operator}`, actor: state.operator } }],
-          effects: [{ kind: BOOTSTRAP_EFFECT }],
-        }),
+        apply: ({ state }) =>
+          /* factory:BEH-009: a resumed run arrives with a seeded state; run.started is then recorded and the manifest written, nothing else. */
+          state.status === "started"
+            ? {
+                state: { ...state, status: "workspace" },
+                emits: [{ type: "human.intervention", producer: "foreman", payload: { kind: "launch", note: `run launched; approvals pre-authorised by ${state.operator}`, actor: state.operator } }],
+                effects: [{ kind: BOOTSTRAP_EFFECT }],
+              }
+            : { state, emits: [], effects: [{ kind: MANIFEST_EFFECT }] },
       },
       {
         name: "human.intervention recorded",
@@ -110,6 +115,9 @@ export function createFactorySlice(options: FactorySliceOptions): SliceFactory {
           const reason = error instanceof BootstrapError && error.reason === "toolchain_install_failed" ? "tooling_broken" : "runtime_error";
           effectContext.publish({ type: "run.failed", producer: "foreman", payload: { stage: "workspace", reason, detail: error instanceof Error ? error.message : String(error) } });
         }
+      },
+      [MANIFEST_EFFECT]: async (_effect: Effect, effectContext: EffectContext): Promise<void> => {
+        await persistManifest({ ...manifest, stage: stageOf(effectContext.state.status, effectContext.state.failure) });
       },
       [FINALIZE_EFFECT]: async (effect: Effect, effectContext: EffectContext): Promise<void> => {
         const state = effectContext.state;

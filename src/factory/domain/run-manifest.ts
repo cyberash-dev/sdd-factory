@@ -25,6 +25,7 @@ export interface RunManifest {
   readonly outputDir: string | null;
   readonly pushed: boolean | null;
   readonly counters: RunCounters;
+  readonly resumedFrom: string | null;
 }
 
 export function createRunManifest(input: {
@@ -33,6 +34,7 @@ export function createRunManifest(input: {
   readonly specPath: string;
   readonly operator: string;
   readonly startedAt: string;
+  readonly resumedFrom?: string | null;
 }): RunManifest {
   return {
     schemaVersion: 1,
@@ -50,6 +52,7 @@ export function createRunManifest(input: {
     outputDir: null,
     pushed: null,
     counters: { tasks: 0, tasksApproved: 0, tasksFailed: 0, reworks: 0 },
+    resumedFrom: input.resumedFrom ?? null,
   };
 }
 

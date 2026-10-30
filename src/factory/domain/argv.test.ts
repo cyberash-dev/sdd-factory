@@ -30,6 +30,24 @@ describe("factory argv", () => {
     });
   });
 
+  // @covers factory:DLT-004
+  it("parses the minimal resume command with defaults", () => {
+    expect(parseArgv(["resume", "todo-20261029-120000"])).toEqual({ kind: "resume", runId: "todo-20261029-120000", note: null, force: false, push: true, outDir: null, maxParallelLanes: null });
+  });
+
+  // @covers factory:DLT-004
+  it("parses every resume flag", () => {
+    expect(parseArgv(["resume", "todo-20261029-120000", "--note", "fixed the critic", "--force", "--no-push", "--out", "out/todo", "--max-parallel-lanes", "3"])).toEqual({
+      kind: "resume",
+      runId: "todo-20261029-120000",
+      note: "fixed the critic",
+      force: true,
+      push: false,
+      outDir: "out/todo",
+      maxParallelLanes: 3,
+    });
+  });
+
   it("parses the nudge command", () => {
     expect(parseArgv(["nudge", "todo-20261029-120000", "--note", "retry the planner"])).toEqual({ kind: "nudge", runId: "todo-20261029-120000", note: "retry the planner" });
   });
@@ -42,6 +60,9 @@ describe("factory argv", () => {
     [["run", "a.md", "--max-parallel-lanes", "9"], "--max-parallel-lanes must be an integer between 1 and 8, got 9"],
     [["run", "a.md", "--operator"], "--operator requires a value"],
     [["nudge", "run-1"], "--note is required"],
+    [["resume"], "missing <runId>"],
+    [["resume", "run-1", "run-2"], "unexpected positional argument run-2"],
+    [["resume", "run-1", "--note"], "--note requires a value"],
     [[], "missing subcommand"],
     [["build"], "unknown subcommand build"],
   ])("rejects %j with a usage error naming the problem", (argv, message) => {

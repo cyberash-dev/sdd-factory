@@ -2,10 +2,11 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { ExecCommandRunner } from "./factory/adapters/outbound/exec-command-runner.js";
 import { startRun } from "./factory/application/compose.js";
+import { readRunManifest, ResumeError } from "./factory/application/resume.js";
 import { NudgeError, recordNudge } from "./factory/application/nudge.js";
 import { fileExists, preflight, PreflightError } from "./factory/application/preflight.js";
 import { failureReport, successSummary } from "./factory/application/terminal-report.js";
-import { parseArgv, USAGE, UsageError } from "./factory/domain/argv.js";
+import { parseArgv, type ResumeCommand, USAGE, UsageError } from "./factory/domain/argv.js";
 import { exitCodeOf } from "./factory/domain/run-manifest.js";
 import { loadConfig, mergeConfig } from "./shared/config.js";
 import { createRedactor } from "./shared/redaction.js";
@@ -41,6 +42,18 @@ function silenceCoreCloudWarning(): void {
   };
 }
 
+interface Launch {
+  readonly specPath: string;
+  readonly operatorFlag: string | null;
+  readonly resume: { readonly fromRunId: string; readonly note: string | null; readonly force: boolean } | null;
+}
+
+/* factory:BEH-009: a resumed run takes its spec and operator from the run it continues. */
+async function resumeLaunch(repoRoot: string, command: ResumeCommand): Promise<Launch> {
+  const source = await readRunManifest(repoRoot, command.runId);
+  return { specPath: source.specPath, operatorFlag: source.operator, resume: { fromRunId: command.runId, note: command.note, force: command.force } };
+}
+
 async function runCommand(argv: readonly string[]): Promise<number> {
   const command = parseArgv(argv);
   const repoRoot = process.cwd();
@@ -54,9 +67,10 @@ async function runCommand(argv: readonly string[]): Promise<number> {
   process.env["MOZAIK_API_KEY"] = "";
   silenceCoreCloudWarning();
   const baseConfig = await loadConfig(join(repoRoot, "factory.config.json"));
+  const launch = command.kind === "resume" ? await resumeLaunch(repoRoot, command) : { specPath: command.specPath, operatorFlag: command.operator, resume: null };
   const checked = await preflight({
-    specPath: command.specPath,
-    operatorFlag: command.operator,
+    specPath: launch.specPath,
+    operatorFlag: launch.operatorFlag,
     env,
     models: baseConfig.models,
     nodeMajor: Number(process.versions.node.split(".")[0]),
@@ -65,7 +79,7 @@ async function runCommand(argv: readonly string[]): Promise<number> {
   const config = command.maxParallelLanes === null ? baseConfig : mergeConfig(baseConfig, { maxParallelLanes: command.maxParallelLanes });
   const running = await startRun({
     repoRoot,
-    specPath: resolve(command.specPath),
+    specPath: resolve(launch.specPath),
     slug: checked.slug,
     operator: checked.operator,
     push: command.push,
@@ -77,6 +91,7 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     now: () => new Date(),
     log: (line) => process.stderr.write(`[factory] ${redactLog(line)}\n`),
     env,
+    ...(launch.resume === null ? {} : { resume: launch.resume }),
   });
   process.stderr.write(`[factory] run ${running.runId} started; run dir ${running.paths.runDir}\n`);
   const outcome = await running.terminal;
@@ -96,6 +111,11 @@ async function main(): Promise<void> {
     const code = await runCommand(process.argv.slice(2));
     process.exitCode = code;
   } catch (error) {
+    if (error instanceof ResumeError) {
+      process.stderr.write(`${error.message}\n`);
+      process.exitCode = 2;
+      return;
+    }
     if (error instanceof UsageError || error instanceof NudgeError) {
       process.stderr.write(`${error.message}\n${USAGE}\n`);
       process.exitCode = 2;
