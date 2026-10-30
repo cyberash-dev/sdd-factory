@@ -2,6 +2,7 @@ import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describeHandoffError, parseHandoff } from "../../../bus/domain/handoff.js";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
+import type { PendingEvent } from "../../../bus/domain/transition.js";
 import { readTextOrNull } from "../../../shared/fs/text.js";
 import type { ApiRoleUsage } from "../../../shared/llm/api-role-runner.js";
 import { reviewerModel } from "../../../shared/config.js";
@@ -63,6 +64,27 @@ async function archiveWorktreeHandoffs(worktree: string, handoffPath: string): P
   await rm(source, { recursive: true, force: true });
 }
 
+/* build-stage:DLT-004: the review is a quality layer over the Verifier, so a reviewer without a handoff approves on evidence. */
+function reviewUnavailable(taskId: string, runs: number, usage: ApiRoleUsage): PendingEvent {
+  return {
+    type: "task.reviewed",
+    producer: "foreman",
+    payload: {
+      taskId,
+      decision: "advisory_only",
+      target: "none",
+      reportPath: "",
+      specIds: [],
+      findingText: `review unavailable: reviewer produced no handoff after ${runs} runs`,
+      costUsd: usage.costUsd,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      durationMs: usage.durationMs,
+      model: usage.model,
+    },
+  };
+}
+
 export async function runReviewer(slice: SliceContext, deps: LaneDeps, context: EffectContext, run: ReviewerRun): Promise<void> {
   const token = deps.lanes.tokenOf(run.taskId);
   const inputs = await laneInputs(slice, deps, context.state, run.taskId);
@@ -79,14 +101,19 @@ export async function runReviewer(slice: SliceContext, deps: LaneDeps, context: 
   const message = reviewerMessage({ ...base, mode: run.mode, implSha, diff, frozenTestFiles: frozen, evidenceJson, finding: run.finding, reportPath: reviewReportPath(run.taskId) });
   const trace = (entry: { readonly tool: string; readonly path: string | null }): void => slice.log(`reviewer ${run.taskId} ${entry.tool} ${entry.path ?? ""}`);
   const tools = [readFileTool(worktree, trace), listDirTool(worktree, trace), restrictedWriteFileTool(worktree, REVIEWER_WRITE_PREFIXES, trace)];
+  const models = slice.config.models;
+  const invokeWith =
+    (model: string) =>
+    (text: string): Promise<ApiRoleUsage> =>
+      slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model, tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), "tools.jsonl") });
   const result = await runWithHandoffRetry<ApiRoleUsage, ReviewReport>(
     {
       role: "reviewer",
       handoffPath: worktreeHandoff,
       maxReruns: slice.config.caps.handoffRerun,
-      timeout: { note: roleTimeoutNote(slice.config.timeouts.apiRoleMs), run: { model: reviewerModel(slice.config.models), inputTokens: 0, outputTokens: 0, costUsd: null, inferenceCount: 0, durationMs: 0, answer: "" } },
-      invoke: (text) =>
-        slice.apiRoles.run({ role: "reviewer", taskId: run.taskId, instruction, message: text, model: reviewerModel(slice.config.models), tools, timeoutMs: slice.config.timeouts.apiRoleMs, maxOutputTokens: REVIEWER_MAX_OUTPUT_TOKENS, toolTracePath: join(dirname(handoffPath), "tools.jsonl") }),
+      timeout: { note: roleTimeoutNote(slice.config.timeouts.apiRoleMs), run: { model: reviewerModel(models), inputTokens: 0, outputTokens: 0, costUsd: null, inferenceCount: 0, durationMs: 0, answer: "" } },
+      invoke: invokeWith(reviewerModel(models)),
+      ...(reviewerModel(models) === models.default ? {} : { fallback: invokeWith(models.default) }),
       parse: () => parseReviewOutputs(worktree, worktreeHandoff, run, implSha),
     },
     message,
@@ -96,7 +123,14 @@ export async function runReviewer(slice: SliceContext, deps: LaneDeps, context: 
     return;
   }
   if (!result.ok) {
-    context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "unparseable_handoff", detail: `reviewer: ${result.error}` } });
+    if (reviewerModel(models) === models.default) {
+      context.publish({ type: "task.failed", producer: "foreman", payload: { taskId: run.taskId, reason: "unparseable_handoff", detail: `reviewer: ${result.error}` } });
+      return;
+    }
+    if (result.run === null) {
+      throw new Error(`reviewer ${run.taskId}: round-trip ended without a run`);
+    }
+    context.publish(reviewUnavailable(run.taskId, result.reruns + 1, result.run));
     return;
   }
   const usage = result.run;

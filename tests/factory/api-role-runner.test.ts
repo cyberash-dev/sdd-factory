@@ -82,6 +82,34 @@ describe("API role runner on the Mozaik loop", () => {
     expect(lines.map((line) => [line["tool"], line["args"], line["result"]])).toEqual([["write_file", '{"path":"spec/spec.md"}', "written"]]);
   });
 
+  // @covers build-stage:DLT-004
+  it("keeps the final answer as answer-run1.md next to the tool trace", async () => {
+    const runtime = createFactoryRuntime(RUN_ID, { inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "I reviewed it, all good." })], tokenUsage: usage(5, 1), rowResponse: null }]) });
+    const roleDir = join(await mkdtemp(join(tmpdir(), "roles-")), "reviewer-1");
+
+    await createApiRoleRunner(runtime, {}).run({ role: "reviewer", instruction: "a", message: "m", model: "m", tools: [], timeoutMs: 5000, maxOutputTokens: 100, toolTracePath: join(roleDir, "tools.jsonl") });
+
+    expect(await readFile(join(roleDir, "answer-run1.md"), "utf8")).toBe("I reviewed it, all good.");
+  });
+
+  // @covers build-stage:DLT-004
+  it("numbers the answer file of a re-run sharing the trace path as answer-run2.md", async () => {
+    const runtime = createFactoryRuntime(RUN_ID, {
+      inferenceRunner: scriptedRunner([
+        { items: [ModelMessageItem.rehydrate({ text: "first answer" })], tokenUsage: usage(5, 1), rowResponse: null },
+        { items: [ModelMessageItem.rehydrate({ text: "second answer" })], tokenUsage: usage(5, 1), rowResponse: null },
+      ]),
+    });
+    const roleDir = join(await mkdtemp(join(tmpdir(), "roles-")), "reviewer-1");
+    const runner = createApiRoleRunner(runtime, {});
+    const request = { role: "reviewer", instruction: "a", message: "m", model: "m", tools: [], timeoutMs: 5000, maxOutputTokens: 100, toolTracePath: join(roleDir, "tools.jsonl") } as const;
+    await runner.run(request);
+
+    await runner.run(request);
+
+    expect(await readFile(join(roleDir, "answer-run2.md"), "utf8")).toBe("second answer");
+  });
+
   // @covers factory:EXT-001
   it("keeps the agent joined while the loop is still publishing its final answer", async () => {
     const runtime = createFactoryRuntime(RUN_ID, { inferenceRunner: scriptedRunner([{ items: [ModelMessageItem.rehydrate({ text: "ok" })], tokenUsage: usage(1, 1), rowResponse: null }]) });

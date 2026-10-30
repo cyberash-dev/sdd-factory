@@ -1,5 +1,5 @@
-import { appendFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { createAgent, type SemanticEvent, type Tool } from "@mozaik-ai/core";
 import type { FactoryRuntime } from "../../bus/adapters/mozaik/runtime.js";
 import { createRuntimeObserver } from "../../bus/adapters/mozaik/runtime.js";
@@ -29,6 +29,30 @@ async function appendTraceLine(path: string, line: Record<string, unknown>): Pro
   try {
     await mkdir(dirname(path), { recursive: true });
     await appendFile(path, `${JSON.stringify(line)}\n`, "utf8");
+  } catch {
+    return;
+  }
+}
+
+function isFileExists(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+/* build-stage:DLT-004: re-runs share one trace path, so the run number is the first free answer-run<N>.md beside it. */
+async function keepAnswer(toolTracePath: string, answer: string): Promise<void> {
+  const dir = dirname(toolTracePath);
+  try {
+    await mkdir(dir, { recursive: true });
+    for (let runNumber = 1; ; runNumber += 1) {
+      try {
+        await writeFile(join(dir, `answer-run${runNumber}.md`), answer, { encoding: "utf8", flag: "wx" });
+        return;
+      } catch (error) {
+        if (!isFileExists(error)) {
+          throw error;
+        }
+      }
+    }
   } catch {
     return;
   }
@@ -156,7 +180,7 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
             rejectPromise(outcome.error);
             return;
           }
-          resolvePromise({
+          const usage: ApiRoleUsage = {
             model: request.model,
             inputTokens,
             outputTokens,
@@ -164,7 +188,12 @@ export function createApiRoleRunner(runtime: FactoryRuntime, pricing: Readonly<R
             inferenceCount,
             durationMs: Date.now() - startedAt,
             answer: outcome.answer,
-          });
+          };
+          if (request.toolTracePath === undefined) {
+            resolvePromise(usage);
+            return;
+          }
+          void keepAnswer(request.toolTracePath, outcome.answer).then(() => resolvePromise(usage));
         };
         runtime.join(observer);
         runtime.mozaik.join(agent);

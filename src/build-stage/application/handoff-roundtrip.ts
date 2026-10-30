@@ -13,6 +13,8 @@ export interface RoleInvocation<TRun, TParsed> {
   parse(): Promise<ParseOutcome<TParsed>>;
   /* factory:BEH-011: when set, a role timeout is a re-run with this note instead of an error; `run` stands in for the lost attempt. */
   readonly timeout?: { readonly note: string; readonly run: TRun };
+  /* build-stage:DLT-004: one more run after the re-runs, e.g. the reviewer on models.default. */
+  readonly fallback?: (message: string) => Promise<TRun>;
 }
 
 export type RoundtripResult<TRun, TParsed> =
@@ -38,11 +40,13 @@ export async function runWithHandoffRetry<TRun, TParsed>(invocation: RoleInvocat
   let lastRun: TRun | null = null;
   let lastError = "missing_file";
   let currentMessage = message;
-  for (let rerun = 0; rerun <= invocation.maxReruns; rerun += 1) {
+  const lastRerun = invocation.maxReruns + (invocation.fallback === undefined ? 0 : 1);
+  for (let rerun = 0; rerun <= lastRerun; rerun += 1) {
+    const invoke = rerun > invocation.maxReruns && invocation.fallback !== undefined ? invocation.fallback : (text: string): Promise<TRun> => invocation.invoke(text);
     let timedOut = false;
     let run: TRun;
     try {
-      run = await invocation.invoke(currentMessage);
+      run = await invoke(currentMessage);
     } catch (error) {
       if (invocation.timeout === undefined || !isRoleTimeout(error)) {
         throw error;
@@ -59,5 +63,5 @@ export async function runWithHandoffRetry<TRun, TParsed>(invocation: RoleInvocat
     await keepMalformed(invocation.handoffPath, rerun + 1);
     currentMessage = `${message}${timedOut && invocation.timeout !== undefined ? invocation.timeout.note : handoffRejectionNote(invocation.handoffPath, outcome.error)}`;
   }
-  return { ok: false, run: lastRun, error: lastError, reruns: invocation.maxReruns };
+  return { ok: false, run: lastRun, error: lastError, reruns: lastRerun };
 }

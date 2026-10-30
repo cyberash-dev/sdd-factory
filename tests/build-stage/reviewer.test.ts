@@ -3,10 +3,10 @@ import { join } from "node:path";
 import YAML from "yaml";
 import { describe, expect, it } from "vitest";
 import { greeterDesign } from "./support/design.js";
-import { aLaneHarness } from "./support/harness.js";
 import { laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
 import { aProductRepo, git, writeProductFile } from "./support/product.js";
 import { verifiedLane, writeReview } from "./support/reviews.js";
+import { aLaneHarness, TEST_CONFIG } from "./support/harness.js";
 import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { invokeTool, reviewFrontmatter, scriptedApiRoles } from "./support/runners.js";
 
@@ -142,5 +142,55 @@ describe("reviewer invocation", () => {
       [true, true, true, true, true],
       [["request_changes", "test-writer", ["greeter:BEH-001"]]],
     ]);
+  });
+});
+
+describe("reviewer without a handoff", () => {
+  // @covers build-stage:DLT-004
+  it("falls back to the default model after the re-runs, then publishes advisory_only from the foreman with the last run's usage", async () => {
+    const apiRoles = scriptedApiRoles(async () => undefined);
+    const { harness, state } = await verifiedLane(apiRoles, { models: { ...TEST_CONFIG.models, default: "claude-sonnet-5-5", reviewer: "z-ai/glm-5.3-flash" } });
+
+    const published = await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
+
+    expect([apiRoles.requests.map((request) => request.model), published]).toEqual([
+      ["z-ai/glm-5.3-flash", "z-ai/glm-5.3-flash", "claude-sonnet-5-5"],
+      [{ type: "task.reviewed", producer: "foreman", payload: { taskId: "T-001", decision: "advisory_only", target: "none", reportPath: "", specIds: [], findingText: "review unavailable: reviewer produced no handoff after 3 runs", costUsd: 0.02, inputTokens: 800, outputTokens: 150, durationMs: 2500, model: "claude-sonnet-5-5" } }],
+    ]);
+  });
+
+  // @covers build-stage:DLT-004
+  it("sends the fallback run the original message plus the re-run note", async () => {
+    const apiRoles = scriptedApiRoles(async () => undefined);
+    const { harness, state } = await verifiedLane(apiRoles, { models: { ...TEST_CONFIG.models, reviewer: "z-ai/glm-5.3-flash" } });
+
+    await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
+
+    const [first, , fallback] = apiRoles.requests;
+    expect([fallback?.message.startsWith(first?.message ?? "-"), fallback?.message.includes("Previous handoff rejected")]).toEqual([true, true]);
+  });
+
+  // @covers build-stage:DLT-004
+  it("publishes the review written on the fallback run", async () => {
+    const apiRoles = scriptedApiRoles(async (request, invocation) => {
+      if (invocation === 3) {
+        await writeReview(request, reviewFrontmatter({ impl_sha: (request.message.match(/Reviewed commit: ([0-9a-f]{40})/) ?? [])[1] ?? null }));
+      }
+    });
+    const { harness, state } = await verifiedLane(apiRoles, { models: { ...TEST_CONFIG.models, default: "claude-sonnet-5-5", reviewer: "z-ai/glm-5.3-flash" } });
+
+    const published = await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
+
+    expect(published.map((event) => [event.type, event.producer, event.payload["decision"], event.payload["model"]])).toEqual([["task.reviewed", "reviewer", "approve", "claude-sonnet-5-5"]]);
+  });
+
+  // @covers build-stage:DLT-004
+  it("makes no extra invocation when the reviewer model is the default model and fails the task", async () => {
+    const apiRoles = scriptedApiRoles(async () => undefined);
+    const { harness, state } = await verifiedLane(apiRoles, { models: { ...TEST_CONFIG.models, reviewer: null } });
+
+    const published = await runLaneEffect(harness, "build.reviewer", { taskId: "T-001", mode: "review", attempt: 1 }, state);
+
+    expect([apiRoles.requests.length, published.map((event) => [event.type, event.payload["reason"]])]).toEqual([2, [["task.failed", "unparseable_handoff"]]]);
   });
 });
