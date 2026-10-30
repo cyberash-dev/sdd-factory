@@ -76,6 +76,14 @@ describe("event catalogue validation", () => {
     expect(codeOf(() => validateEvent(eventOf(type, payload)))).toBe(`envelope_invalid:payload.${field}`);
   });
 
+  // @covers bus:DLT-004
+  // @covers bus:CTR-002
+  it("accepts run.failed with the terminated reason carrying the signal name", () => {
+    const event = eventOf("run.failed", { stage: "spec", reason: "terminated", detail: "SIGTERM" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
   it("rejects an unknown event type before looking at the payload", () => {
     const event = eventOf("task.exploded", { taskId: "T-001" });
 
@@ -85,6 +93,7 @@ describe("event catalogue validation", () => {
   it.each([
     ["spec.reviewed", { ...VALID_PAYLOADS["spec.reviewed"], decision: "maybe" }, "payload.decision"],
     ["run.failed", { ...VALID_PAYLOADS["run.failed"], reason: "toolchain_install_failed" }, "payload.reason"],
+    ["run.failed", { ...VALID_PAYLOADS["run.failed"], reason: "stopped" }, "payload.reason"],
     ["run.failed", { ...VALID_PAYLOADS["run.failed"], stage: "bootstrap" }, "payload.stage"],
     ["task.finding", { ...VALID_PAYLOADS["task.finding"], type: "BUG" }, "payload.type"],
     ["assembly.verified", { ...VALID_PAYLOADS["assembly.verified"], step: "lint" }, "payload.step"],

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { startRun } from "../../src/factory/application/compose.js";
+import { readResumeSource } from "../../src/factory/application/resume.js";
 import type { RunManifest } from "../../src/factory/domain/run-manifest.js";
 import type { CommandRunner } from "../../src/factory/ports/outbound/command-runner.js";
 import { DEFAULT_CONFIG } from "../../src/shared/config.js";
@@ -97,6 +98,74 @@ async function traceTypes(runDir: string): Promise<readonly (readonly [string, s
     .filter((record) => record.producer !== "runtime")
     .map((record) => [record.type, typeof record.payload["kind"] === "string" ? record.payload["kind"] : ""] as const);
 }
+
+const hangingSpecStage: SliceFactory = () => ({
+  name: "hanging-spec-stage",
+  rules: [{ name: "workspace.ready -> spec_drafting", eventType: "workspace.ready", apply: ({ state }) => ({ state: { ...state, status: "spec_drafting" }, emits: [], effects: [{ kind: "spec.draft" }] }) }],
+  effects: {
+    "spec.draft": () => new Promise<void>(() => undefined),
+  },
+  participants: () => [],
+});
+
+async function stateReaches(runDir: string, status: string): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const text = await readFile(join(runDir, "state.json"), "utf8").catch(() => "");
+    if (text.includes(`"status": "${status}"`)) {
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+  }
+  throw new Error(`state did not reach ${status} within 5s`);
+}
+
+async function startHanging(repoRoot: string): Promise<ReturnType<typeof startRun>> {
+  return startRun({ repoRoot, specPath: join(repoRoot, "todo-cli.md"), slug: "todo-cli", operator: "cyberash", push: false, outDir: null, config: DEFAULT_CONFIG, stageSlices: [createTraceSlice({ env: {} }), hangingSpecStage], commandRunner: fakeCommands, versions: { typescript: "7.0.2", vitest: "5.0.5", typesNode: "26.6.6", agentSdd: "2.1.1" }, now: () => new Date(), log: () => undefined, env: {} });
+}
+
+describe("terminated run", () => {
+  // @covers factory:BEH-010
+  it("ends a run waiting on a role as run.failed terminated at the current stage when the process is signalled", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
+    const running = await startHanging(repoRoot);
+    await stateReaches(running.paths.runDir, "spec_drafting");
+
+    running.terminate("SIGTERM");
+    const outcome = await running.terminal;
+    await running.shutdown();
+
+    const written: RunManifest = JSON.parse(await readFile(join(running.paths.runDir, "run.json"), "utf8"));
+    expect([outcome.manifest.status, outcome.manifest.reason, outcome.manifest.stage, outcome.failureDetail, written.status]).toEqual(["failed", "terminated", "spec", "SIGTERM", "failed"]);
+  });
+
+  // @covers factory:BEH-010
+  it("ignores a signal after the terminal event and keeps the first reason", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
+    const running = await startHanging(repoRoot);
+    running.terminate("SIGINT");
+    await running.terminal;
+
+    running.terminate("SIGTERM");
+    await running.shutdown();
+
+    const written: RunManifest = JSON.parse(await readFile(join(running.paths.runDir, "run.json"), "utf8"));
+    expect([written.status, written.reason]).toEqual(["failed", "terminated"]);
+  });
+
+  // @covers factory:BEH-010
+  it("leaves a terminated run resumable without --force", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "compose-"));
+    const running = await startHanging(repoRoot);
+    running.terminate("SIGTERM");
+    await running.terminal;
+    await running.shutdown();
+
+    const source = await readResumeSource(repoRoot, running.runId, false);
+
+    expect(source.manifest.status).toBe("failed");
+  });
+});
 
 describe("resumed run", () => {
   // @covers factory:BEH-009

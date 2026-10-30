@@ -2,7 +2,7 @@ import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeArgv, createCliRoleRunner, laneEnvironment, parseStreamJsonLine, type CliRoleRequest } from "../../src/shared/llm/cli-role-runner.js";
+import { claudeArgv, createCliRoleRunner, laneEnvironment, parseStreamJsonLine, signalLanes, type CliRoleRequest } from "../../src/shared/llm/cli-role-runner.js";
 
 const RESULT_LINE = JSON.stringify({ type: "result", subtype: "success", is_error: false, total_cost_usd: 0.0421, duration_ms: 1234, usage: { input_tokens: 500, output_tokens: 120 }, result: "done" });
 const TOOL_LINE = JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name: "Write", input: { file_path: "src/a.ts" } }] } });
@@ -57,6 +57,19 @@ describe("claude -p lane executor", () => {
     const outcome = await createCliRoleRunner().run(request(binary, 200));
 
     expect([outcome.timedOut, outcome.result]).toEqual([true, null]);
+  });
+
+  // @covers factory:BEH-010
+  it("forwards a termination signal to every lane still running", async () => {
+    const binary = await fakeClaude([], { sleepMs: 2000 });
+    const runner = createCliRoleRunner();
+    const running = runner.run(request(binary, 20000));
+
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 200));
+    signalLanes("SIGTERM");
+    const outcome = await running;
+
+    expect([outcome.signal, outcome.timedOut]).toEqual(["SIGTERM", false]);
   });
 
   it("rejects when the binary does not exist", async () => {

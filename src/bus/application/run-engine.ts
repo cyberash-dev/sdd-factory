@@ -44,7 +44,7 @@ export class RunEngine {
     this.deps.publisher.publish(pending);
   }
 
-  fail(stageHint: RunState["status"] | null, reason: "runtime_error" | "trace_write_failed", detail: string): void {
+  fail(stageHint: RunState["status"] | null, reason: "runtime_error" | "trace_write_failed" | "terminated", detail: string): void {
     if (isTerminalStatus(this.current.status)) {
       this.deps.log(`warning after terminal event: ${reason}: ${detail}`);
       return;

@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.3.0"
+version: "0.4.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -1880,6 +1880,53 @@ test_obligation:
     - members after finalize
   failure_scenarios:
     - drift still reported
+---
+```
+
+```yaml
+---
+id: bus:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-30T16:51:47.781Z
+    change_request: termination signals end the run cleanly
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.3.0 -> 0.4.0 - run.failed reason terminated
+target_ids:
+  - bus:SUR-001
+  - bus:CTR-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.4.0"
+description: |
+  bus:CTR-002 `run.failed.reason` gains the value `terminated`, published
+  by the foreman when the factory process receives SIGINT or SIGTERM
+  (factory:BEH-010); `detail` carries the signal name. Adding a reason
+  value is a minor bump per the contract's own compatibility rule. The
+  state.json failure block (bus:CTR-008) carries the new value unchanged.
+tests_old_behavior:
+  - every existing reason value is still accepted and every value outside the enum still rejected
+tests_new_behavior:
+  - to:bus:CTR-002
+test_obligation:
+  predicate: |
+    run.failed{reason: "terminated"} passes payload validation and
+    run.failed{reason: "stopped"} is still rejected; bus:SUR-001 is at
+    0.4.0 after finalize.
+  test_template: contract
+  boundary_classes:
+    - the new reason value
+    - a value outside the enum
+  failure_scenarios:
+    - the enum widened to any string
 ---
 ```
 

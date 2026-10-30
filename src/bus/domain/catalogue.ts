@@ -34,6 +34,7 @@ export const RUN_FAILED_REASONS = [
   "runtime_error",
   "publish_failed",
   "trace_write_failed",
+  "terminated",
 ] as const;
 export const INTERVENTION_KINDS = ["launch", "fix_between_runs", "mid_run_nudge"] as const;
 export const FINDING_TYPES = ["TEST-CONTRACT-CONFLICT", "TASK-OVERFLOW", "VD-INFEASIBLE", "TOOLING-BROKEN"] as const;

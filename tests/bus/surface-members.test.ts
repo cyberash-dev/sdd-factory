@@ -26,11 +26,19 @@ describe("bus surfaces after the member, state and roster deltas", () => {
     ]);
   });
 
-  // @covers bus:DLT-003
-  it("carries the participant roster behaviour as a factory-events member at version 0.3.0", async () => {
+  // @covers bus:DLT-004
+  it("carries version 0.4.0 after the terminated reason joined the lifecycle contract", async () => {
     const events = await surfaceRecord("bus:SUR-001");
 
-    expect([events.version, events.members.includes("bus:BEH-007")]).toEqual(["0.3.0", true]);
+    expect(events.version).toBe("0.4.0");
+  });
+
+  // @covers bus:DLT-003
+  it("carries the participant roster behaviour as a factory-events member past version 0.2.0", async () => {
+    const events = await surfaceRecord("bus:SUR-001");
+
+    const [major, minor] = events.version.split(".").map(Number);
+    expect([major, (minor ?? 0) >= 3, events.members.includes("bus:BEH-007")]).toEqual([0, true, true]);
   });
 
   // @covers bus:DLT-002

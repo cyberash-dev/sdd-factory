@@ -94,8 +94,18 @@ async function runCommand(argv: readonly string[]): Promise<number> {
     ...(launch.resume === null ? {} : { resume: launch.resume }),
   });
   process.stderr.write(`[factory] run ${running.runId} started; run dir ${running.paths.runDir}\n`);
+  const onSignal = (signal: NodeJS.Signals): void => {
+    if (signal === "SIGINT" || signal === "SIGTERM") {
+      process.stderr.write(`[factory] ${signal} received; ending the run\n`);
+      running.terminate(signal);
+    }
+  };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
   const outcome = await running.terminal;
   await running.shutdown();
+  process.off("SIGINT", onSignal);
+  process.off("SIGTERM", onSignal);
   const costs = await readCosts(running.paths.traceDir);
   if (outcome.manifest.status === "published") {
     const durationMs = Date.parse(outcome.manifest.endedAt ?? outcome.manifest.startedAt) - Date.parse(outcome.manifest.startedAt);

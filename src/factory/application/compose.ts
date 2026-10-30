@@ -11,7 +11,7 @@ import { createRunState } from "../../bus/domain/run-state.js";
 import type { PendingEvent } from "../../bus/domain/transition.js";
 import type { FactoryConfig } from "../../shared/config.js";
 import { createApiRoleRunner, type ApiRoleRunner } from "../../shared/llm/api-role-runner.js";
-import { createCliRoleRunner, type CliRoleRunner } from "../../shared/llm/cli-role-runner.js";
+import { createCliRoleRunner, signalLanes, type CliRoleRunner } from "../../shared/llm/cli-role-runner.js";
 import { createPromptLibrary } from "../../shared/prompts.js";
 import { createRedactor, redactDeep } from "../../shared/redaction.js";
 import { composeEffectRunner, composeRules, type RunPaths, type Slice, type SliceContext, type SliceFactory } from "../../shared/slice.js";
@@ -39,10 +39,13 @@ export interface StartRunInput {
   readonly resume?: { readonly fromRunId: string; readonly note: string | null; readonly force: boolean };
 }
 
+export type TerminationSignal = "SIGINT" | "SIGTERM";
+
 export interface RunningFactory {
   readonly runId: string;
   readonly paths: RunPaths;
   readonly terminal: Promise<TerminalOutcome>;
+  terminate(signal: TerminationSignal): void;
   shutdown(): Promise<void>;
 }
 
@@ -184,6 +187,11 @@ export async function startRun(input: StartRunInput): Promise<RunningFactory> {
     runId,
     paths,
     terminal,
+    /* factory:BEH-010: the signal ends the run through the bus so the trace, manifest and cloud session close like any failure. */
+    terminate(signal) {
+      signalLanes(signal);
+      engine.fail(null, "terminated", signal);
+    },
     async shutdown() {
       watcher.close();
       process.off("unhandledRejection", onUnhandled);

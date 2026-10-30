@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 
 export interface CliRoleRequest {
   readonly binary: string;
@@ -36,6 +36,15 @@ export interface CliRoleOutcome {
 
 export interface CliRoleRunner {
   run(request: CliRoleRequest): Promise<CliRoleOutcome>;
+}
+
+const liveLanes = new Set<ChildProcess>();
+
+/* factory:BEH-010: a lane subprocess receives the signal that ends the factory process. */
+export function signalLanes(signal: "SIGINT" | "SIGTERM"): void {
+  for (const lane of liveLanes) {
+    lane.kill(signal);
+  }
 }
 
 export function claudeArgv(request: CliRoleRequest): string[] {
@@ -101,6 +110,7 @@ export function createCliRoleRunner(): CliRoleRunner {
         let buffer = "";
         let timedOut = false;
         const child = spawn(request.binary, claudeArgv(request), { cwd: request.cwd, env: { ...request.env }, stdio: ["pipe", "pipe", "pipe"] });
+        liveLanes.add(child);
         const timer = setTimeout(() => {
           timedOut = true;
           child.kill("SIGTERM");
@@ -126,10 +136,12 @@ export function createCliRoleRunner(): CliRoleRunner {
         });
         child.on("error", (error) => {
           clearTimeout(timer);
+          liveLanes.delete(child);
           rejectPromise(error);
         });
         child.on("close", (exitCode, signal) => {
           clearTimeout(timer);
+          liveLanes.delete(child);
           if (buffer.length > 0) {
             consume("\n");
           }
