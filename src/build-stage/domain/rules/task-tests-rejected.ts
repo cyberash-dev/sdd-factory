@@ -1,7 +1,7 @@
 import type { TransitionRule } from "../../../bus/domain/transition.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { stringField } from "../payload.js";
-import { capExhausted, countedTestWriterAttempts, laneEffect, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
+import { capExhausted, isTestWriterCapReached, laneEffect, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
 
 export function taskTestsRejectedRule(deps: RuleDeps): TransitionRule {
   return {
@@ -12,7 +12,7 @@ export function taskTestsRejectedRule(deps: RuleDeps): TransitionRule {
       const taskId = stringField(event.payload, "taskId");
       const task = taskOf(state, taskId);
       const stamped = withTask(state, taskId, { ...task, lastEvent: event.type });
-      if (countedTestWriterAttempts(task) > deps.caps.testWriterRework) {
+      if (isTestWriterCapReached(task, deps.caps)) {
         return { state: stamped, emits: [capExhausted(taskId, "test-writer")], effects: [] };
       }
       const attempt = task.attempts.testWriter + 1;

@@ -50,8 +50,24 @@ export function countedTestWriterAttempts(task: TaskState): number {
   return task.attempts.testWriter - (task.designRestarts ?? 0);
 }
 
+export function isImplementerCapReached(task: TaskState, caps: Caps): boolean {
+  return implementerAttemptsSinceRestart(task) >= caps.implementerAttempts;
+}
+
+export function isTestWriterCapReached(task: TaskState, caps: Caps): boolean {
+  return countedTestWriterAttempts(task) > caps.testWriterRework;
+}
+
+export function isArchitectCapReached(state: RunState, caps: Caps): boolean {
+  return state.stageAttempts.architectRepairs >= caps.architectRepairs;
+}
+
+export function isCriticCapReached(state: RunState, caps: Caps, specIds: readonly string[]): boolean {
+  return specIds.some((id) => (state.assumptionsByRecord[id] ?? 0) >= caps.criticAssumptionsPerId);
+}
+
 export function implementerRework(task: TaskState, taskId: string, caps: Caps, reason: string, findingPath: string | null): PendingEvent {
-  if (implementerAttemptsSinceRestart(task) >= caps.implementerAttempts) {
+  if (isImplementerCapReached(task, caps)) {
     return capExhausted(taskId, "implementer");
   }
   return foreman("task.rework", { taskId, target: "implementer", attempt: task.attempts.implementer + 1, reason, findingPath });
@@ -69,7 +85,7 @@ export function plannerRework(state: RunState, taskId: string, caps: Caps, reaso
 }
 
 export function architectRework(state: RunState, taskId: string, caps: Caps, reason: string, findingPath: string | null, specIds: readonly string[]): PendingEvent {
-  if (state.stageAttempts.architectRepairs >= caps.architectRepairs) {
+  if (isArchitectCapReached(state, caps)) {
     return capExhausted(taskId, "architect");
   }
   return foreman("task.rework", { taskId, target: "architect", attempt: state.stageAttempts.architectRepairs + 1, reason, findingPath, specIds });
@@ -81,8 +97,7 @@ export function designReworkAttempt(state: RunState): number {
 }
 
 export function criticRework(state: RunState, taskId: string, caps: Caps, specIds: readonly string[], findingPath: string | null, finding: string): PendingEvent {
-  const minted = specIds.map((id) => state.assumptionsByRecord[id] ?? 0);
-  if (minted.some((count) => count >= caps.criticAssumptionsPerId)) {
+  if (isCriticCapReached(state, caps, specIds)) {
     return capExhausted(taskId, "critic");
   }
   return foreman("task.rework", { taskId, target: "critic", attempt: criticAttempts(taskOf(state, taskId)) + 1, reason: "spec_contradiction", findingPath, specIds, finding });

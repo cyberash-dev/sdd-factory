@@ -2,7 +2,7 @@ import type { TransitionRule, TransitionResult } from "../../../bus/domain/trans
 import { withCriticAttempt, type RunState, type TaskState } from "../../../bus/domain/run-state.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { PayloadFieldError, stringField, stringOrNullField } from "../payload.js";
-import { capExhausted, countedTestWriterAttempts, designReworkAttempt, findingTextOf, foreman, laneEffect, specAssumeEffect, specIdsOf, tasksCovering, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
+import { capExhausted, designReworkAttempt, findingTextOf, foreman, isTestWriterCapReached, laneEffect, specAssumeEffect, specIdsOf, tasksCovering, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
 
 function implementerRestart(state: RunState, task: TaskState, taskId: string, reworkFinding: ReworkFinding, lastEvent: string): TransitionResult {
   const attempt = task.attempts.implementer + 1;
@@ -16,7 +16,7 @@ function isDesignRestartReason(reason: string): boolean {
 
 function laneRestart(state: RunState, task: TaskState, taskId: string, caps: RuleDeps["caps"], reworkFinding: ReworkFinding, lastEvent: string): TransitionResult {
   const isDesignRestart = isDesignRestartReason(reworkFinding.reason);
-  if (!isDesignRestart && countedTestWriterAttempts(task) > caps.testWriterRework) {
+  if (!isDesignRestart && isTestWriterCapReached(task, caps)) {
     return { state: withTask(state, taskId, { ...task, lastEvent }), emits: [capExhausted(taskId, "test-writer")], effects: [] };
   }
   const attempt = task.attempts.testWriter + 1;
