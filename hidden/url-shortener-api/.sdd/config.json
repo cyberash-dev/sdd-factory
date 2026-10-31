@@ -1,0 +1,34 @@
+{
+  "$schema": "https://github.com/cyberash-dev/agent-sdd/blob/main/schema/sdd.config.schema.json",
+  "spec_file": "spec/spec.md",
+  "baseline_id": "url-shortener-api:BL-001",
+  "discovery_scope": [
+    "src",
+    "tests",
+    "package.json",
+    "tsconfig.json"
+  ],
+  "mechanism": "git_tree_hash_v1",
+  "lint": {
+    "spec_files": [
+      "spec/spec.md",
+      "spec/assumptions.md"
+    ],
+    "approver_blocklist": []
+  },
+  "partitions": {
+    "url-shortener-api": {
+      "spec_paths": [
+        "spec/spec.md",
+        "spec/assumptions.md"
+      ],
+      "test_paths": [
+        "tests/**/*.test.ts",
+        "src/**/*.test.ts"
+      ],
+      "sandbox_paths": [
+        "spec/assumptions.md"
+      ]
+    }
+  }
+}

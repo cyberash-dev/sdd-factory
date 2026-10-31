@@ -1,0 +1,21 @@
+{
+  "name": "url-shortener-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node build/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "agent-sdd": "2.1.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

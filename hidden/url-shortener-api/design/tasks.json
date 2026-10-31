@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "partition": "url-shortener-api",
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "encode error bodies and JSON responses",
+      "covers": [
+        "url-shortener-api:POL-001",
+        "url-shortener-api:INV-003",
+        "url-shortener-api:INV-004"
+      ],
+      "writes": ["src/errors/**", "tests/errors/**"],
+      "dependsOn": [],
+      "designRefs": ["M-01"],
+      "testBudget": { "maxTests": 18 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-002",
+      "title": "store links in memory and issue codes",
+      "covers": [
+        "url-shortener-api:INV-001",
+        "url-shortener-api:INV-002",
+        "url-shortener-api:CON-002"
+      ],
+      "writes": ["src/links/**", "tests/links/**"],
+      "dependsOn": [],
+      "designRefs": ["M-02"],
+      "testBudget": { "maxTests": 14 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-003",
+      "title": "serve link creation, statistics and deletion",
+      "covers": [
+        "url-shortener-api:CTR-001",
+        "url-shortener-api:CTR-003",
+        "url-shortener-api:CTR-004",
+        "url-shortener-api:BEH-001",
+        "url-shortener-api:BEH-002",
+        "url-shortener-api:BEH-003",
+        "url-shortener-api:BEH-004",
+        "url-shortener-api:BEH-007",
+        "url-shortener-api:BEH-008",
+        "url-shortener-api:BEH-009",
+        "url-shortener-api:BEH-010",
+        "url-shortener-api:POL-002"
+      ],
+      "writes": ["src/routes/links/**", "tests/routes/links/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-03"],
+      "testBudget": { "maxTests": 77 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-004",
+      "title": "redirect codes to original URLs",
+      "covers": [
+        "url-shortener-api:CTR-002",
+        "url-shortener-api:BEH-005",
+        "url-shortener-api:BEH-006",
+        "url-shortener-api:CON-003"
+      ],
+      "writes": ["src/routes/redirect/**", "tests/routes/redirect/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-04"],
+      "testBudget": { "maxTests": 23 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-005",
+      "title": "compose the server and resolve the port",
+      "covers": [
+        "url-shortener-api:CTR-005",
+        "url-shortener-api:CTR-006",
+        "url-shortener-api:BEH-011",
+        "url-shortener-api:BEH-012",
+        "url-shortener-api:BEH-013",
+        "url-shortener-api:BEH-014",
+        "url-shortener-api:BEH-015",
+        "url-shortener-api:CON-001",
+        "url-shortener-api:NFR-001",
+        "url-shortener-api:GA-001",
+        "url-shortener-api:ED-001",
+        "url-shortener-api:SCN-001",
+        "url-shortener-api:SCN-002"
+      ],
+      "writes": [
+        "src/index.ts",
+        "src/config/**",
+        "src/server/**",
+        "tsconfig.build.json",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "tests/integration/**",
+        "tests/server/**"
+      ],
+      "dependsOn": ["T-001", "T-002", "T-003", "T-004"],
+      "designRefs": ["M-05"],
+      "testBudget": { "maxTests": 68 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    }
+  ]
+}

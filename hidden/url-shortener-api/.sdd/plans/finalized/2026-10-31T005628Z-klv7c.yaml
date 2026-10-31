@@ -1,0 +1,17 @@
+plan_id: 2026-10-31T005628Z-klv7c
+created_at: 2026-10-31T00:56:28.180Z
+pending_attestations:
+  - id: url-shortener-api:*
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:56:28.177Z
+    change_request: "url-shortener-api-20261031-004751: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: url-shortener-api:BL-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:56:28.517Z
+    change_request: "url-shortener-api-20261031-004751: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
