@@ -45,7 +45,7 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 
 | Stage | Role | Model (`factory.config.json`) | Runs as | Concurrency |
 |---|---|---|---|---|
-| spec | spec-analyst | `deepseek/deepseek-v4.1-flash-1017`, effort medium | Mozaik agent | loops on `sdd lint` (cap 8) |
+| spec | spec-analyst | `deepseek/deepseek-v4.1-flash-1017:nitro` (throughput-sorted OpenRouter routing), effort medium | Mozaik agent | loops on `sdd lint` (cap 8) |
 | spec | spec-critic | `openai/gpt-6.1-terra`, effort medium | Mozaik agent, fresh context, another vendor than the analyst | after each draft (cap 4 rounds) |
 | spec | foreman | none | deterministic Mozaik participant | runs `sdd approve` + `sdd finalize` |
 | design | architect | DeepSeek V4.1 Flash, effort medium | Mozaik agent | in parallel with verification-designer |
@@ -66,7 +66,7 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 4. **Assembly.** The assembler runs `npm ci`, `tsc`, `vitest` and `sdd ready` on `integration` and routes an attributed failure back to the owning lane, an unattributed one to triage.
 5. **Publication.** Product tree plus `trace/` to `hidden/<slug>/`, commit, push.
 
-The critic and the reviewer run on a different vendor's model than the roles whose output they judge, so judge and author share fewer blind spots. The critic moved from GLM-5.3 Flash to GPT-6.1 Terra after micro-evals on the critic's own rules: GLM passed 20 of 25 calls, every failure a stall at its 32k output cap, at 24 to 207 s per call; Terra passed 25 of 25 at 8 to 12 s per call and a similar cost per call. The reviewer moved from DeepSeek V4.1 Flash to Terra after replaying one real review (room booking T-005) on the same input: DeepSeek took 13 to 14 min, Terra 66 to 88 s at about 0.10 to 0.13 USD billed, and all runs found the same blocking defect (an unhandled rejection that ended the server on a malformed request target).
+The critic and the reviewer run on a different vendor's model than the roles whose output they judge, so judge and author share fewer blind spots. The critic moved from GLM-5.3 Flash to GPT-6.1 Terra after micro-evals on the critic's own rules: GLM passed 20 of 25 calls, every failure a stall at its 32k output cap, at 24 to 207 s per call; Terra passed 25 of 25 at 8 to 12 s per call and a similar cost per call. The reviewer moved from DeepSeek V4.1 Flash to Terra after replaying one real review (room booking T-005) on the same input: DeepSeek took 13 to 14 min, Terra 66 to 88 s at about 0.10 to 0.13 USD billed, and all runs found the same blocking defect (an unhandled rejection that ended the server on a malformed request target). The DeepSeek roles use the `:nitro` variant: OpenRouter's default routing for this model spreads requests over more than twenty providers, several of them fp4 quantisations, and one slow provider stretched a spec stage to half an hour; `:nitro` pins the fastest (fp8 at the time of measurement, about 270 instead of 200 tokens/s) for about 2.4 times the token price.
 
 ## How agents run concurrently
 

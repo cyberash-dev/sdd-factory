@@ -23,9 +23,9 @@
   },
   "maxParallelLanes": 4,
   "models": {
-    "default": "deepseek/deepseek-v4.1-flash-1017",
+    "default": "deepseek/deepseek-v4.1-flash-1017:nitro",
     "critic": "openai/gpt-6.1-terra",
-    "triage": "deepseek/deepseek-v4.1-flash-1017",
+    "triage": "deepseek/deepseek-v4.1-flash-1017:nitro",
     "reviewer": "openai/gpt-6.1-terra",
     "lane": null,
     "lanes": {
@@ -81,6 +81,10 @@
     "gpt-6-luna": {
       "inputPerMillion": 0.1,
       "outputPerMillion": 0.5
+    },
+    "deepseek/deepseek-v4.1-flash-1017:nitro": {
+      "inputPerMillion": 0.3,
+      "outputPerMillion": 1.2
     }
   }
 }
