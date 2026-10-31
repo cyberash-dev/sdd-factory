@@ -1,0 +1,10 @@
+plan_id: 2026-10-31T011053Z-2cb35
+created_at: 2026-10-31T01:10:53.517Z
+pending_attestations:
+  - id: build-stage:DLT-009
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:10:53.516Z
+    change_request: "stub imports re-anchored after the URL run; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved

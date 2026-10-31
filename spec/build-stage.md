@@ -2656,6 +2656,67 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-009
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:10:53.516Z
+    change_request: stub imports re-anchored after the URL run; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: build-stage
+title: a stub's relative import is re-anchored to the module entry it names
+target_ids:
+  - build-stage:BEH-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  build-stage:DLT-003 copies the import lines of a module's interface
+  block into its stub verbatim. In the URL shortener run the architect
+  wrote the interfaces of src/routes/links/index.ts and
+  src/routes/redirect/index.ts with `../errors/index.js` and
+  `../links/index.js`, paths that are right for a module one level up;
+  both stubs failed `tsc --noEmit` and each red check needed a
+  simple-fixer run. Change: when the stub is rendered, a relative import
+  specifier that does not resolve, from the stub's own entry file, to the
+  entry of a module listed in tech.md is replaced by the relative path
+  from that entry to the one listed module entry whose path ends with
+  the specifier's trailing segments (`errors/index.js` names
+  `src/errors/index.ts`), keeping the `.js` extension style; a
+  specifier that already resolves, matches no module or matches several
+  is left as written. The architect prompt states that import paths in
+  an interface block are relative to that module's entry file.
+tests_old_behavior:
+  - an import that already resolves to a module entry is copied verbatim
+  - an interface without import lines produces the same stub as today
+tests_new_behavior:
+  - to:build-stage:BEH-001
+test_obligation:
+  predicate: |
+    Given tech.md modules with entries src/errors/index.ts,
+    src/links/index.ts and src/routes/links/index.ts whose interface
+    imports "../errors/index.js" and "../links/index.js", the stub of
+    src/routes/links/index.ts imports "../../errors/index.js" and
+    "../../links/index.js"; an import "./errors/index.js" in src/index.ts
+    is kept; an import whose tail matches two module entries, or none,
+    is kept as written.
+  test_template: unit
+  boundary_classes:
+    - specifier one level short
+    - specifier already correct
+    - ambiguous or unknown tail
+  failure_scenarios:
+    - a correct import rewritten
+    - a package import (no leading dot) touched
+---
+```
+
 ---
 
 ## 16. Implementation bindings
