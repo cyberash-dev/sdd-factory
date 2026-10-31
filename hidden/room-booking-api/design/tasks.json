@@ -4,133 +4,150 @@
   "tasks": [
     {
       "id": "T-001",
-      "title": "own the error codes and the JSON response envelope",
+      "title": "hold the error codes and the JSON error envelope",
       "covers": [
-        "room-booking-api:INV-004",
-        "room-booking-api:INV-005",
-        "room-booking-api:POL-001"
+        "room-booking-api:POL-001",
+        "room-booking-api:INV-003",
+        "room-booking-api:INV-004"
       ],
       "writes": ["src/errors/**", "tests/errors/**"],
       "dependsOn": [],
       "designRefs": ["M-01"],
-      "testBudget": { "maxTests": 41 },
+      "testBudget": { "maxTests": 23 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
       "id": "T-002",
-      "title": "hold the entities, the in-memory store and shared primitives",
+      "title": "keep rooms and bookings in memory with creation-ordered ids",
       "covers": [
         "room-booking-api:INV-001",
         "room-booking-api:INV-002",
-        "room-booking-api:INV-003",
+        "room-booking-api:INV-005",
         "room-booking-api:INV-007",
         "room-booking-api:INV-008"
       ],
-      "writes": ["src/core/**", "tests/core/**"],
+      "writes": ["src/state/**", "tests/state/**"],
       "dependsOn": [],
       "designRefs": ["M-02"],
-      "testBudget": { "maxTests": 39 },
+      "testBudget": { "maxTests": 35 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
       "id": "T-003",
-      "title": "serve room creation and the room list",
+      "title": "match requests against the four route patterns",
       "covers": [
+        "room-booking-api:CTR-008",
+        "room-booking-api:BEH-022",
+        "room-booking-api:BEH-023"
+      ],
+      "writes": ["src/routing/**", "tests/routing/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-07"],
+      "testBudget": { "maxTests": 27 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-004",
+      "title": "serve the room creation and room listing endpoints",
+      "covers": [
+        "room-booking-api:CTR-001",
+        "room-booking-api:CTR-002",
         "room-booking-api:BEH-001",
         "room-booking-api:BEH-002",
         "room-booking-api:BEH-003",
         "room-booking-api:BEH-004",
         "room-booking-api:BEH-005",
         "room-booking-api:BEH-006",
-        "room-booking-api:CTR-001",
-        "room-booking-api:CTR-002"
+        "room-booking-api:BEH-024",
+        "room-booking-api:BEH-027"
       ],
-      "writes": ["src/routes/rooms/**", "tests/routes/rooms/**"],
+      "writes": ["src/rooms/**", "tests/rooms/**"],
       "dependsOn": ["T-001", "T-002"],
       "designRefs": ["M-03"],
       "testBudget": { "maxTests": 80 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
-      "id": "T-004",
-      "title": "serve booking creation on a room",
+      "id": "T-005",
+      "title": "serve booking creation and booking deletion",
       "covers": [
+        "room-booking-api:CTR-003",
+        "room-booking-api:CTR-005",
         "room-booking-api:BEH-007",
         "room-booking-api:BEH-008",
         "room-booking-api:BEH-009",
         "room-booking-api:BEH-010",
         "room-booking-api:BEH-011",
         "room-booking-api:BEH-012",
-        "room-booking-api:CTR-003",
-        "room-booking-api:SCN-002"
+        "room-booking-api:BEH-017",
+        "room-booking-api:BEH-018",
+        "room-booking-api:BEH-026",
+        "room-booking-api:SCN-001",
+        "room-booking-api:SCN-002",
+        "room-booking-api:SCN-003"
       ],
-      "writes": ["src/routes/booking-create/**", "tests/routes/booking-create/**"],
+      "writes": ["src/bookings/write/**", "tests/bookings/write/**"],
       "dependsOn": ["T-001", "T-002"],
       "designRefs": ["M-04"],
       "testBudget": { "maxTests": 80 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
-      "id": "T-005",
-      "title": "serve booking listing and booking deletion",
+      "id": "T-006",
+      "title": "serve the room booking listing endpoint with the window filter",
       "covers": [
+        "room-booking-api:CTR-004",
         "room-booking-api:BEH-013",
         "room-booking-api:BEH-014",
         "room-booking-api:BEH-015",
-        "room-booking-api:BEH-016",
-        "room-booking-api:BEH-017",
-        "room-booking-api:CTR-004",
-        "room-booking-api:CTR-005",
-        "room-booking-api:SCN-001"
+        "room-booking-api:BEH-016"
       ],
-      "writes": ["src/routes/booking-query/**", "tests/routes/booking-query/**"],
+      "writes": ["src/bookings/read/**", "tests/bookings/read/**"],
       "dependsOn": ["T-001", "T-002"],
       "designRefs": ["M-05"],
-      "testBudget": { "maxTests": 65 },
-      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
-    },
-    {
-      "id": "T-006",
-      "title": "serve availability search",
-      "covers": [
-        "room-booking-api:BEH-018",
-        "room-booking-api:BEH-019",
-        "room-booking-api:CTR-006"
-      ],
-      "writes": ["src/routes/availability/**", "tests/routes/availability/**"],
-      "dependsOn": ["T-001", "T-002"],
-      "designRefs": ["M-06"],
-      "testBudget": { "maxTests": 32 },
+      "testBudget": { "maxTests": 50 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
       "id": "T-007",
-      "title": "compose the server, route requests and start the process",
+      "title": "serve the availability endpoint",
       "covers": [
-        "room-booking-api:BEH-020",
+        "room-booking-api:CTR-006",
+        "room-booking-api:BEH-019",
+        "room-booking-api:BEH-020"
+      ],
+      "writes": ["src/availability/**", "tests/availability/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-06"],
+      "testBudget": { "maxTests": 35 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-008",
+      "title": "wire the modules into the HTTP handler and the process",
+      "covers": [
         "room-booking-api:BEH-021",
-        "room-booking-api:CTR-007",
+        "room-booking-api:BEH-025",
+        "room-booking-api:INV-006",
         "room-booking-api:POL-002",
         "room-booking-api:CON-001",
         "room-booking-api:CON-002",
+        "room-booking-api:CON-003",
         "room-booking-api:NFR-001",
-        "room-booking-api:LOC-001",
-        "room-booking-api:INV-006",
-        "room-booking-api:SCN-003"
+        "room-booking-api:NFR-002"
       ],
       "writes": [
-        "src/server/**",
-        "src/index.ts",
-        "tsconfig.build.json",
-        "tests/server/**",
         "package.json",
         "package-lock.json",
         "tsconfig.json",
-        "vitest.config.ts"
+        "tsconfig.build.json",
+        "vitest.config.ts",
+        "src/index.ts",
+        "tests/root/**"
       ],
-      "dependsOn": ["T-003", "T-004", "T-005", "T-006"],
-      "designRefs": ["M-07"],
-      "testBudget": { "maxTests": 60 },
+      "dependsOn": ["T-001", "T-002", "T-003", "T-004", "T-005", "T-006", "T-007"],
+      "designRefs": ["M-08"],
+      "testBudget": { "maxTests": 62 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     }
   ]

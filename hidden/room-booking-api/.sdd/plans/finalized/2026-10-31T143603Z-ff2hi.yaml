@@ -1,0 +1,521 @@
+plan_id: 2026-10-31T143603Z-ff2hi
+created_at: 2026-10-31T14:36:03.679Z
+pending_attestations:
+  - id: room-booking-api:BL-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:03.678Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:SUR-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:03.995Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:04.318Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:04.644Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:04.968Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-004
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:05.294Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-005
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:05.619Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-006
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:05.949Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-007
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:06.279Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-008
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:06.607Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-009
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:06.929Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-010
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:07.253Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-011
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:07.579Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-012
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:07.910Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-013
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:08.255Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-014
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:08.580Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-015
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:08.911Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-016
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:09.244Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-017
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:09.573Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-018
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:09.902Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-019
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:10.232Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-020
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:10.564Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-021
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:10.925Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-022
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:11.308Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-023
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:11.645Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-024
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:11.975Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-025
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:12.310Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-026
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:12.639Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BEH-027
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:12.986Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:SCN-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:13.328Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:SCN-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:13.662Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:SCN-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:13.991Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:NFR-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:14.324Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:NFR-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:14.656Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:14.995Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:15.327Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:15.657Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-004
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:15.988Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-005
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:16.321Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-006
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:16.654Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CTR-008
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:16.991Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:17.324Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:17.654Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:17.985Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-004
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:18.324Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-005
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:18.662Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-006
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:19.010Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-007
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:19.344Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:INV-008
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:19.676Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:POL-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:20.007Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:POL-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:20.341Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CON-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:20.673Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CON-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:21.004Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:CON-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:21.339Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:21.672Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:22.006Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:22.341Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-004
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:22.677Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-005
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:23.015Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-006
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:23.355Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-007
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:23.687Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-008
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:24.018Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-009
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:24.364Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:OQ-010
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:24.696Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:25.035Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-002
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:25.370Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-003
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:25.710Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-004
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:26.051Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-005
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:26.390Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-006
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:26.742Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-007
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:27.078Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-008
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:27.418Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-009
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:27.755Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:ASM-010
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:36:28.087Z
+    change_request: "room-booking-api-20261031-142643: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved

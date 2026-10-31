@@ -1,5 +1,5 @@
 ---
-run_id: room-booking-api-20261031-141800
+run_id: room-booking-api-20261031-142643
 slug: room-booking-api
 rounds: 1
 verdict: published
@@ -11,34 +11,39 @@ task_order:
   - T-005
   - T-006
   - T-007
+  - T-008
 merges:
   - round: 1
     task_id: T-001
-    impl_sha: 498be3a501d52466fb87160ffbc63106b93016c9
+    impl_sha: 1cb1ecc47b1d9ee510be3cbd75dc50907da9ff30
     result: skipped_ancestor
   - round: 1
     task_id: T-002
-    impl_sha: 9fe17ab75d726f6f6d7e73e6c4ea0859be602f31
+    impl_sha: c900fb61dd5cf1eff36d06c1cdc28abef290feec
     result: skipped_ancestor
   - round: 1
     task_id: T-003
-    impl_sha: 2b5d3b4754419a6a9ed4e38250c1f71380c531bf
+    impl_sha: 202940e6f9bc271b77bf27dccc7590f7659be549
     result: skipped_ancestor
   - round: 1
     task_id: T-004
-    impl_sha: ae5e656c3836cf5137d22c99e2012293c8b7c4c6
+    impl_sha: 1a4196ed70aedc64fa44a617e804d1ab89b8acbd
     result: skipped_ancestor
   - round: 1
     task_id: T-005
-    impl_sha: 00deab1e7daf27c33ae0efc4654b0673542d00ce
+    impl_sha: 98dbe688b20f4feaeb1bfcceea0d4b2ebe2aa028
     result: skipped_ancestor
   - round: 1
     task_id: T-006
-    impl_sha: 16eab87472b7cebd6105fdfa25d1df64f8c0d579
+    impl_sha: ef0e92a02ebde5b32a41ba3eda3df9670ea3bf69
     result: skipped_ancestor
   - round: 1
     task_id: T-007
-    impl_sha: 271370aed5ced7f329256ae188e1ea75536e49a8
+    impl_sha: eb6b47070076984c1beea5251241410a145ab801
+    result: skipped_ancestor
+  - round: 1
+    task_id: T-008
+    impl_sha: 1d6990baf0c33d8782fc81a4ba5c96a3316a7d5e
     result: skipped_ancestor
 verification:
   - round: 1
@@ -50,9 +55,9 @@ verification:
       - --no-audit
       - --no-fund
     exit_code: 0
-    duration_ms: 824
+    duration_ms: 1466
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/install.log
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/install.log
   - round: 1
     step: typecheck
     argv:
@@ -60,9 +65,9 @@ verification:
       - tsc
       - --noEmit
     exit_code: 0
-    duration_ms: 960
+    duration_ms: 924
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/typecheck.log
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/typecheck.log
   - round: 1
     step: build
     argv:
@@ -70,9 +75,9 @@ verification:
       - run
       - build
     exit_code: 0
-    duration_ms: 281
+    duration_ms: 569
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/build.log
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/build.log
   - round: 1
     step: test
     argv:
@@ -80,11 +85,11 @@ verification:
       - vitest
       - run
       - --reporter=json
-      - --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/vitest.json
+      - --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/vitest.json
     exit_code: 0
-    duration_ms: 1799
+    duration_ms: 4567
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/vitest.json
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/vitest.json
   - round: 1
     step: sdd_ready
     argv:
@@ -93,9 +98,9 @@ verification:
       - ready
       - --format=json
     exit_code: 0
-    duration_ms: 440
+    duration_ms: 436
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/sdd_ready.json
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/sdd_ready.json
 sdd_ready:
   ok: true
   violations: []
@@ -105,22 +110,23 @@ fixes: []
 published: null
 ---
 
-# Assembly report room-booking-api room-booking-api-20261031-141800
+# Assembly report room-booking-api room-booking-api-20261031-142643
 
 ## Round 1
 
-- merge T-001 498be3a501d5: skipped_ancestor
-- merge T-002 9fe17ab75d72: skipped_ancestor
-- merge T-003 2b5d3b475441: skipped_ancestor
-- merge T-004 ae5e656c3836: skipped_ancestor
-- merge T-005 00deab1e7daf: skipped_ancestor
-- merge T-006 16eab87472b7: skipped_ancestor
-- merge T-007 271370aed5ce: skipped_ancestor
-- install: green (exit 0, 824 ms) `npm ci --prefer-offline --no-audit --no-fund`
-- typecheck: green (exit 0, 960 ms) `npx tsc --noEmit`
-- build: green (exit 0, 281 ms) `npm run build`
-- test: green (exit 0, 1799 ms) `npx vitest run --reporter=json --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-132516/handoffs/assembly/round-1/vitest.json`
-- sdd_ready: green (exit 0, 440 ms) `npx sdd ready --format=json`
+- merge T-001 1cb1ecc47b1d: skipped_ancestor
+- merge T-002 c900fb61dd5c: skipped_ancestor
+- merge T-003 202940e6f9bc: skipped_ancestor
+- merge T-004 1a4196ed70ae: skipped_ancestor
+- merge T-005 98dbe688b20f: skipped_ancestor
+- merge T-006 ef0e92a02ebd: skipped_ancestor
+- merge T-007 eb6b47070076: skipped_ancestor
+- merge T-008 1d6990baf0c3: skipped_ancestor
+- install: green (exit 0, 1466 ms) `npm ci --prefer-offline --no-audit --no-fund`
+- typecheck: green (exit 0, 924 ms) `npx tsc --noEmit`
+- build: green (exit 0, 569 ms) `npm run build`
+- test: green (exit 0, 4567 ms) `npx vitest run --reporter=json --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/room-booking-api-20261031-142643/handoffs/assembly/round-1/vitest.json`
+- sdd_ready: green (exit 0, 436 ms) `npx sdd ready --format=json`
 
 ## Published
 
