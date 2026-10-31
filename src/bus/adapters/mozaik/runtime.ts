@@ -10,11 +10,13 @@ import {
   type SituationContext,
   type SituationHandler,
 } from "@mozaik-ai/core";
+import { setTimeout as sleep } from "node:timers/promises";
 import { isEventType, TERMINAL_EVENT_TYPES, validateEvent, type EventType } from "../../domain/catalogue.js";
 import { BusError, isProducer, type DeliveredEvent, type Producer } from "../../domain/envelope.js";
 import type { PendingEvent } from "../../domain/transition.js";
 import type { EventPublisher } from "../../ports/outbound/event-publisher.js";
 import { FACTORY_MODELS } from "../../../shared/llm/model-provider.js";
+import { createResilientInferenceRunner, type InferenceRetryDelay } from "../../../shared/llm/resilient-inference-runner.js";
 import { ParticipantRoster, type LaneParticipant, type LaneRole } from "./roster.js";
 
 export class FactoryRuntimeState extends RuntimeState {
@@ -105,6 +107,7 @@ export function createRuntimeObserver(name: string, handler: RuntimeObserverHand
 
 export interface FactoryRuntimeOptions {
   readonly inferenceRunner?: InferenceRunner;
+  readonly inferenceRetryDelay?: InferenceRetryDelay;
   readonly redactPayload?: (payload: Record<string, unknown>) => Record<string, unknown>;
 }
 
@@ -121,11 +124,18 @@ export interface FactoryRuntime {
   readonly mozaik: ReturnType<typeof defineRuntime<FactoryRuntimeState>>;
 }
 
+/* Mozaik builds its default runner only with its unexported request validator, so a throwaway runtime builds it and hands it over. */
+function defaultInferenceRunner(runId: string): InferenceRunner {
+  const supportedModels = [...FACTORY_MODELS];
+  return defineRuntime<FactoryRuntimeState>().initializeRuntime({ state: new FactoryRuntimeState(runId), inferenceRunnerConfig: { supportedModels } }).getInferenceRunner();
+}
+
 export function createFactoryRuntime(runId: string, options: FactoryRuntimeOptions = {}): FactoryRuntime {
   const mozaik = defineRuntime<FactoryRuntimeState>();
   const state = new FactoryRuntimeState(runId);
-  const supportedModels = [...FACTORY_MODELS];
-  mozaik.initializeRuntime({ state, inferenceRunnerConfig: options.inferenceRunner === undefined ? { supportedModels } : { supportedModels, runner: options.inferenceRunner } });
+  const innerRunner = options.inferenceRunner ?? defaultInferenceRunner(runId);
+  const runner = createResilientInferenceRunner(innerRunner, options.inferenceRetryDelay ?? ((ms: number): Promise<void> => sleep(ms)));
+  mozaik.initializeRuntime({ state, inferenceRunnerConfig: { runner } });
   const roster = new ParticipantRoster({ join: (participant) => mozaik.join(participant), leave: (participant) => mozaik.leave(participant) });
   let seq = 0;
   let terminalPublished = false;
