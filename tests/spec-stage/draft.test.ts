@@ -308,3 +308,22 @@ describe("spec.draft effect", () => {
     await expect(runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, slice, { commands: scriptedCommands(() => exitZero()), clock: createStageClock() })).rejects.toThrow("must live inside the repository root");
   });
 });
+
+describe("spec.draft effect with a lane model configured for the analyst", () => {
+  // @covers spec-stage:DLT-015 compatibility_action=ignore
+  it("keeps the analyst on the API role and models.default when models.lanes names a spec-analyst model", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const roles = scriptedRoles([(request) => writeText(handoffPath(ws), analystHandoff(1))]);
+    const commands = scriptedCommands(sddReplies({}));
+    const { context, published } = effectContext(runStateAt("spec_drafting"));
+    const config = { ...DEFAULT_CONFIG, models: { ...DEFAULT_CONFIG.models, lanes: { ...DEFAULT_CONFIG.models.lanes, "spec-analyst": "claude-opus-5-5" } } };
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles, config), { commands, clock: createStageClock() });
+
+    expect([roles.requests.map((request) => [request.role, request.model]), published.map((event) => event.type)]).toEqual([
+      [["spec-analyst", DEFAULT_CONFIG.models.default]],
+      ["spec.drafted"],
+    ]);
+  });
+});
+
