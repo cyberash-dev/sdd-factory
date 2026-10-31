@@ -7,12 +7,16 @@ export type GaFindingKind = (typeof GA_FINDING_KINDS)[number];
 
 export type ReviewDecision = "accept" | "rework";
 
+export type GaSeverity = "major" | "minor";
+
 export interface GaFinding {
   readonly id: string;
   readonly kind: GaFindingKind;
   readonly targetIds: readonly string[];
+  readonly severity: GaSeverity;
   readonly resolution: "decide" | "assume";
   readonly requiredChange: string;
+  readonly assumption: string | null;
   readonly applied: boolean | null;
 }
 
@@ -47,6 +51,14 @@ function appliedOf(value: unknown): boolean | null | undefined {
   return undefined;
 }
 
+/* spec-stage:DLT-014: a finding without severity counts as major. */
+function severityOf(value: unknown): GaSeverity | undefined {
+  if (value === undefined || value === null) {
+    return "major";
+  }
+  return value === "major" || value === "minor" ? value : undefined;
+}
+
 function parseFinding(raw: unknown, index: number): GaFinding | string {
   if (!isRecord(raw)) {
     return `finding ${index} is not a mapping`;
@@ -63,6 +75,10 @@ function parseFinding(raw: unknown, index: number): GaFinding | string {
   if (!isStringArray(targetIds)) {
     return `${id}: target_ids must be a list of record ids`;
   }
+  const severity = severityOf(raw["severity"]);
+  if (severity === undefined) {
+    return `${id}: severity must be major or minor`;
+  }
   const resolution = raw["resolution"];
   if (resolution !== "decide" && resolution !== "assume") {
     return `${id}: resolution must be decide or assume`;
@@ -75,17 +91,23 @@ function parseFinding(raw: unknown, index: number): GaFinding | string {
   if (applied === undefined) {
     return `${id}: applied must be yes or no`;
   }
-  return { id, kind, targetIds, resolution, requiredChange, applied };
+  const assumption = typeof raw["assumption"] === "string" ? raw["assumption"] : null;
+  return { id, kind, targetIds, severity, resolution, requiredChange, assumption, applied };
+}
+
+export function findingsYaml(text: string): string | null {
+  const fence = FINDINGS_FENCE.exec(text);
+  return fence === null ? null : (fence[1] ?? "");
 }
 
 function parseFindings(text: string): readonly GaFinding[] | string {
-  const fence = FINDINGS_FENCE.exec(text);
-  if (fence === null) {
+  const yaml = findingsYaml(text);
+  if (yaml === null) {
     return "missing '## Findings' section with a yaml fence";
   }
   let parsed: unknown;
   try {
-    parsed = YAML.parse(fence[1] ?? "");
+    parsed = YAML.parse(yaml);
   } catch (error) {
     return `findings yaml does not parse: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -123,7 +145,11 @@ export function parseGaReview(text: string): GaReviewResult {
   return { ok: true, review: { slug: header[1] ?? "", round: Number(header[2]), decision, findings } };
 }
 
+export function isOpenDecision(finding: GaFinding, round: number): boolean {
+  return finding.resolution === "decide" && (round === 1 || finding.applied !== true);
+}
+
+/* spec-stage:DLT-014: only an open major decide finding sends the spec back to the analyst. */
 export function derivedDecision(findings: readonly GaFinding[], round: number): ReviewDecision {
-  const openDecisions = findings.filter((finding) => finding.resolution === "decide" && (round === 1 || finding.applied !== true));
-  return openDecisions.length === 0 ? "accept" : "rework";
+  return findings.some((finding) => finding.severity === "major" && isOpenDecision(finding, round)) ? "rework" : "accept";
 }

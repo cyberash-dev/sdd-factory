@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { runAssumeFindings } from "../../src/spec-stage/application/assume-findings.js";
 import { createStageClock } from "../../src/spec-stage/application/stage-clock.js";
 import type { CommandResult } from "../../src/spec-stage/ports/command-runner.js";
-import { approvalReplies, CLI_SPEC, effectContext, gaReview, OPERATOR, runStateAt, scriptedCommands, scriptedRoles, sliceContext, stageWorkspace, writeText } from "./harness.js";
+import { approvalReplies, CLI_SPEC, effectContext, gaReview, MAJOR_ERRORS_FINDING, MINOR_TITLE_FINDING, OPERATOR, runStateAt, scriptedCommands, scriptedRoles, sliceContext, stageWorkspace, writeText } from "./harness.js";
 
 const FINALIZED: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"plan_id":"p","flipped":["todo-cli:SUR-001","todo-cli:CTR-001","todo-cli:OQ-001","todo-cli:ASM-001"],"files_changed":["spec/spec.md"],"archived_path":"x"}\n', stderr: "" };
 
@@ -56,6 +56,20 @@ describe("spec.assume_findings effect", () => {
       assumptions.includes("## 18. Assumptions\n\nnone"),
       commands.calls.map((call) => call[0]),
     ]).toEqual([[{ type: "spec.approved", producer: "foreman", payload: { approver: OPERATOR, mode: "pre-authorized-at-launch", approvedIds: 4 } }], true, true, true, false, true, true, false, ["lint", "lint", "record", "approve", "finalize", "ready", "approve", "finalize", "record", "lint"]]);
+  });
+
+  // @covers spec-stage:DLT-014
+  it("records only the unapplied major finding as an assumption when a major and a minor finding are open at the cap", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    await writeText(ws.gaPath, gaReview(2, "rework", `${MINOR_TITLE_FINDING}\n  applied: no\n${MAJOR_ERRORS_FINDING}\n  applied: no`));
+    await writeText(ws.assumptionsPath, ASSUMPTIONS_SKELETON);
+    const commands = scriptedCommands(approvalReplies([{ id: "todo-cli:SUR-001", file: "spec/spec.md" }], { finalize: FINALIZED }));
+    const { context } = effectContext(runStateAt("spec_review"));
+
+    await runAssumeFindings({ kind: "spec.assume_findings", round: 2, findingsPath: "spec/review/ga.md" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
+
+    const assumptions = await readFile(ws.assumptionsPath, "utf8");
+    expect([assumptions.includes("critic finding GA-002 (gap; targets todo-cli:CTR-001) of round 2"), assumptions.includes("critic finding GA-001"), assumptions.includes("id: todo-cli:ASM-003")]).toEqual([true, false, false]);
   });
 
   it("approves without creating the assumptions file when the final round left no open finding", async () => {

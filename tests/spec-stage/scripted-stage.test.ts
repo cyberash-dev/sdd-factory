@@ -5,9 +5,10 @@ import { createFactoryRuntime, createReactor } from "../../src/bus/adapters/moza
 import { RunEngine } from "../../src/bus/application/run-engine.js";
 import { EVENT_TYPES, type EventType } from "../../src/bus/domain/catalogue.js";
 import type { DeliveredEvent } from "../../src/bus/domain/envelope.js";
+import { readTextOrNull } from "../../src/shared/fs/text.js";
 import { composeEffectRunner, composeRules, type Slice } from "../../src/shared/slice.js";
 import { createSpecStageSlice } from "../../src/spec-stage/index.js";
-import { analystHandoff, CLI_SPEC, criticHandoff, gaReview, RUN_ID, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type RoleScript, type StageWorkspace } from "./harness.js";
+import { analystHandoff, CLI_SPEC, criticHandoff, gaReview, MAJOR_ASSUMPTION_BODY, MAJOR_ERRORS_FINDING, MINOR_ASSUMPTION_BODY, MINOR_NEGATIVE_FINDING, MINOR_TITLE_FINDING, RUN_ID, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type RoleScript, type StageWorkspace } from "./harness.js";
 
 const FINALIZED = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"plan_id":"p","flipped":["todo-cli:SUR-001","todo-cli:CTR-001"]}', stderr: "" };
 
@@ -21,8 +22,22 @@ function analystWrites(ws: StageWorkspace, attempt: number): RoleScript {
 
 function criticAnswers(ws: StageWorkspace, round: number, decision: "accept" | "rework"): RoleScript {
   return async () => {
-    await writeText(ws.gaPath, gaReview(round, decision, decision === "rework" ? DECIDE_FINDING : `${DECIDE_FINDING}\n  applied: yes`));
+    await writeText(ws.gaPath, gaReview(round, decision, decision === "rework" ? DECIDE_FINDING : round === 1 ? "[]" : `${DECIDE_FINDING}\n  applied: yes`));
     await writeText(join(ws.handoffsDir, "spec-critic", "handoff.md"), criticHandoff(round, decision));
+  };
+}
+
+function criticWrites(ws: StageWorkspace, gaText: string, handoffText: string): RoleScript {
+  return async () => {
+    await writeText(ws.gaPath, gaText);
+    await writeText(join(ws.handoffsDir, "spec-critic", "handoff.md"), handoffText);
+  };
+}
+
+function analystRecordsMessage(ws: StageWorkspace, attempt: number, messages: string[]): RoleScript {
+  return async (request) => {
+    messages.push(request.message);
+    await writeText(join(ws.handoffsDir, "spec-analyst", "handoff.md"), analystHandoff(attempt));
   };
 }
 
@@ -112,6 +127,69 @@ describe("spec stage through the run engine", () => {
       "spec_approved",
       true,
       true,
+    ]);
+  });
+
+  // @covers spec-stage:DLT-014
+  it("starts the analyst rework with ga-major.md holding only the major finding and its assumption body", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const reworkMessages: string[] = [];
+    const roundOne = gaReview(1, "rework", `${MINOR_TITLE_FINDING}\n${MAJOR_ERRORS_FINDING}\n${MINOR_NEGATIVE_FINDING}`, [MAJOR_ASSUMPTION_BODY, MINOR_ASSUMPTION_BODY]);
+
+    await scriptedStage(ws, [analystWrites(ws, 1), criticWrites(ws, roundOne, criticHandoff(1, "rework")), analystRecordsMessage(ws, 2, reworkMessages), criticAnswers(ws, 2, "accept")]);
+
+    expect([reworkMessages.map((message) => message.includes("Critic findings to apply (none on attempt 1): spec/review/ga-major.md")), await readTextOrNull(join(ws.productDir, "spec", "review", "ga-major.md"))]).toEqual([
+      [true],
+      [
+        "# Spec review: todo-cli, round 1",
+        "",
+        "decision: rework",
+        "",
+        "## Findings",
+        "```yaml",
+        "- id: GA-002",
+        "  kind: gap",
+        "  target_ids: [todo-cli:CTR-001]",
+        "  severity: major",
+        "  resolution: decide",
+        "  required_change: |",
+        "    add error_taxonomy with E_USAGE",
+        "  assumption: todo-cli:ASM-002",
+        "```",
+        "",
+        "## Assumptions",
+        "",
+        "```yaml",
+        "---",
+        "id: todo-cli:ASM-002",
+        "type: ASSUMPTION",
+        "lifecycle: {status: proposed}",
+        "partition_id: todo-cli",
+        "assumption: a usage error exits 2 with E_USAGE",
+        "source_open_q: not_applicable",
+        "blocking: no",
+        "---",
+        "```",
+        "",
+      ].join("\n"),
+    ]);
+  });
+
+  // @covers spec-stage:DLT-014
+  it("approves after round 1 when the critic answers rework over minor findings only", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const roundOne = gaReview(1, "rework", `${MINOR_TITLE_FINDING}\n${MINOR_NEGATIVE_FINDING}`);
+
+    const { trace, engine } = await scriptedStage(ws, [analystWrites(ws, 1), criticWrites(ws, roundOne, criticHandoff(1, "rework"))]);
+
+    expect([trace.map((event) => [event.type, event.producer, event.payload["decision"] ?? null]), engine.state.status]).toEqual([
+      [
+        ["workspace.ready", "foreman", null],
+        ["spec.drafted", "spec-analyst", null],
+        ["spec.reviewed", "foreman", "accept"],
+        ["spec.approved", "foreman", null],
+      ],
+      "spec_approved",
     ]);
   });
 

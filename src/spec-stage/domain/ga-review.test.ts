@@ -61,8 +61,8 @@ describe("ga.md review file", () => {
         round: 1,
         decision: "rework",
         findings: [
-          { id: "GA-001", kind: "gap", targetIds: ["todo-cli:CTR-001"], resolution: "decide", requiredChange: 'CTR-001.error_taxonomy gains "exit 2 - E_EMPTY_TEXT".\n', applied: null },
-          { id: "GA-002", kind: "missing_negative", targetIds: ["todo-cli:OQ-001", "todo-cli:ASM-001"], resolution: "assume", requiredChange: "none", applied: null },
+          { id: "GA-001", kind: "gap", targetIds: ["todo-cli:CTR-001"], severity: "major", resolution: "decide", requiredChange: 'CTR-001.error_taxonomy gains "exit 2 - E_EMPTY_TEXT".\n', assumption: null, applied: null },
+          { id: "GA-002", kind: "missing_negative", targetIds: ["todo-cli:OQ-001", "todo-cli:ASM-001"], severity: "major", resolution: "assume", requiredChange: "none", assumption: "todo-cli:ASM-001", applied: null },
         ],
       },
     });
@@ -105,6 +105,41 @@ describe("ga.md review file", () => {
     const result = parseGaReview(ROUND_ONE.replace("kind: gap", "kind: nit"));
 
     expect(result).toEqual({ ok: false, error: "GA-001: kind outside gap | conflict | weasel | untestable | missing_negative | unmodeled_term" });
+  });
+
+  // @covers spec-stage:DLT-014
+  it("reads the severity of a finding", () => {
+    const result = parseGaReview(ROUND_ONE.replace("  resolution: decide\n", "  severity: minor\n  resolution: decide\n"));
+
+    expect(result.ok && result.review.findings[0]?.severity).toBe("minor");
+  });
+
+  // @covers spec-stage:DLT-014
+  it("counts a finding without severity as major", () => {
+    const result = parseGaReview(ROUND_ONE);
+
+    expect(result.ok && result.review.findings.map((finding) => finding.severity)).toEqual(["major", "major"]);
+  });
+
+  // @covers spec-stage:DLT-014
+  it("rejects a severity outside major | minor", () => {
+    const result = parseGaReview(ROUND_ONE.replace("  resolution: decide\n", "  severity: blocker\n  resolution: decide\n"));
+
+    expect(result).toEqual({ ok: false, error: "GA-001: severity must be major or minor" });
+  });
+
+  // @covers spec-stage:DLT-014
+  it("derives accept in round 1 when every decide finding is minor", () => {
+    const result = parseGaReview(ROUND_ONE.replace("  resolution: decide\n", "  severity: minor\n  resolution: decide\n"));
+
+    expect(result.ok && derivedDecision(result.review.findings, 1)).toBe("accept");
+  });
+
+  // @covers spec-stage:DLT-014
+  it("derives accept in round 2 when only a minor decide finding stays unapplied", () => {
+    const result = parseGaReview(ROUND_TWO.replace("applied: yes", "applied: no").replace("  resolution: decide\n", "  severity: minor\n  resolution: decide\n"));
+
+    expect(result.ok && derivedDecision(result.review.findings, 2)).toBe("accept");
   });
 
   it("treats an empty findings fence as a clean review", () => {

@@ -5,7 +5,7 @@ import type { Tool } from "@mozaik-ai/core";
 import { DEFAULT_CONFIG } from "../../src/shared/config.js";
 import { runReview } from "../../src/spec-stage/application/review.js";
 import { createStageClock } from "../../src/spec-stage/application/stage-clock.js";
-import { analystHandoff, CLI_SPEC, criticHandoff, effectContext, gaReview, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type StageWorkspace } from "./harness.js";
+import { analystHandoff, CLI_SPEC, criticHandoff, effectContext, gaReview, MAJOR_ERRORS_FINDING, MINOR_NEGATIVE_FINDING, MINOR_TITLE_FINDING, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type StageWorkspace } from "./harness.js";
 
 const handoffPath = (ws: StageWorkspace): string => join(ws.handoffsDir, "spec-critic", "handoff.md");
 
@@ -35,7 +35,7 @@ describe("spec.review effect", () => {
 
     await runReview({ kind: "spec.review", round: 1 }, context, sliceContext(ws, roles), deps());
 
-    expect([published, roles.requests[0]?.model]).toEqual([[{ type: "spec.reviewed", producer: "spec-critic", payload: { round: 1, decision: "rework", findingsPath: "spec/review/ga.md" } }], DEFAULT_CONFIG.models.critic]);
+    expect([published, roles.requests[0]?.model]).toEqual([[{ type: "spec.reviewed", producer: "spec-critic", payload: { round: 1, decision: "rework", findingsPath: "spec/review/ga-major.md" } }], DEFAULT_CONFIG.models.critic]);
   });
 
   // @covers spec-stage:BEH-002
@@ -141,6 +141,46 @@ describe("spec.review effect", () => {
     await runReview({ kind: "spec.review", round: 2 }, context, sliceContext(ws, roles), deps());
 
     expect([reads[0], reads[1]]).toEqual([gaReview(1, "rework", DECIDE_FINDING), "ERROR: path src/index.ts is outside what this role is allowed to read"]);
+  });
+
+  // @covers spec-stage:DLT-014
+  it("publishes spec.reviewed{accept} as the foreman and logs the override when the critic answers rework over minor findings only", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const roles = scriptedRoles([
+      async () => {
+        await writeText(ws.gaPath, gaReview(1, "rework", `${MINOR_TITLE_FINDING}\n${MINOR_NEGATIVE_FINDING}`));
+        await writeText(handoffPath(ws), criticHandoff(1, "rework"));
+      },
+    ]);
+    const { context, published } = effectContext(runStateAt("spec_review"));
+    const lines: string[] = [];
+
+    await runReview({ kind: "spec.review", round: 1 }, context, { ...sliceContext(ws, roles), log: (line) => lines.push(line) }, deps());
+
+    expect([published, lines.filter((line) => line.includes("overridden"))]).toEqual([
+      [{ type: "spec.reviewed", producer: "foreman", payload: { round: 1, decision: "accept", findingsPath: "spec/review/ga.md" } }],
+      ["spec-critic round 1: decision overridden to accept: only minor findings (GA-001, GA-003)"],
+    ]);
+  });
+
+  // @covers spec-stage:DLT-014
+  it("points the rework at ga-major.md and logs the minor findings as advisory when major and minor findings are mixed", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const roles = scriptedRoles([
+      async () => {
+        await writeText(ws.gaPath, gaReview(1, "rework", `${MINOR_TITLE_FINDING}\n${MAJOR_ERRORS_FINDING}\n${MINOR_NEGATIVE_FINDING}`));
+        await writeText(handoffPath(ws), criticHandoff(1, "rework"));
+      },
+    ]);
+    const { context, published } = effectContext(runStateAt("spec_review"));
+    const lines: string[] = [];
+
+    await runReview({ kind: "spec.review", round: 1 }, context, { ...sliceContext(ws, roles), log: (line) => lines.push(line) }, deps());
+
+    expect([published, lines.filter((line) => line.includes("advisory"))]).toEqual([
+      [{ type: "spec.reviewed", producer: "spec-critic", payload: { round: 1, decision: "rework", findingsPath: "spec/review/ga-major.md" } }],
+      ["spec-critic round 1: minor findings kept as advisory: GA-001, GA-003"],
+    ]);
   });
 
   // @covers spec-stage:CTR-003

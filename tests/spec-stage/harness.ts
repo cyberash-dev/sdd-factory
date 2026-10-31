@@ -184,9 +184,20 @@ export function criticHandoff(attempt: number, decision: "accept" | "rework", ov
   return `---\n${JSON.stringify(fields)}\n---\ncritic verdict\n`;
 }
 
-export function gaReview(round: number, decision: "accept" | "rework", findingsYaml: string): string {
-  return `# Spec review: ${SLUG}, round ${round}\n\ndecision: ${decision}\n\n## Findings\n\`\`\`yaml\n${findingsYaml}\n\`\`\`\n\n## Assumptions\n\n## Open-Q decisions\n| Open-Q | option | finding | rationale |\n\n## Coverage\nnone\n`;
+export function gaReview(round: number, decision: "accept" | "rework", findingsYaml: string, assumptionBodies: readonly string[] = []): string {
+  const assumptions = assumptionBodies.map((body) => `\n\`\`\`yaml\n${body}\n\`\`\`\n`).join("");
+  return `# Spec review: ${SLUG}, round ${round}\n\ndecision: ${decision}\n\n## Findings\n\`\`\`yaml\n${findingsYaml}\n\`\`\`\n\n## Assumptions\n${assumptions}\n## Open-Q decisions\n| Open-Q | option | finding | rationale |\n\n## Coverage\nnone\n`;
 }
+
+export const MINOR_TITLE_FINDING = "- id: GA-001\n  kind: weasel\n  target_ids: [todo-cli:CTR-001]\n  severity: minor\n  resolution: decide\n  required_change: name the title after the command\n  assumption: todo-cli:ASM-003";
+
+export const MAJOR_ERRORS_FINDING = "- id: GA-002\n  kind: gap\n  target_ids: [todo-cli:CTR-001]\n  severity: major\n  resolution: decide\n  required_change: |\n    add error_taxonomy with E_USAGE\n  assumption: todo-cli:ASM-002";
+
+export const MINOR_NEGATIVE_FINDING = "- id: GA-003\n  kind: missing_negative\n  target_ids: [todo-cli:CTR-001]\n  severity: minor\n  resolution: decide\n  required_change: add a negative case for blank text\n  assumption: null";
+
+export const MAJOR_ASSUMPTION_BODY = "---\nid: todo-cli:ASM-002\ntype: ASSUMPTION\nlifecycle: {status: proposed}\npartition_id: todo-cli\nassumption: a usage error exits 2 with E_USAGE\nsource_open_q: not_applicable\nblocking: no\n---";
+
+export const MINOR_ASSUMPTION_BODY = "---\nid: todo-cli:ASM-003\ntype: ASSUMPTION\nlifecycle: {status: proposed}\npartition_id: todo-cli\nassumption: the title names the command\nsource_open_q: not_applicable\nblocking: no\n---";
 
 export function writeText(path: string, text: string): Promise<void> {
   return mkdir(join(path, ".."), { recursive: true }).then(() => writeFile(path, text, "utf8"));

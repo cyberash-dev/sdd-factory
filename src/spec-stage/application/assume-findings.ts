@@ -20,7 +20,8 @@ export async function unappliedFindings(gaPath: string): Promise<readonly GaFind
     return [];
   }
   const review = parseGaReview(text);
-  return review.ok ? review.review.findings.filter((finding) => finding.resolution === "decide" && finding.applied !== true) : [];
+  /* spec-stage:DLT-014: only unapplied major findings become assumptions at the cap. */
+  return review.ok ? review.review.findings.filter((finding) => finding.resolution === "decide" && finding.severity === "major" && finding.applied !== true) : [];
 }
 
 /* spec-stage:DLT-001: the final critic round never ends the run; its open findings become sandbox assumptions. */
