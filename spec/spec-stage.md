@@ -103,7 +103,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: spec-stage
 name: product-spec-files
-version: "0.3.0"
+version: "0.4.0"
 boundary_type: public_storage
 members:
   - spec-stage:CTR-001
@@ -1640,6 +1640,79 @@ test_obligation:
   failure_scenarios:
     - spec.approved published with records still proposed
     - a pattern attestation that skips a spec file
+---
+```
+
+```yaml
+---
+id: spec-stage:DLT-014
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T13:52:34.622Z
+    change_request: "operator decision 2026-10-31: keep Terra, route only major critic findings to the analyst"
+    scope: first-time-approval
+partition_id: spec-stage
+title: product-spec-files 0.3.0 -> 0.4.0 - only major critic findings reach the analyst
+target_ids:
+  - spec-stage:CTR-003
+  - spec-stage:BEH-002
+  - spec-stage:BEH-003
+  - spec-stage:DLT-001
+  - spec-stage:SUR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: spec-stage:SUR-001
+    intended_version: "0.4.0"
+description: |
+  In room booking the critic's round 1 raised 18 decide findings of which
+  about five changed behaviour the source states; the analyst spent 13 to
+  16 minutes and about 150 tool calls applying all of them, and prompt
+  wording alone did not stop the minor ones. Change: (1) every finding in
+  spec/review/ga.md (spec-stage:CTR-003) carries `severity: major | minor`;
+  major means a record contradicts behaviour or a field constraint the
+  source states, loses or narrows a stated sentence, adds or drops a
+  stated error, or has a predicate no test can check; a finding without
+  severity counts as major. (2) After each critic round the foreman
+  derives the decision itself: rework iff at least one finding has
+  resolution decide and severity major (in rounds after the first: iff a
+  major decide finding is not applied); otherwise the round is accept
+  whatever the critic's decision line says, and the foreman logs the
+  override. (3) On rework the foreman writes spec/review/ga-major.md with
+  the same header and only the major findings and their ASSUMPTION
+  bodies, and the analyst's rework finding is that file (BEH-003); minor
+  findings stay in ga.md and are listed in the trace as advisory. (4) At
+  the critic cap (DLT-001) only unapplied major findings become
+  ASSUMPTION records. product-spec-files 0.3.0 -> 0.4.0.
+tests_old_behavior:
+  - a round with a major decide finding still sends the analyst a rework
+tests_new_behavior:
+  - to:spec-stage:CTR-003
+  - to:spec-stage:BEH-002
+  - to:spec-stage:BEH-003
+test_obligation:
+  predicate: |
+    Given a round-1 ga.md with decision rework, two minor decide findings
+    and one major decide finding, the analyst is started with
+    spec/review/ga-major.md holding only the major finding; given a ga.md
+    with decision rework and only minor decide findings, the round is
+    accepted and approval starts; a finding without severity counts as
+    major; at the critic cap only an unapplied major finding becomes an
+    ASSUMPTION.
+  test_template: integration
+  boundary_classes:
+    - major and minor findings mixed
+    - minor findings only
+    - finding without severity
+    - critic cap with major and minor findings open
+  failure_scenarios:
+    - a minor finding sent to the analyst
+    - a major finding dropped
 ---
 ```
 
