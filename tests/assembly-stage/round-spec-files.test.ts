@@ -132,4 +132,15 @@ describe("assembly round role-written files", () => {
 
     expect(treeAtInstall).toBe("M  src/a.js|design/tech.md");
   });
+
+  // @covers assembly-stage:INV-001
+  it("keeps a staged source change out of every assembler commit of a green round", async () => {
+    const fixture = await productRepo(baselineSpec(SLUG, "0".repeat(40), "0".repeat(64)));
+    await writeFiles(fixture.productDir, { "src/a.js": "export const a = 2;\n" });
+    await git(fixture.productDir, "add", "--", "src/a.js");
+
+    await verifyRound(fixture.root, greenSequence(async () => undefined), fixture.baseSha);
+
+    expect(`${await git(fixture.productDir, "status", "--porcelain")}|${await git(fixture.productDir, "log", "--name-only", "--format=", `${fixture.baseSha}..HEAD`)}`).toBe("M  src/a.js|assembly/report.md\nspec/spec.md");
+  });
 });

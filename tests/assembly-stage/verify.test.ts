@@ -274,7 +274,7 @@ describe("assembly.verify verification sequence", () => {
       true,
       true,
       false,
-      ["npx sdd token --format=json", "git add -- spec/spec.md", "git commit -m spec: baseline refresh", "npx sdd ready --format=json"],
+      ["npx sdd token --format=json", "git add -- spec/spec.md", "git commit -m spec: baseline refresh -- spec/spec.md", "npx sdd ready --format=json"],
       "assembly report round 1\nspec: baseline refresh",
     ]);
   });

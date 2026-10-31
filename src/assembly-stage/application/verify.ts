@@ -177,7 +177,7 @@ async function refreshBaseline(run: VerifyRun): Promise<void> {
   }
   await writeTextAtomic(specPath, refreshed);
   await run.git.output(["add", "--", SPEC_FILE]);
-  await run.git.output(["commit", "-m", "spec: baseline refresh"]);
+  await run.git.output(["commit", "-m", "spec: baseline refresh", "--", SPEC_FILE]);
 }
 
 /* assembly-stage:DLT-003: a spec approved before spec-stage:DLT-007 (or a resumed run) lacks the members `sdd ready` checks. */
@@ -241,7 +241,7 @@ function runStep(run: VerifyRun, step: AssemblyStep): Promise<StepOutcome> {
 async function commitReport(run: VerifyRun, ledger: AssemblyLedger): Promise<void> {
   await writeProductReport(run.slice.paths, ledger, { verdict: "published", published: null });
   await run.git.output(["add", "--", REPORT_FILE]);
-  await run.git.output(["commit", "-m", `assembly report round ${run.round}`]);
+  await run.git.output(["commit", "-m", `assembly report round ${run.round}`, "--", REPORT_FILE]);
   const head = await run.git.output(["rev-parse", "HEAD"]);
   await updateLedger(run.identity, (current) => ({ ...current, verified_head: head }));
 }
@@ -270,7 +270,7 @@ async function commitFix(run: VerifyRun, fixed: SimpleFixRun): Promise<string | 
   const ledger = await updateLedger(run.identity, (current) => current);
   const fixNumber = ledger.fixes.filter((entry) => entry.round === run.round && entry.commit_sha !== null).length + 1;
   await run.git.output(["add", "-A", "--", ...fixed.filesChanged]);
-  await run.git.output(["commit", "-m", `fix assembly round ${run.round} ${fixNumber}`, `--author=${FIXER_AUTHOR}`]);
+  await run.git.output(["commit", "-m", `fix assembly round ${run.round} ${fixNumber}`, `--author=${FIXER_AUTHOR}`, "--", ...fixed.filesChanged]);
   return run.git.output(["rev-parse", "HEAD"]);
 }
 
