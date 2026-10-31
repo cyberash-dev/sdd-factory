@@ -2955,6 +2955,64 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-014
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T14:13:56.805Z
+    change_request: "operator direction 2026-10-31: a green task never ends the run on a review route"
+    scope: first-time-approval
+partition_id: build-stage
+title: a contract route that mints no assumption approves the green task with advisory findings
+target_ids:
+  - build-stage:BEH-008
+  - build-stage:BEH-013
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  A review in review mode that routes to target contract sends the
+  finding to the spec-critic in assumption mode, which must append one
+  ASSUMPTION to spec/assumptions.md. In run room-booking-api-20261031-132516
+  task T-007 was verified green, the reviewer routed a contradiction among
+  six records to contract, the critic produced no assumption in three
+  attempts, and the task and the run failed with unparseable_handoff on
+  the last task of the build. Change, by analogy with build-stage:DLT-013:
+  when the assumption step fails for a task that has green Verifier
+  evidence (the route came from review mode), the task is approved on that
+  evidence exactly as advisory_only does, the review report stays with its
+  findings, and the foreman logs "<task> approved on green evidence:
+  contract route minted no assumption, review findings kept as advisory".
+  In arbitration mode there is no green evidence and the task fails as
+  before.
+tests_old_behavior:
+  - a contract route in arbitration mode whose assumption step fails still fails the task
+tests_new_behavior:
+  - to:build-stage:BEH-008
+  - to:build-stage:BEH-013
+test_obligation:
+  predicate: |
+    Given a task verified green whose review routed to contract, an
+    assumption step whose handoff never adds an ASSUMPTION leads to the
+    task's approval with its verified implSha and no task.failed; the same
+    failure for a task without green evidence (arbitration) emits
+    task.failed unparseable_handoff.
+  test_template: integration
+  boundary_classes:
+    - review-mode contract route, assumption step fails
+    - arbitration-mode contract route, assumption step fails
+  failure_scenarios:
+    - a green task failing the run on the contract route
+    - an arbitration loss approved
+---
+```
+
 ---
 
 ## 16. Implementation bindings
