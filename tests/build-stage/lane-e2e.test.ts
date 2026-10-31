@@ -5,12 +5,12 @@ import type { ApiRoleRequest } from "../../src/shared/llm/api-role-runner.js";
 import type { CliRoleRequest } from "../../src/shared/llm/cli-role-runner.js";
 import type { DesignBundle } from "../../src/build-stage/index.js";
 import { aModule, aTaskSpec, greeterDesign } from "./support/design.js";
-import { aLaneHarness, eventTypes, hasEvent, laneEngine, type LaneEngine, type LaneHarness } from "./support/harness.js";
+import { aLaneHarness, eventTypes, hasEvent, laneEngine, TEST_CONFIG, type LaneEngine, type LaneHarness } from "./support/harness.js";
 import { GREEN_IMPL, RED_TEST } from "./support/lanes.js";
 import { aProductRepo, git, writeProductFile } from "./support/product.js";
 import { invokeTool, reviewFrontmatter, scriptedApiRoles, scriptedCliRoles, writeHandoff, type CliScript } from "./support/runners.js";
 import { aTask, buildingState } from "./support/state.js";
-import type { TaskState } from "../../src/bus/domain/run-state.js";
+import type { RunState, TaskState } from "../../src/bus/domain/run-state.js";
 
 const LANE_TIMEOUT = 90_000;
 
@@ -65,10 +65,10 @@ interface Scenario {
   readonly productDir: string;
 }
 
-async function scenario(cli: CliScript, api: (request: ApiRoleRequest) => Promise<void> = approveReview, design: DesignBundle = greeterDesign(), tasks: Readonly<Record<string, TaskState>> = { "T-001": aTask() }): Promise<Scenario> {
+async function scenario(cli: CliScript, api: (request: ApiRoleRequest) => Promise<void> = approveReview, design: DesignBundle = greeterDesign(), tasks: Readonly<Record<string, TaskState>> = { "T-001": aTask() }, overrides: Partial<RunState> = {}): Promise<Scenario> {
   const productDir = await aProductRepo();
   const harness = await aLaneHarness({ productDir, design, cliRoles: scriptedCliRoles(cli), apiRoles: scriptedApiRoles(api) });
-  const engine = laneEngine(harness, buildingState(tasks));
+  const engine = laneEngine(harness, buildingState(tasks, overrides));
   await engine.runEffect({ kind: "build.schedule" });
   return { harness, engine, productDir };
 }
@@ -216,6 +216,8 @@ describe("build lane end to end", () => {
       markSecondLaneStarted = resolvePromise;
     });
     const design = greeterDesign([aTaskSpec({ id: "T-001" }), aTaskSpec({ id: "T-002", covers: ["greeter:BEH-002"], writes: ["src/b.ts", "tests/b.test.ts"], designRefs: ["M-02"] })], [aModule(), aModule({ id: "M-02", name: "b", covers: ["greeter:BEH-002"], owns: ["src/b.ts"], entry: "src/b.ts" })]);
+    const tasks = { "T-001": aTask(), "T-002": aTask({ covers: ["greeter:BEH-002"], writes: ["src/b.ts", "tests/b.test.ts"] }) };
+    const plannerCapReached = { stageAttempts: { ...buildingState(tasks).stageAttempts, plannerRecuts: TEST_CONFIG.caps.plannerRecuts } };
     const { engine } = await scenario(
       async (request) => {
         const invocation = invocationOf(request);
@@ -230,7 +232,8 @@ describe("build lane end to end", () => {
       },
       approveReview,
       design,
-      { "T-001": aTask(), "T-002": aTask({ covers: ["greeter:BEH-002"], writes: ["src/b.ts", "tests/b.test.ts"] }) },
+      tasks,
+      plannerCapReached,
     );
 
     await engine.waitFor(runEnded, LANE_TIMEOUT);

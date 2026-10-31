@@ -6,11 +6,14 @@ import type { SliceContext } from "../../../shared/slice.js";
 import { firewallViolations } from "../../domain/context-firewall.js";
 import { laneHandoffPath, laneTranscriptPath } from "../../domain/handoff-paths.js";
 import { instructionVariables, testWriterMessage, techExcerptOf, type LaneMessageInput } from "../../domain/lane-messages.js";
-import type { ReworkFinding } from "../../domain/rules/support.js";
+import { plannerRework, type ReworkFinding } from "../../domain/rules/support.js";
 import { costFieldsOf, runCliLane, withLaneParticipant } from "../cli-lane.js";
 import { runWithHandoffRetry, type ParseOutcome } from "../handoff-roundtrip.js";
 import type { LaneDeps } from "../lane-deps.js";
 import { laneInputs, reworkFindingText, taskStateOf, type LaneInputs } from "../lane-inputs.js";
+
+/* build-stage:DLT-017: a test-writer that cannot test its slice reports a task-cut problem, so it goes to the planner like TASK-OVERFLOW. */
+const TEST_WRITER_BLOCKED = "test_writer_blocked";
 
 export interface TestWriterRun {
   readonly taskId: string;
@@ -86,7 +89,7 @@ export async function runTestWriterOnFinding(slice: SliceContext, deps: LaneDeps
     }
     const frontmatter = result.parsed.frontmatter;
     if (frontmatter["status"] === "blocked") {
-      context.publish({ type: "task.failed", producer: "test-writer", payload: { taskId: run.taskId, reason: "blocked", detail: `test-writer: ${String(frontmatter["blocked_reason"] ?? "")}` } });
+      context.publish(plannerRework(context.state, run.taskId, slice.config.caps, TEST_WRITER_BLOCKED, handoffPath));
       return;
     }
     const violations = firewallViolations(result.run.toolUses, inputs.task.worktree, inputs.stubPaths);

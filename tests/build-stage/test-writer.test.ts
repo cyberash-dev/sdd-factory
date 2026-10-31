@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG } from "../../src/shared/config.js";
 import { greeterDesign } from "./support/design.js";
 import { aLaneHarness } from "./support/harness.js";
 import { handoffPathFromWorktree, handoffPathOf, laneState, provisionLane, RED_TEST, runLaneEffect } from "./support/lanes.js";
@@ -57,7 +58,8 @@ describe("test-writer invocation", () => {
     expect([prompt.includes("## Rework finding\n\nreview_changes\nsource: "), prompt.includes("RV-001: test contradicts greeter:BEH-001.then"), prompt.includes("This is attempt 2 for this role on this task.")]).toEqual([true, true, true]);
   });
 
-  it("publishes task.failed with reason blocked when the handoff declares blocked", async () => {
+  // @covers build-stage:DLT-017
+  it("sends a blocked handoff under the planner cap to the planner as a re-cut with the handoff as the finding", async () => {
     const cliRoles = scriptedCliRoles(async (request) => {
       await writeHandoff(handoffPathFromWorktree(request.cwd, "test-writer", 1), { ...completeHandoff(), status: "blocked", blocked_reason: "greeter:BEH-001 has no entry point" });
     });
@@ -66,7 +68,22 @@ describe("test-writer invocation", () => {
 
     const published = await runLaneEffect(harness, "build.test-writer", { taskId: "T-001", attempt: 1, reworkFinding: null }, laneState(lane));
 
-    expect(published).toEqual([{ type: "task.failed", producer: "test-writer", payload: { taskId: "T-001", reason: "blocked", detail: "test-writer: greeter:BEH-001 has no entry point" } }]);
+    expect(published).toEqual([{ type: "task.rework", producer: "foreman", payload: { taskId: "T-001", target: "planner", attempt: 1, reason: "test_writer_blocked", findingPath: handoffPathOf(harness, "test-writer", 1) } }]);
+  });
+
+  // @covers build-stage:DLT-017
+  it("fails the task with cap_exhausted planner when a blocked handoff arrives at the planner cap", async () => {
+    const cliRoles = scriptedCliRoles(async (request) => {
+      await writeHandoff(handoffPathFromWorktree(request.cwd, "test-writer", 1), { ...completeHandoff(), status: "blocked", blocked_reason: "greeter:BEH-001 has no entry point" });
+    });
+    const harness = await aLaneHarness({ productDir: await aProductRepo(), design: greeterDesign(), cliRoles, config: { caps: { ...DEFAULT_CONFIG.caps, plannerRecuts: 2 } } });
+    const lane = await provisionLane(harness);
+    const fresh = laneState(lane);
+    const atPlannerCap = { ...fresh, stageAttempts: { ...fresh.stageAttempts, plannerRecuts: 2 } };
+
+    const published = await runLaneEffect(harness, "build.test-writer", { taskId: "T-001", attempt: 1, reworkFinding: null }, atPlannerCap);
+
+    expect(published).toEqual([{ type: "task.failed", producer: "foreman", payload: { taskId: "T-001", reason: "cap_exhausted", detail: "planner" } }]);
   });
 
   // @covers build-stage:BEH-015
