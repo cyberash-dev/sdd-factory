@@ -46,7 +46,7 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 | Stage | Role | Model (`factory.config.json`) | Runs as | Concurrency |
 |---|---|---|---|---|
 | spec | spec-analyst | `deepseek/deepseek-v4.1-flash-1017:nitro` (throughput-sorted OpenRouter routing), effort medium | Mozaik agent | loops on `sdd lint` (cap 8) |
-| spec | spec-critic | `openai/gpt-6.1-terra`, effort medium | Mozaik agent, fresh context, another vendor than the analyst | after each draft (cap 4 rounds) |
+| spec | spec-critic | `openai/gpt-6.1-terra`, effort medium | Mozaik agent, fresh context, another vendor than the analyst | after each draft (2 rounds in the shipped profile: review, then verification; open findings of the last round become assumptions) |
 | spec | foreman | none | deterministic Mozaik participant | runs `sdd approve` + `sdd finalize` |
 | design | architect | DeepSeek V4.1 Flash, effort medium | Mozaik agent | in parallel with verification-designer |
 | design | verification-designer | DeepSeek V4.1 Flash, effort high | Mozaik agent | in parallel with architect |
