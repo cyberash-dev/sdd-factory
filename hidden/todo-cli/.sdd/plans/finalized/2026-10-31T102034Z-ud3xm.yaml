@@ -1,17 +1,17 @@
-plan_id: 2026-10-31T015810Z-chtbm
-created_at: 2026-10-31T01:58:10.268Z
+plan_id: 2026-10-31T102034Z-ud3xm
+created_at: 2026-10-31T10:20:34.542Z
 pending_attestations:
   - id: todo-cli:*
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T01:58:10.267Z
-    change_request: "todo-cli-20261031-014956: pre-authorised at launch"
+    timestamp: 2026-10-31T10:20:34.541Z
+    change_request: "todo-cli-20261031-100913: pre-authorised at launch"
     scope: first-time-approval
     target_status: approved
   - id: todo-cli:BL-001
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T01:58:10.617Z
-    change_request: "todo-cli-20261031-014956: pre-authorised at launch"
+    timestamp: 2026-10-31T10:20:34.875Z
+    change_request: "todo-cli-20261031-100913: pre-authorised at launch"
     scope: first-time-approval
     target_status: approved

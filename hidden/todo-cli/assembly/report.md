@@ -1,5 +1,5 @@
 ---
-run_id: todo-cli-20261031-014956
+run_id: todo-cli-20261031-100913
 slug: todo-cli
 rounds: 1
 verdict: published
@@ -8,27 +8,22 @@ task_order:
   - T-002
   - T-003
   - T-004
-  - T-005
 merges:
   - round: 1
     task_id: T-001
-    impl_sha: e5db20613f9cf2f34d246563ad0486cb053c23f7
+    impl_sha: 391402714be993be17773c2ae54e4f714663350c
     result: skipped_ancestor
   - round: 1
     task_id: T-002
-    impl_sha: 05e9ecd004fae59f01ec309d9a27fe382366d53e
+    impl_sha: 934d5ff8138b70ee01977768d956cf0539ee5bd8
     result: skipped_ancestor
   - round: 1
     task_id: T-003
-    impl_sha: 5449d52faaa49d6d91e221fe6c5388b7d2dfa723
+    impl_sha: 5a50181aac89c41983be64cd31794537ca8983b2
     result: skipped_ancestor
   - round: 1
     task_id: T-004
-    impl_sha: 63a3d4d5903231796e850c238424b7f6e0cbca13
-    result: skipped_ancestor
-  - round: 1
-    task_id: T-005
-    impl_sha: e2d9d725360c34bd2ac1f7d3b1610c18896f9022
+    impl_sha: 4f16be5ca45101fffe4b967580c365249a067798
     result: skipped_ancestor
 verification:
   - round: 1
@@ -40,9 +35,9 @@ verification:
       - --no-audit
       - --no-fund
     exit_code: 0
-    duration_ms: 816
+    duration_ms: 1310
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-014956/handoffs/assembly/round-1/install.log
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/install.log
   - round: 1
     step: typecheck
     argv:
@@ -50,9 +45,19 @@ verification:
       - tsc
       - --noEmit
     exit_code: 0
-    duration_ms: 830
+    duration_ms: 978
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-014956/handoffs/assembly/round-1/typecheck.log
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/typecheck.log
+  - round: 1
+    step: build
+    argv:
+      - npm
+      - run
+      - build
+    exit_code: 0
+    duration_ms: 596
+    result: green
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/build.log
   - round: 1
     step: test
     argv:
@@ -60,11 +65,11 @@ verification:
       - vitest
       - run
       - --reporter=json
-      - --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-014956/handoffs/assembly/round-1/vitest.json
+      - --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/vitest.json
     exit_code: 0
-    duration_ms: 17919
+    duration_ms: 3635
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-014956/handoffs/assembly/round-1/vitest.json
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/vitest.json
   - round: 1
     step: sdd_ready
     argv:
@@ -73,9 +78,9 @@ verification:
       - ready
       - --format=json
     exit_code: 0
-    duration_ms: 450
+    duration_ms: 452
     result: green
-    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-014956/handoffs/assembly/round-1/sdd_ready.json
+    evidence_path: /Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/sdd_ready.json
 sdd_ready:
   ok: true
   violations: []
@@ -85,19 +90,19 @@ fixes: []
 published: null
 ---
 
-# Assembly report todo-cli todo-cli-20261031-014956
+# Assembly report todo-cli todo-cli-20261031-100913
 
 ## Round 1
 
-- merge T-001 e5db20613f9c: skipped_ancestor
-- merge T-002 05e9ecd004fa: skipped_ancestor
-- merge T-003 5449d52faaa4: skipped_ancestor
-- merge T-004 63a3d4d59032: skipped_ancestor
-- merge T-005 e2d9d725360c: skipped_ancestor
-- install: green (exit 0, 816 ms) `npm ci --prefer-offline --no-audit --no-fund`
-- typecheck: green (exit 0, 830 ms) `npx tsc --noEmit`
-- test: green (exit 0, 17919 ms) `npx vitest run --reporter=json --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-014956/handoffs/assembly/round-1/vitest.json`
-- sdd_ready: green (exit 0, 450 ms) `npx sdd ready --format=json`
+- merge T-001 391402714be9: skipped_ancestor
+- merge T-002 934d5ff8138b: skipped_ancestor
+- merge T-003 5a50181aac89: skipped_ancestor
+- merge T-004 4f16be5ca451: skipped_ancestor
+- install: green (exit 0, 1310 ms) `npm ci --prefer-offline --no-audit --no-fund`
+- typecheck: green (exit 0, 978 ms) `npx tsc --noEmit`
+- build: green (exit 0, 596 ms) `npm run build`
+- test: green (exit 0, 3635 ms) `npx vitest run --reporter=json --outputFile=/Users/cyberash/Projects/multi-agent-hackaton/.factory/runs/todo-cli-20261031-100913/handoffs/assembly/round-1/vitest.json`
+- sdd_ready: green (exit 0, 452 ms) `npx sdd ready --format=json`
 
 ## Published
 

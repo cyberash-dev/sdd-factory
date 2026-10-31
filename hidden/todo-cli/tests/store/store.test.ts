@@ -1,287 +1,294 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, statSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  createTask,
-  nextTaskId,
-  readTasks,
-  resolveStoragePath,
-  writeTasks,
+  emptyTaskList,
+  formatCreatedAt,
+  readTaskList,
+  resolveStorePath,
+  writeTaskList,
 } from "../../src/store/index.js";
-import type { Task } from "../../src/store/index.js";
+import type { Task, TaskList } from "../../src/store/index.js";
 
-const CREATED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const TS = "2026-10-31T10:20:34.541Z";
+const TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-function tmp(): string {
-  return mkdtempSync(join(tmpdir(), "todo-store-"));
+function dir(): string {
+  return mkdtempSync(join(tmpdir(), "store-t002-"));
+}
+function task(id: number, text = `t${id}`, done = false): Task {
+  return { id, text, done, createdAt: TS };
+}
+function list(nextId: number, tasks: Task[]): TaskList {
+  return { nextId, tasks };
+}
+function tl(nextId: unknown, tasks: unknown): string {
+  return JSON.stringify({ nextId, tasks });
 }
 
-function seed(id: number, text: string, done = false): Task {
-  return { id, text, done, createdAt: "2026-10-31T01:58:10.267Z" };
-}
+const UNPARSABLE: Array<[string, string]> = [
+  ["truncated JSON", '{"nextId":1,"tasks":['],
+  ["empty file", ""],
+  ["non-JSON text", "not a task list"],
+  ["brace garbage", "{oops"],
+];
 
-// Mirrors what `add` does: read, allocate, stamp, write.
-function addTask(env: NodeJS.ProcessEnv, cwd: string, text: string): Task {
-  const path = resolveStoragePath(env, cwd);
-  const read = readTasks(path);
-  if (!read.ok) throw new Error("unreadable store");
-  const task = createTask(nextTaskId(read.tasks), text, new Date());
-  const written = writeTasks(path, [...read.tasks, task]);
-  if (!written.ok) throw new Error("unwritable store");
-  return task;
-}
+const FOREIGN: Array<[string, string]> = [
+  ["object without contract keys", '{"hello": 1}'],
+  ["array at the root", "[]"],
+  ["number scalar", "42"],
+  ["null scalar", "null"],
+  ["string scalar", '"x"'],
+  ["missing tasks", '{"nextId":1}'],
+  ["missing nextId", '{"tasks":[]}'],
+  ["nextId zero", tl(0, [])],
+  ["nextId fractional", tl(1.5, [])],
+  ["nextId string", tl("1", [])],
+  ["tasks not an array", tl(1, {})],
+  ["task is not an object", tl(2, [1])],
+  ["task id zero", tl(2, [{ id: 0, text: "a", done: false, createdAt: TS }])],
+  ["task id fractional", tl(2, [{ id: 1.5, text: "a", done: false, createdAt: TS }])],
+  ["task text empty", tl(2, [{ id: 1, text: "", done: false, createdAt: TS }])],
+  ["task done not boolean", tl(2, [{ id: 1, text: "a", done: "no", createdAt: TS }])],
+  ["task without createdAt", tl(2, [{ id: 1, text: "a", done: false }])],
+  ["createdAt not a string", tl(2, [{ id: 1, text: "a", done: false, createdAt: 5 }])],
+  ["createdAt wrong format", tl(2, [{ id: 1, text: "a", done: false, createdAt: "2026-10-31" }])],
+  ["task without id", tl(2, [{ text: "a", done: false, createdAt: TS }])],
+  [
+    "duplicate ids",
+    tl(2, [
+      { id: 1, text: "a", done: false, createdAt: TS },
+      { id: 1, text: "b", done: false, createdAt: TS },
+    ]),
+  ],
+  [
+    "descending ids",
+    tl(3, [
+      { id: 2, text: "a", done: false, createdAt: TS },
+      { id: 1, text: "b", done: false, createdAt: TS },
+    ]),
+  ],
+];
 
-function stored(path: string): unknown {
-  return JSON.parse(readFileSync(path, "utf8"));
-}
-
-describe("storage path", () => {
-  it("uses TODO_FILE when set and ./todo.json in the current directory otherwise", () => {
-    expect(resolveStoragePath({ TODO_FILE: "/data/alt.json" }, "/work")).toBe("/data/alt.json");
-    expect(resolveStoragePath({}, "/work")).toBe("/work/todo.json");
-    expect(resolve("/work", resolveStoragePath({ TODO_FILE: "./alt.json" }, "/work"))).toBe(
-      "/work/alt.json",
-    );
+describe("storage path (CTR-007)", () => {
+  // @covers todo-cli:CTR-007
+  it("resolves TODO_FILE verbatim when set and non-empty, ./todo.json otherwise", () => {
+    expect(resolveStorePath({})).toBe("./todo.json");
+    expect(resolveStorePath({ TODO_FILE: undefined })).toBe("./todo.json");
+    expect(resolveStorePath({ TODO_FILE: "" })).toBe("./todo.json");
+    expect(resolveStorePath({ TODO_FILE: "/tmp/v/abs.json" })).toBe("/tmp/v/abs.json");
+    expect(resolveStorePath({ TODO_FILE: "sub/store.json" })).toBe("sub/store.json");
+    expect(resolveStorePath({ TODO_FILE: "/tmp/v/a b.json" })).toBe("/tmp/v/a b.json");
   });
 });
 
-describe("storage file", () => {
-  // @covers todo-cli:BEH-003
-  it("first add creates the storage file holding one task", () => {
-    const dir = tmp();
-    const task = addTask({}, dir, "first");
-    expect(task.id).toBe(1);
-    expect(task.text).toBe("first");
-    const file = join(dir, "todo.json");
-    expect(existsSync(file)).toBe(true);
-    const items = stored(file) as Task[];
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ id: 1, text: "first", done: false });
+describe("storage file format (CTR-006)", () => {
+  it("emptyTaskList is nextId 1 with no tasks", () => {
+    expect(emptyTaskList()).toEqual({ nextId: 1, tasks: [] });
   });
 
-  it("first add at a TODO_FILE path creates only that file", () => {
-    const dir = tmp();
-    addTask({ TODO_FILE: join(dir, "custom.json") }, dir, "first");
-    expect(existsSync(join(dir, "custom.json"))).toBe(true);
-    expect(existsSync(join(dir, "todo.json"))).toBe(false);
+  it("formatCreatedAt renders YYYY-MM-DDTHH:MM:SS.sssZ in UTC", () => {
+    expect(formatCreatedAt(new Date("2026-10-31T10:20:34.541Z"))).toBe("2026-10-31T10:20:34.541Z");
+    expect(formatCreatedAt(new Date("2026-01-02T03:04:05.000Z"))).toBe("2026-01-02T03:04:05.000Z");
   });
 
-  // @covers todo-cli:BEH-004
-  it.each([
-    { name: "gap in ids", ids: [1, 3], next: 4 },
-    { name: "contiguous ids", ids: [1, 2, 3], next: 4 },
-    { name: "highest id removed", ids: [1, 2], next: 3 },
-    { name: "empty list", ids: [] as number[], next: 1 },
-  ])("add assigns the next integer id: $name", ({ ids, next }) => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    writeFileSync(file, JSON.stringify(ids.map((id) => seed(id, `t${id}`))));
-    const task = addTask({}, dir, "next");
-    expect(task.id).toBe(next);
-    const items = stored(file) as Task[];
-    expect(items.filter((t) => t.id === next)).toHaveLength(1);
-    expect(items.every((t) => t.id > 0)).toBe(true);
-  });
-
-  it("add on an absent storage file gives the new task id 1", () => {
-    expect(addTask({}, tmp(), "next").id).toBe(1);
-  });
-
-  // @covers todo-cli:BEH-017
-  it.each([
-    { name: "default path", env: {} as NodeJS.ProcessEnv, file: "todo.json" },
-    { name: "TODO_FILE path", env: { TODO_FILE: "custom.json" }, file: "custom.json" },
-  ])("absent storage file reads as an empty list and is not created: $name", ({ env, file }) => {
-    const dir = tmp();
-    const path = resolveStoragePath(
-      env.TODO_FILE ? { TODO_FILE: join(dir, env.TODO_FILE) } : env,
-      dir,
-    );
-    expect(readTasks(path)).toEqual({ ok: true, tasks: [] });
-    expect(existsSync(join(dir, file))).toBe(false);
-    expect(readdirSync(dir)).toEqual([]);
-  });
-
-  it("reading an existing empty array leaves the file byte-identical", () => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    writeFileSync(file, "[]");
-    expect(readTasks(file)).toEqual({ ok: true, tasks: [] });
-    expect(readFileSync(file, "utf8")).toBe("[]");
-  });
-
-  // @covers todo-cli:BEH-018
-  it.each([
-    { name: "malformed JSON", content: "{ not json" },
-    { name: "JSON object instead of array", content: '{"tasks":[]}' },
-    { name: "empty file", content: "" },
-    { name: "item without createdAt", content: '[{"id":1,"text":"a","done":false}]' },
-  ])("unparseable storage file is a storage failure naming the path: $name", ({ content }) => {
-    const dir = tmp();
-    const file = join(dir, "broken.json");
-    writeFileSync(file, content);
-    expect(readTasks(file)).toEqual({ ok: false, path: file });
-    expect(readFileSync(file, "utf8")).toBe(content);
-  });
-
-  it("parseable storage file reads ok", () => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    writeFileSync(file, "[]");
-    expect(readTasks(file).ok).toBe(true);
-  });
-
-  it("write to an unwritable path reports the path", () => {
-    const file = join(tmp(), "missing-dir", "todo.json");
-    expect(writeTasks(file, [seed(1, "a")])).toEqual({ ok: false, path: file });
-  });
-
-  // @covers todo-cli:BEH-019
-  it("TODO_FILE receives the write and the default path is not created", () => {
-    const dir = tmp();
-    const alt = join(dir, "alt.json");
-    const task = addTask({ TODO_FILE: alt }, dir, "env");
-    expect(task.id).toBe(1);
-    expect((stored(alt) as Task[]).map((t) => t.text)).toEqual(["env"]);
-    expect(existsSync(join(dir, "todo.json"))).toBe(false);
-  });
-
-  it("TODO_FILE leaves an existing default file untouched", () => {
-    const dir = tmp();
-    const def = join(dir, "todo.json");
-    const before = JSON.stringify([seed(1, "default")]);
-    writeFileSync(def, before);
-    addTask({ TODO_FILE: "./alt.json" }, dir, "env");
-    expect(readFileSync(def, "utf8")).toBe(before);
-    expect(existsSync(join(dir, "alt.json"))).toBe(true);
-  });
-
-  it("unset TODO_FILE writes to ./todo.json", () => {
-    const dir = tmp();
-    expect(addTask({}, dir, "env").id).toBe(1);
-    expect((stored(join(dir, "todo.json")) as Task[])[0]?.text).toBe("env");
-  });
-});
-
-describe("storage file format", () => {
   // @covers todo-cli:CTR-006
-  it("first write leaves a JSON array whose item has the four fields and a millisecond Z createdAt", () => {
-    const dir = tmp();
-    addTask({}, dir, "milk");
-    const items = stored(join(dir, "todo.json"));
-    expect(Array.isArray(items)).toBe(true);
-    const list = items as Task[];
-    expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ id: 1, text: "milk", done: false });
-    expect(list[0]?.createdAt).toMatch(CREATED_AT);
-    expect(Number.isNaN(Date.parse(list[0]?.createdAt ?? ""))).toBe(false);
+  it("writes a root object with nextId and tasks and reads it back in ascending id order", () => {
+    const p = join(dir(), "s.json");
+    const written = list(4, [task(1, "a"), task(2, "b", true), task(3, "c")]);
+    expect(writeTaskList(p, written)).toEqual({ ok: true, value: null });
+    const raw = JSON.parse(readFileSync(p, "utf8"));
+    expect(Array.isArray(raw)).toBe(false);
+    expect(Object.keys(raw).sort()).toEqual(["nextId", "tasks"]);
+    expect(raw.nextId).toBe(4);
+    expect(raw.tasks.map((t: Task) => t.id)).toEqual([1, 2, 3]);
+    for (const t of raw.tasks) expect(Object.keys(t).sort()).toEqual(["createdAt", "done", "id", "text"]);
+    expect(readTaskList(p)).toEqual({ ok: true, value: written });
   });
 
-  it("write over an existing file keeps the first item and appends a well-formed second", () => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    writeFileSync(file, JSON.stringify([seed(1, "alpha")]));
-    addTask({}, dir, "eggs");
-    const items = stored(file) as Task[];
-    expect(items).toHaveLength(2);
-    expect(items[0]).toEqual({
-      id: 1,
-      text: "alpha",
-      done: false,
-      createdAt: "2026-10-31T01:58:10.267Z",
-    });
-    expect(items[1]).toMatchObject({ id: 2, text: "eggs", done: false });
-    expect(items[1]?.createdAt).toMatch(CREATED_AT);
-  });
-
-  it("writing an empty list leaves a JSON array with no item", () => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    writeFileSync(file, JSON.stringify([seed(1, "a")]));
-    expect(writeTasks(file, [])).toEqual({ ok: true });
-    expect(stored(file)).toEqual([]);
-  });
-
-  it("createTask stamps createdAt as UTC ISO-8601 with milliseconds and a Z suffix", () => {
-    expect(createTask(5, "x", new Date("2026-10-31T01:58:10.267Z"))).toEqual({
-      id: 5,
-      text: "x",
-      done: false,
-      createdAt: "2026-10-31T01:58:10.267Z",
-    });
-    expect(createTask(1, "x", new Date("2026-01-02T03:04:05.000Z")).createdAt).toBe(
-      "2026-01-02T03:04:05.000Z",
-    );
+  it.each(FOREIGN)("reports a file of another shape (%s) as not ok", (_n, content) => {
+    const p = join(dir(), "s.json");
+    writeFileSync(p, content);
+    expect(readTaskList(p)).toEqual({ ok: false });
   });
 });
 
-describe("stored task fields", () => {
+describe("unparsable storage file (BEH-016)", () => {
+  // @covers todo-cli:BEH-016
+  it.each(UNPARSABLE)("reports %s as not ok and leaves the bytes unchanged", (_n, content) => {
+    const p = join(dir(), "s.json");
+    writeFileSync(p, content);
+    expect(readTaskList(p)).toEqual({ ok: false });
+    expect(readFileSync(p, "utf8")).toBe(content);
+  });
+
+  it("reads a valid empty storage file as an empty list", () => {
+    const p = join(dir(), "s.json");
+    writeFileSync(p, '{"nextId":1,"tasks":[]}');
+    expect(readTaskList(p)).toEqual({ ok: true, value: { nextId: 1, tasks: [] } });
+  });
+});
+
+describe("storage file of another shape (BEH-017)", () => {
+  // @covers todo-cli:BEH-017
+  it.each(FOREIGN)("reports %s as not ok and leaves the bytes unchanged", (_n, content) => {
+    const p = join(dir(), "s.json");
+    writeFileSync(p, content);
+    expect(readTaskList(p)).toEqual({ ok: false });
+    expect(readFileSync(p, "utf8")).toBe(content);
+  });
+
+  it("reads the contract shape with no tasks as an empty list", () => {
+    const p = join(dir(), "s.json");
+    writeFileSync(p, tl(1, []));
+    expect(readTaskList(p)).toEqual({ ok: true, value: { nextId: 1, tasks: [] } });
+  });
+});
+
+describe("missing storage file (BEH-018)", () => {
+  // @covers todo-cli:BEH-018
+  it("reads an absent file as an empty list and does not create it", () => {
+    const d = dir();
+    const p = join(d, "s.json");
+    expect(readTaskList(p)).toEqual({ ok: true, value: { nextId: 1, tasks: [] } });
+    expect(existsSync(p)).toBe(false);
+  });
+
+  it("keeps an absent file absent in an existing nested directory", () => {
+    const d = dir();
+    mkdirSync(join(d, "sub"));
+    const p = join(d, "sub", "s.json");
+    expect(readTaskList(p)).toEqual({ ok: true, value: { nextId: 1, tasks: [] } });
+    expect(existsSync(p)).toBe(false);
+  });
+});
+
+describe("first write (BEH-019)", () => {
+  // @covers todo-cli:BEH-019
+  it("creates the absent file holding exactly one task with id 1 and nextId 2", () => {
+    const p = join(dir(), "s.json");
+    expect(existsSync(p)).toBe(false);
+    const first = { id: 1, text: "first", done: false, createdAt: TS };
+    expect(writeTaskList(p, { nextId: 2, tasks: [first] })).toEqual({ ok: true, value: null });
+    expect(existsSync(p)).toBe(true);
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ nextId: 2, tasks: [first] });
+  });
+
+  it("reports a write into a missing parent directory as not ok and creates nothing", () => {
+    const d = dir();
+    const p = join(d, "nope", "s.json");
+    expect(writeTaskList(p, list(2, [task(1)]))).toEqual({ ok: false });
+    expect(existsSync(p)).toBe(false);
+    expect(existsSync(join(d, "nope"))).toBe(false);
+  });
+});
+
+describe("task ids (INV-001, INV-002)", () => {
   // @covers todo-cli:INV-001
-  it("every stored task carries the four task fields with the stated types", () => {
-    const dir = tmp();
-    addTask({}, dir, "alpha");
-    addTask({}, dir, "beta");
-    const file = join(dir, "todo.json");
-    const read = readTasks(file);
-    if (!read.ok) throw new Error("unreadable");
-    const completed = read.tasks.map((t) => (t.id === 1 ? { ...t, done: true } : t));
-    expect(writeTasks(file, completed)).toEqual({ ok: true });
-    const items = stored(file) as Record<string, unknown>[];
-    expect(items).toHaveLength(2);
-    for (const item of items) {
-      expect(Number.isInteger(item.id)).toBe(true);
-      expect(typeof item.text).toBe("string");
-      expect(typeof item.done).toBe("boolean");
-      expect(typeof item.createdAt).toBe("string");
-      expect(item.createdAt).toMatch(CREATED_AT);
+  it("keeps ten tasks with ids 1 to 10, each at least 1 and appearing once, through write and read", () => {
+    const p = join(dir(), "s.json");
+    const tasks = Array.from({ length: 10 }, (_, i) => task(i + 1));
+    expect(writeTaskList(p, list(11, tasks))).toEqual({ ok: true, value: null });
+    const r = readTaskList(p);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.tasks.map((t) => t.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     }
-    expect(items[0]?.done).toBe(true);
   });
-});
 
-describe("stored task ids", () => {
+  it("rejects two tasks with id 1 in one file", () => {
+    const p = join(dir(), "s.json");
+    writeFileSync(p, tl(2, [task(1, "a"), task(1, "b")]));
+    expect(readTaskList(p)).toEqual({ ok: false });
+  });
+
   // @covers todo-cli:INV-002
-  it("ids stay positive, unique and unchanged across add, rm and done", () => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    for (const text of ["alpha", "beta", "gamma"]) addTask({}, dir, text);
-    expect((stored(file) as Task[]).map((t) => t.id)).toEqual([1, 2, 3]);
-
-    writeFileSync(file, JSON.stringify([seed(1, "alpha"), seed(2, "beta")]));
-    const read = readTasks(file);
-    if (!read.ok) throw new Error("unreadable");
-    writeTasks(file, read.tasks.filter((t) => t.id !== 1));
-    const added = addTask({}, dir, "gamma");
-    const ids = (stored(file) as Task[]).map((t) => t.id);
-    expect(added.id).not.toBe(2);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toContain(2);
-    expect(ids.every((id) => Number.isInteger(id) && id > 0)).toBe(true);
-
-    writeFileSync(file, JSON.stringify([seed(1, "alpha"), seed(2, "beta")]));
-    const again = readTasks(file);
-    if (!again.ok) throw new Error("unreadable");
-    writeTasks(file, again.tasks.map((t) => (t.id === 1 ? { ...t, done: true } : t)));
-    expect((stored(file) as Task[]).map((t) => t.id)).toEqual([1, 2]);
+  it("preserves nextId across a removal of the highest id and of every task", () => {
+    const p = join(dir(), "s.json");
+    expect(writeTaskList(p, list(3, [task(1)]))).toEqual({ ok: true, value: null });
+    expect(readTaskList(p)).toEqual({ ok: true, value: list(3, [task(1)]) });
+    expect(writeTaskList(p, list(3, []))).toEqual({ ok: true, value: null });
+    expect(JSON.parse(readFileSync(p, "utf8")).nextId).toBe(3);
+    expect(readTaskList(p)).toEqual({ ok: true, value: { nextId: 3, tasks: [] } });
   });
 });
 
-describe("read-only access", () => {
-  // @covers todo-cli:INV-004
-  it("reading a missing file creates nothing, reading an existing file changes nothing, only a write creates it", () => {
-    const dir = tmp();
-    const file = join(dir, "todo.json");
-    expect(readTasks(file)).toEqual({ ok: true, tasks: [] });
-    expect(existsSync(file)).toBe(false);
-    expect(readdirSync(dir)).toEqual([]);
+describe("task fields (INV-003)", () => {
+  // @covers todo-cli:INV-003
+  it("writes every task with id, text, done and createdAt of the contract types", () => {
+    const p = join(dir(), "s.json");
+    const now = formatCreatedAt(new Date("2026-10-31T10:20:34.541Z"));
+    expect(now).toMatch(TS_RE);
+    expect(writeTaskList(p, list(3, [task(1, "buy milk"), task(2, "x", true)]))).toEqual({ ok: true, value: null });
+    const raw = JSON.parse(readFileSync(p, "utf8"));
+    expect(raw.tasks).toHaveLength(2);
+    for (const t of raw.tasks) {
+      expect(Object.keys(t).sort()).toEqual(["createdAt", "done", "id", "text"]);
+      expect(Number.isInteger(t.id) && t.id >= 1).toBe(true);
+      expect(typeof t.text === "string" && t.text.length > 0).toBe(true);
+      expect(typeof t.done).toBe("boolean");
+      expect(t.createdAt).toMatch(TS_RE);
+    }
+    expect(raw.tasks[1].done).toBe(true);
+    expect(raw.tasks[0].createdAt).toBe(TS);
+  });
+});
 
-    writeFileSync(file, "[]");
-    readTasks(file);
-    expect(readFileSync(file, "utf8")).toBe("[]");
+describe("failing invocations (INV-006, POL-003)", () => {
+  // @covers todo-cli:INV-006
+  it("leaves an unparsable file byte-identical and an absent target absent when a store call fails", () => {
+    const d = dir();
+    const p = join(d, "s.json");
+    writeFileSync(p, "{oops");
+    expect(readTaskList(p)).toEqual({ ok: false });
+    expect(readFileSync(p, "utf8")).toBe("{oops");
+    const q = join(d, "missing", "s.json");
+    expect(writeTaskList(q, list(2, [task(1)]))).toEqual({ ok: false });
+    expect(existsSync(q)).toBe(false);
+  });
 
-    const other = tmp();
-    addTask({}, other, "x");
-    expect(existsSync(join(other, "todo.json"))).toBe(true);
+  it("reports a write onto a directory as not ok and leaves the directory in place", () => {
+    const d = dir();
+    const p = join(d, "adir");
+    mkdirSync(p);
+    expect(writeTaskList(p, list(2, [task(1)]))).toEqual({ ok: false });
+    expect(statSync(p).isDirectory()).toBe(true);
+  });
+
+  // @covers todo-cli:POL-003
+  it.each([...UNPARSABLE, ...FOREIGN.slice(0, 3)])(
+    "reports %s as not ok, never as an empty list, and never modifies it",
+    (_n, content) => {
+      const p = join(dir(), "s.json");
+      writeFileSync(p, content);
+      const r = readTaskList(p);
+      expect(r).toEqual({ ok: false });
+      expect(readFileSync(p, "utf8")).toBe(content);
+    },
+  );
+});
+
+describe("read-only access (INV-007)", () => {
+  // @covers todo-cli:INV-007
+  it("never creates an absent file and never touches an existing one on read; a write changes it", () => {
+    const d = dir();
+    const absent = join(d, "a.json");
+    expect(readTaskList(absent)).toEqual({ ok: true, value: { nextId: 1, tasks: [] } });
+    expect(existsSync(absent)).toBe(false);
+
+    const p = join(d, "s.json");
+    const content = tl(3, [task(1), task(2)]);
+    writeFileSync(p, content);
+    const old = new Date("2020-01-01T00:00:00.000Z");
+    utimesSync(p, old, old);
+    const before = statSync(p).mtimeMs;
+    expect(readTaskList(p).ok).toBe(true);
+    expect(readFileSync(p, "utf8")).toBe(content);
+    expect(statSync(p).mtimeMs).toBe(before);
+
+    expect(writeTaskList(p, list(4, [task(1), task(2), task(3, "c")]))).toEqual({ ok: true, value: null });
+    expect(readFileSync(p, "utf8")).not.toBe(content);
+    expect(JSON.parse(readFileSync(p, "utf8")).tasks).toHaveLength(3);
   });
 });

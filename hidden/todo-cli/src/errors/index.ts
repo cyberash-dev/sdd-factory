@@ -1,37 +1,59 @@
-export type ErrorCode = "E_USAGE" | "E_NO_TASK" | "E_STORAGE";
+export type ErrorCode =
+  | "E_USAGE_MISSING_ARGUMENT"
+  | "E_USAGE_EMPTY_TEXT"
+  | "E_USAGE_UNKNOWN_OPTION"
+  | "E_USAGE_INVALID_ID"
+  | "E_NO_TASK"
+  | "E_CANNOT_READ";
 
 export interface CliError {
   readonly code: ErrorCode;
-  readonly exitCode: 1 | 2;
-  readonly message: string;
+  readonly line: string;
 }
 
-export type CommandResult =
-  | { readonly ok: true; readonly stdout: string }
-  | { readonly ok: false; readonly error: CliError };
+const CODES: readonly ErrorCode[] = [
+  "E_USAGE_MISSING_ARGUMENT",
+  "E_USAGE_EMPTY_TEXT",
+  "E_USAGE_UNKNOWN_OPTION",
+  "E_USAGE_INVALID_ID",
+  "E_NO_TASK",
+  "E_CANNOT_READ",
+];
 
-export function usageError(detail: string): CliError {
-  return { code: "E_USAGE", exitCode: 2, message: `usage: ${detail}` };
+function lineFor(code: ErrorCode, subject: string): string {
+  switch (code) {
+    case "E_USAGE_MISSING_ARGUMENT":
+      return "usage: missing argument";
+    case "E_USAGE_EMPTY_TEXT":
+      return "usage: empty text";
+    case "E_USAGE_UNKNOWN_OPTION":
+      return `usage: unknown argument ${subject}`;
+    case "E_USAGE_INVALID_ID":
+      return `usage: invalid id ${subject}`;
+    case "E_NO_TASK":
+      return `error: no task #${subject}`;
+    case "E_CANNOT_READ":
+      return `error: cannot read ${subject}`;
+  }
 }
 
-export function noTaskError(id: number): CliError {
-  return { code: "E_NO_TASK", exitCode: 1, message: `error: no task #${id}` };
+export function makeError(code: ErrorCode, subject: string = ""): CliError {
+  return { code, line: lineFor(code, subject) };
 }
 
-export function storageError(path: string): CliError {
-  return { code: "E_STORAGE", exitCode: 1, message: `error: cannot read ${path}` };
-}
-
-export function formatErrorLine(error: CliError): string {
-  return error.message;
+export function exitCodeFor(error: CliError): 1 | 2 {
+  return error.code.startsWith("E_USAGE_") ? 2 : 1;
 }
 
 export function isCliError(value: unknown): value is CliError {
-  if (typeof value !== "object" || value === null) return false;
-  const { code, exitCode, message } = value as Record<string, unknown>;
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const code: unknown = Reflect.get(value, "code");
+  const line: unknown = Reflect.get(value, "line");
   return (
-    (code === "E_USAGE" || code === "E_NO_TASK" || code === "E_STORAGE") &&
-    (exitCode === 1 || exitCode === 2) &&
-    typeof message === "string"
+    typeof line === "string" &&
+    typeof code === "string" &&
+    CODES.some((known) => known === code)
   );
 }

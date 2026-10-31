@@ -1,252 +1,236 @@
+import { describe, expect, it, vi } from "vitest";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { main } from "../../src/cli.js";
+import { join } from "node:path";
+import { main, usageText } from "../../src/index.js";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const TIMEOUT = 120000;
-const ALPHA = '[{"id":1,"text":"alpha","done":false,"createdAt":"2026-01-01T00:00:00.000Z"}]';
+const ROOT = process.cwd();
 
-function cleanEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, ...extra };
-  for (const key of Object.keys(env)) {
-    if (key.startsWith("VITEST") || key === "NODE_OPTIONS" || key === "TODO_FILE") delete env[key];
-  }
-  return { ...env, ...extra };
+function tmpStore(): string {
+  return join(mkdtempSync(join(tmpdir(), "todo-t004-")), "s.json");
 }
 
-function build() {
-  return spawnSync("npm", ["run", "build"], { cwd: root, encoding: "utf8", env: cleanEnv({}) });
+async function run(args: string[], file: string) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = await main(args, { TODO_FILE: file }, { out: (l) => out.push(l), err: (l) => err.push(l) });
+  return { code, out: out.join("\n"), err };
 }
 
-function sandbox(content: string | null) {
-  const dir = mkdtempSync(join(tmpdir(), "todo-cli-t005-"));
-  const file = join(dir, "todo.json");
-  if (content !== null) writeFileSync(file, content);
-  return { dir, file };
-}
-
-function cli(args: string[], file: string, nodeArgs: string[] = [], extraEnv: Record<string, string> = {}) {
-  return spawnSync(process.execPath, [...nodeArgs, join(root, "dist/cli.js"), ...args], {
-    cwd: root,
-    encoding: "utf8",
-    env: cleanEnv({ TODO_FILE: file, ...extraEnv }),
+describe("todo --help", () => {
+  // @covers todo-cli:BEH-020
+  it("prints a non-empty usage text to stdout, nothing to stderr, and creates no storage file when the storage file is absent", async () => {
+    const file = tmpStore();
+    const r = await run(["--help"], file);
+    expect(r.code).toBe(0);
+    expect(r.out.trim().length).toBeGreaterThan(0);
+    expect(r.err).toEqual([]);
+    expect(existsSync(file)).toBe(false);
   });
-}
-
-function buildThenCli(args: string[], file: string) {
-  const b = build();
-  expect(b.status).toBe(0);
-  return cli(args, file);
-}
-
-const dirs: string[] = [];
-afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  vi.restoreAllMocks();
-});
-function box(content: string | null) {
-  const s = sandbox(content);
-  dirs.push(s.dir);
-  return s;
-}
-
-describe("CLI streams and exit codes", () => {
-  // @covers todo-cli:INV-003
-  it("a successful add exits 0 with the result line on stdout and nothing on stderr", () => {
-    const { file } = box("[]");
-    const r = buildThenCli(["add", "milk"], file);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toBe("#1 milk\n");
-    expect(r.stderr).toBe("");
-  }, TIMEOUT);
-
-  it("an add with blank text exits 2 with exactly one usage: line on stderr and no stdout", () => {
-    const { file } = box(ALPHA);
-    const r = buildThenCli(["add", ""], file);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toBe("");
-    expect(r.stderr).toMatch(/^usage: [^\n]+\n$/);
-  }, TIMEOUT);
-
-  it("done on an absent id exits 1 with the single line error: no task #7", () => {
-    const { file } = box(ALPHA);
-    const r = buildThenCli(["done", "7"], file);
-    expect(r.status).toBe(1);
-    expect(r.stdout).toBe("");
-    expect(r.stderr).toBe("error: no task #7\n");
-  }, TIMEOUT);
-
-  it("rm on an absent id exits 1 with the single line error: no task #9", () => {
-    const { file } = box(ALPHA);
-    const r = buildThenCli(["rm", "9"], file);
-    expect(r.status).toBe(1);
-    expect(r.stdout).toBe("");
-    expect(r.stderr).toBe("error: no task #9\n");
-  }, TIMEOUT);
-
-  it("list over a storage file holding not-json exits 1 with the single line error: cannot read <path>", () => {
-    const { file } = box("not-json");
-    const r = buildThenCli(["list"], file);
-    expect(r.status).toBe(1);
-    expect(r.stdout).toBe("");
-    expect(r.stderr).toBe(`error: cannot read ${file}\n`);
-  }, TIMEOUT);
-
-  it("a storage path that is a directory is reported as one error: line with no stack trace", () => {
-    const { dir } = box(null);
-    const r = buildThenCli(["list"], dir);
-    expect(r.status).toBe(1);
-    expect(r.stdout).toBe("");
-    expect(r.stderr).toBe(`error: cannot read ${dir}\n`);
-  }, TIMEOUT);
 
   it.each([
-    [[]],
-    [["bogus"]],
-    [["list", "--x"]],
-    [["add", "a", "b"]],
-    [["add"]],
-    [["done", "0"]],
-    [["rm", "01"]],
-    [["done", "abc"]],
-  ])("usage failure for argv %j exits 2 with one usage: line and no stdout", (argv) => {
-    const { file } = box("[]");
-    const r = buildThenCli(argv, file);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toBe("");
-    expect(r.stderr).toMatch(/^usage: [^\n]+\n$/);
-  }, TIMEOUT);
+    ["empty store", '{"nextId":1,"tasks":[]}'],
+    ["unparsable store", "{oops"],
+  ])("leaves the %s byte-unchanged and still exits 0", async (_n, content) => {
+    const file = tmpStore();
+    writeFileSync(file, content);
+    const r = await run(["--help"], file);
+    expect(r.code).toBe(0);
+    expect(r.out.trim().length).toBeGreaterThan(0);
+    expect(r.err).toEqual([]);
+    expect(readFileSync(file, "utf8")).toBe(content);
+  });
 
-  it("--help exits 0 with the usage text naming every command on stdout and nothing on stderr", () => {
-    const { file } = box("[]");
-    const r = buildThenCli(["--help"], file);
-    expect(r.status).toBe(0);
-    expect(r.stderr).toBe("");
-    for (const token of ["add", "list", "done", "rm", "--help"]) expect(r.stdout).toContain(token);
-  }, TIMEOUT);
+  it("exits 2 with E_USAGE_MISSING_ARGUMENT for a bare invocation and prints no usage text on stdout", async () => {
+    const file = tmpStore();
+    const r = await run([], file);
+    expect(r.code).toBe(2);
+    expect(r.out).toBe("");
+    expect(r.err).toEqual(["usage: missing argument"]);
+    expect(existsSync(file)).toBe(false);
+  });
 
-  it.each([
-    [["add", "milk"], "[]", 0],
-    [["done", "7"], ALPHA, 1],
-    [["add", ""], ALPHA, 2],
-  ])("main returns the exit code for argv %j", (argv, content, code) => {
-    const { file } = box(content);
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    expect(main(argv, { TODO_FILE: file }, root)).toBe(code);
+  // @covers todo-cli:CTR-005
+  it("honours the help contract: unparsable store untouched, bare invocation exit 2, list --help is E_USAGE_UNKNOWN_OPTION", async () => {
+    const file = tmpStore();
+    writeFileSync(file, "{oops");
+    const help = await run(["--help"], file);
+    expect(help.code).toBe(0);
+    expect(help.out.trim().length).toBeGreaterThan(0);
+    expect(help.err).toEqual([]);
+    expect(readFileSync(file, "utf8")).toBe("{oops");
+
+    const content = '{"nextId":1,"tasks":[]}';
+    writeFileSync(file, content);
+    const bare = await run([], file);
+    expect(bare.code).toBe(2);
+    expect(bare.out).toBe("");
+    expect(bare.err).toEqual(["usage: missing argument"]);
+
+    writeFileSync(file, '{"nextId":2,"tasks":[{"id":1,"text":"a","done":false,"createdAt":"2026-10-31T10:00:00.000Z"}]}');
+    const lh = await run(["list", "--help"], file);
+    expect(lh.code).toBe(2);
+    expect(lh.out).toBe("");
+    expect(lh.err).toEqual(["usage: unknown argument --help"]);
+  });
+
+  it("returns a non-empty multi-line usageText", () => {
+    const t = usageText();
+    expect(t.trim().length).toBeGreaterThan(0);
+    expect(t.split("\n").length).toBeGreaterThan(1);
   });
 });
 
-describe("product constraints", () => {
+describe("task lifecycle", () => {
+  // @covers todo-cli:SCN-001
+  it("runs add, list, done, list, list --all, rm, list with the listed stdout and exit 0 each", async () => {
+    const file = tmpStore();
+    const steps: [string[], string][] = [
+      [["add", "buy milk"], "#1 buy milk"],
+      [["list"], "#1 buy milk"],
+      [["done", "1"], "#1 done"],
+      [["list"], ""],
+      [["list", "--all"], "[x] #1 buy milk"],
+      [["rm", "1"], "#1 removed"],
+      [["list"], ""],
+    ];
+    for (const [args, expected] of steps) {
+      const r = await run(args, file);
+      expect(r.code).toBe(0);
+      expect(r.out).toBe(expected);
+      expect(r.err).toEqual([]);
+      expect(existsSync(file)).toBe(true);
+    }
+  });
+
+  it("starts the lifecycle at id 6 for a populated store holding task 5 and nextId 6", async () => {
+    const file = tmpStore();
+    writeFileSync(file, '{"nextId":6,"tasks":[{"id":5,"text":"x","done":false,"createdAt":"2026-10-31T10:00:00.000Z"}]}');
+    const add = await run(["add", "buy milk"], file);
+    expect(add.code).toBe(0);
+    expect(add.out).toBe("#6 buy milk");
+    const done = await run(["done", "6"], file);
+    expect(done.out).toBe("#6 done");
+    const rm = await run(["rm", "6"], file);
+    expect(rm.out).toBe("#6 removed");
+  });
+
+  // @covers todo-cli:SCN-002
+  it("prints the identical line #1 done on two consecutive done invocations and keeps the task done", async () => {
+    const file = tmpStore();
+    writeFileSync(file, '{"nextId":2,"tasks":[{"id":1,"text":"a","done":false,"createdAt":"2026-10-31T10:00:00.000Z"}]}');
+    const first = await run(["done", "1"], file);
+    const second = await run(["done", "1"], file);
+    expect(first.code).toBe(0);
+    expect(first.out).toBe("#1 done");
+    expect(second.code).toBe(0);
+    expect(second.out).toBe("#1 done");
+    expect(second.err).toEqual([]);
+    const stored = JSON.parse(readFileSync(file, "utf8"));
+    expect(stored.tasks[0].done).toBe(true);
+  });
+
+  it("exits 0 with #1 done for an already completed task", async () => {
+    const file = tmpStore();
+    writeFileSync(file, '{"nextId":2,"tasks":[{"id":1,"text":"a","done":true,"createdAt":"2026-10-31T10:00:00.000Z"}]}');
+    const r = await run(["done", "1"], file);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe("#1 done");
+  });
+
+  it("exits 1 with E_NO_TASK both times for done 1 on an empty store", async () => {
+    const file = tmpStore();
+    writeFileSync(file, '{"nextId":1,"tasks":[]}');
+    for (let i = 0; i < 2; i++) {
+      const r = await run(["done", "1"], file);
+      expect(r.code).toBe(1);
+      expect(r.out).toBe("");
+      expect(r.err).toEqual(["error: no task #1"]);
+    }
+  });
+
+  // @covers todo-cli:SCN-003
+  it("hands out id 2 after the only task 1 was removed", async () => {
+    const file = tmpStore();
+    const a = await run(["add", "a"], file);
+    const rm = await run(["rm", "1"], file);
+    const b = await run(["add", "b"], file);
+    expect([a.out, rm.out, b.out]).toEqual(["#1 a", "#1 removed", "#2 b"]);
+    expect([a.code, rm.code, b.code]).toEqual([0, 0, 0]);
+    expect([a.err, rm.err, b.err]).toEqual([[], [], []]);
+    const stored = JSON.parse(readFileSync(file, "utf8"));
+    expect(stored.tasks).toHaveLength(1);
+    expect(stored.tasks[0].id).toBe(2);
+  });
+
+  it("hands out id 3 after the highest id 2 was removed", async () => {
+    const file = tmpStore();
+    await run(["add", "a"], file);
+    await run(["add", "b"], file);
+    await run(["rm", "2"], file);
+    const c = await run(["add", "c"], file);
+    expect(c.code).toBe(0);
+    expect(c.out).toBe("#3 c");
+  });
+});
+
+describe("constraints and build", () => {
   // @covers todo-cli:CON-001
-  it("strict TypeScript passes tsc --noEmit and the build emits an ESM CLI that runs", () => {
-    const tsconfig = JSON.parse(readFileSync(join(root, "tsconfig.json"), "utf8"));
-    expect(tsconfig.compilerOptions.strict).toBe(true);
-    const tsc = spawnSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit"], {
-      cwd: root,
-      encoding: "utf8",
-    });
-    expect(tsc.status).toBe(0);
-    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    expect(pkg.type).toBe("module");
-    const { file } = box("[]");
-    const r = buildThenCli(["--help"], file);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain("--help");
-    expect(readFileSync(join(root, "dist/cli.js"), "utf8")).not.toMatch(/\brequire\(|module\.exports/);
-  }, TIMEOUT);
+  it("runs every command without calling fetch", async () => {
+    const fetchSpy = vi.fn(() => Promise.reject(new Error("network")));
+    vi.stubGlobal("fetch", fetchSpy);
+    try {
+      const file = tmpStore();
+      const codes: number[] = [];
+      for (const args of [["--help"], ["add", "a"], ["list"], ["list", "--all"], ["done", "1"], ["rm", "1"]]) {
+        codes.push((await run(args, file)).code);
+      }
+      expect(codes).toEqual([0, 0, 0, 0, 0, 0]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 
   // @covers todo-cli:CON-002
-  it("node dist/cli.js --help runs on Node.js 22 or newer", () => {
-    expect(Number(process.versions.node.split(".")[0])).toBeGreaterThanOrEqual(22);
-    const { file } = box("[]");
-    const r = buildThenCli(["--help"], file);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain("--help");
-  }, TIMEOUT);
-
-  // @covers todo-cli:CON-003
-  it("npm test runs the suite with vitest and exits 0", () => {
-    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    expect(pkg.scripts.test).toBe("vitest run");
-    // filter to one finished module's tests so the nested run does not recurse into this file
-    const t = spawnSync("npm", ["test", "--", "tests/errors"], { cwd: root, encoding: "utf8", env: cleanEnv({}) });
-    expect(t.status).toBe(0);
-    expect(t.stdout + t.stderr).toMatch(/Test Files\s+1 passed/);
-    const { file } = box("[]");
-    const h = buildThenCli(["--help"], file);
-    expect([h.status, h.stdout.includes("--help")]).toEqual([0, true]);
-  }, TIMEOUT);
-
-  // @covers todo-cli:CON-004
-  it("add, list and rm open no network connection", () => {
-    const { dir, file } = box("[]");
-    const hook = join(dir, "block-net.cjs");
-    const log = join(dir, "net.log");
-    writeFileSync(
-      hook,
-      [
-        'const fs = require("fs");',
-        "const hit = (w) => { fs.appendFileSync(process.env.NET_LOG, w + '\\n'); throw new Error('network blocked'); };",
-        'require("net").Socket.prototype.connect = function () { hit("net.connect"); };',
-        'require("dns").lookup = function () { hit("dns.lookup"); };',
-        'globalThis.fetch = function () { hit("fetch"); };',
-      ].join("\n"),
-    );
-    expect(build().status).toBe(0);
-    const run = (args: string[]) => cli(args, file, ["--require", hook], { NET_LOG: log });
-    const add = run(["add", "milk"]);
-    expect([add.status, add.stdout, add.stderr]).toEqual([0, "#1 milk\n", ""]);
-    const list = run(["list"]);
-    expect([list.status, list.stdout, list.stderr]).toEqual([0, "#1 milk\n", ""]);
-    const rm = run(["rm", "1"]);
-    expect([rm.status, rm.stdout, rm.stderr]).toEqual([0, "#1 removed\n", ""]);
-    expect(existsSync(log)).toBe(false);
-  }, TIMEOUT);
-
-  // @covers todo-cli:CON-005
-  it("package.json lists no run-time dependency and dist/cli.js runs without node_modules", () => {
-    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    expect(pkg.dependencies).toBeUndefined();
-    expect(pkg.peerDependencies).toBeUndefined();
-    expect(pkg.optionalDependencies).toBeUndefined();
-    expect(build().status).toBe(0);
-    const { dir, file } = box("[]");
-    const copy = join(dir, "app");
-    mkdirSync(copy);
-    cpSync(join(root, "dist"), join(copy, "dist"), { recursive: true });
-    writeFileSync(join(copy, "package.json"), JSON.stringify({ type: "module" }));
-    const r = spawnSync(process.execPath, [join(copy, "dist/cli.js"), "add", "milk"], {
-      cwd: copy,
+  it("declares no runtime dependency and the built CLI runs on the standard library alone", () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+    expect(pkg.dependencies ?? {}).toEqual({});
+    const build = spawnSync("npm", ["run", "build"], { cwd: ROOT, encoding: "utf8" });
+    expect(build.status).toBe(0);
+    const r = spawnSync("node", ["dist/cli.js", "--help"], {
+      cwd: ROOT,
       encoding: "utf8",
-      env: cleanEnv({ TODO_FILE: file }),
+      env: { ...process.env, NODE_PATH: "" },
     });
-    expect([r.status, r.stdout, r.stderr]).toEqual([0, "#1 milk\n", ""]);
-  }, TIMEOUT);
-
-  // @covers todo-cli:CON-006
-  it("npm run build from a clean tree exits 0, emits dist/cli.js and node dist/cli.js --help runs", () => {
-    rmSync(join(root, "dist"), { recursive: true, force: true });
-    const b = build();
-    expect(b.status).toBe(0);
-    expect(existsSync(join(root, "dist/cli.js"))).toBe(true);
-    const { file } = box("[]");
-    const r = cli(["--help"], file);
     expect(r.status).toBe(0);
-    expect(r.stderr).toBe("");
-    for (const token of ["add", "list", "done", "rm", "--help"]) expect(r.stdout).toContain(token);
-  }, TIMEOUT);
+    expect(r.stdout.trim().length).toBeGreaterThan(0);
+  }, 120000);
 
-  it("npm run build over an existing dist exits 0 and node dist/cli.js still runs", () => {
-    expect(build().status).toBe(0);
-    const again = build();
-    expect(again.status).toBe(0);
-    const { file } = box("[]");
-    const r = cli(["add", "milk"], file);
-    expect([r.status, r.stdout]).toEqual([0, "#1 milk\n"]);
-  }, TIMEOUT);
+  // @covers todo-cli:NFR-001
+  it("exits 0 for npm run build twice in a row", () => {
+    for (let i = 0; i < 2; i++) {
+      const build = spawnSync("npm", ["run", "build"], { cwd: ROOT, encoding: "utf8" });
+      expect(build.status).toBe(0);
+    }
+    expect(existsSync(join(ROOT, "dist", "cli.js"))).toBe(true);
+  }, 120000);
+
+  // @covers todo-cli:GA-001
+  it("produces dist/cli.js that answers node dist/cli.js --help with exit 0 after the build", () => {
+    const build = spawnSync("npm", ["run", "build"], { cwd: ROOT, encoding: "utf8" });
+    expect(build.status).toBe(0);
+    expect(existsSync(join(ROOT, "dist", "cli.js"))).toBe(true);
+    const file = tmpStore();
+    const r = spawnSync("node", ["dist/cli.js", "--help"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: { ...process.env, TODO_FILE: file },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim().length).toBeGreaterThan(0);
+    expect(r.stderr).toBe("");
+    expect(existsSync(file)).toBe(false);
+  }, 120000);
 });

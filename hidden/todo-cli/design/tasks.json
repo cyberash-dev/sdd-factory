@@ -4,103 +4,111 @@
   "tasks": [
     {
       "id": "T-001",
-      "title": "Define error codes and storage file access",
+      "title": "parse arguments and build usage errors",
       "covers": [
         "todo-cli:POL-001",
-        "todo-cli:CTR-006",
-        "todo-cli:INV-001",
-        "todo-cli:INV-002",
-        "todo-cli:INV-004",
-        "todo-cli:BEH-003",
-        "todo-cli:BEH-004",
-        "todo-cli:BEH-017",
-        "todo-cli:BEH-018",
-        "todo-cli:BEH-019"
+        "todo-cli:INV-005",
+        "todo-cli:BEH-012",
+        "todo-cli:BEH-013",
+        "todo-cli:BEH-014",
+        "todo-cli:BEH-015",
+        "todo-cli:BEH-021",
+        "todo-cli:POL-002"
       ],
-      "writes": ["src/errors/**", "src/store/**", "tests/errors/**", "tests/store/**"],
+      "writes": [
+        "src/errors/**",
+        "src/args/**",
+        "tests/errors/**",
+        "tests/args/**"
+      ],
       "dependsOn": [],
-      "designRefs": ["M-01", "M-02"],
-      "testBudget": { "maxTests": 53 },
+      "designRefs": ["M-01", "M-03"],
+      "testBudget": { "maxTests": 59 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
       "id": "T-002",
-      "title": "Parse command-line arguments into typed commands",
+      "title": "read, validate and write the storage file",
       "covers": [
-        "todo-cli:BEH-002",
-        "todo-cli:BEH-013",
-        "todo-cli:BEH-014",
-        "todo-cli:BEH-015",
-        "todo-cli:POL-002"
+        "todo-cli:CTR-006",
+        "todo-cli:CTR-007",
+        "todo-cli:BEH-016",
+        "todo-cli:BEH-017",
+        "todo-cli:BEH-018",
+        "todo-cli:BEH-019",
+        "todo-cli:INV-001",
+        "todo-cli:INV-002",
+        "todo-cli:INV-003",
+        "todo-cli:INV-006",
+        "todo-cli:INV-007",
+        "todo-cli:POL-003"
       ],
-      "writes": ["src/parse/**", "tests/parse/**"],
-      "dependsOn": ["T-001"],
-      "designRefs": ["M-03"],
-      "testBudget": { "maxTests": 36 },
+      "writes": [
+        "src/store/**",
+        "tests/store/**"
+      ],
+      "dependsOn": [],
+      "designRefs": ["M-02"],
+      "testBudget": { "maxTests": 75 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
       "id": "T-003",
-      "title": "Render list output and the usage text",
+      "title": "run add, list, done and rm against the task list",
       "covers": [
-        "todo-cli:CTR-002",
-        "todo-cli:CTR-005",
+        "todo-cli:BEH-001",
+        "todo-cli:BEH-002",
+        "todo-cli:BEH-003",
+        "todo-cli:BEH-004",
         "todo-cli:BEH-005",
         "todo-cli:BEH-006",
         "todo-cli:BEH-007",
-        "todo-cli:BEH-016"
-      ],
-      "writes": ["src/read-commands/**", "tests/read-commands/**"],
-      "dependsOn": ["T-001"],
-      "designRefs": ["M-04"],
-      "testBudget": { "maxTests": 38 },
-      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
-    },
-    {
-      "id": "T-004",
-      "title": "Execute add, done and rm against the storage file",
-      "covers": [
-        "todo-cli:CTR-001",
-        "todo-cli:CTR-003",
-        "todo-cli:CTR-004",
-        "todo-cli:BEH-001",
         "todo-cli:BEH-008",
         "todo-cli:BEH-009",
         "todo-cli:BEH-010",
         "todo-cli:BEH-011",
-        "todo-cli:BEH-012"
+        "todo-cli:CTR-001",
+        "todo-cli:CTR-002",
+        "todo-cli:CTR-003",
+        "todo-cli:CTR-004",
+        "todo-cli:INV-004"
       ],
-      "writes": ["src/write-commands/**", "tests/write-commands/**"],
-      "dependsOn": ["T-001"],
-      "designRefs": ["M-05"],
-      "testBudget": { "maxTests": 63 },
+      "writes": [
+        "src/commands/**",
+        "tests/commands/**"
+      ],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-04"],
+      "testBudget": { "maxTests": 80 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     },
     {
-      "id": "T-005",
-      "title": "Wire the process entry, build and test scripts",
+      "id": "T-004",
+      "title": "wire the command entry point and print usage text",
       "covers": [
-        "todo-cli:INV-003",
+        "todo-cli:BEH-020",
+        "todo-cli:CTR-005",
+        "todo-cli:SCN-001",
+        "todo-cli:SCN-002",
+        "todo-cli:SCN-003",
+        "todo-cli:NFR-001",
         "todo-cli:CON-001",
         "todo-cli:CON-002",
-        "todo-cli:CON-003",
-        "todo-cli:CON-004",
-        "todo-cli:CON-005",
-        "todo-cli:CON-006"
+        "todo-cli:GA-001"
       ],
       "writes": [
-        "src/cli.ts",
         "src/index.ts",
-        "tests/cli/**",
+        "src/cli.ts",
+        "tsconfig.build.json",
         "package.json",
         "package-lock.json",
         "tsconfig.json",
-        "tsconfig.build.json",
-        "vitest.config.ts"
+        "vitest.config.ts",
+        "tests/cli/**"
       ],
-      "dependsOn": ["T-001", "T-002", "T-003", "T-004"],
-      "designRefs": ["M-06"],
-      "testBudget": { "maxTests": 33 },
+      "dependsOn": ["T-001", "T-002", "T-003"],
+      "designRefs": ["M-05"],
+      "testBudget": { "maxTests": 47 },
       "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
     }
   ]

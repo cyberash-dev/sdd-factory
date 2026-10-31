@@ -2,41 +2,40 @@
 
 ## 1. Overview
 
-`todo` is a single-process TypeScript command-line program invoked as `node dist/cli.js <command>` and installed through `npm run build`. It reads its argv once, executes exactly one of five commands (`add <text>`, `list [--all]`, `done <id>`, `rm <id>`, `--help`), and keeps every task in one JSON array in the storage file selected by `TODO_FILE` or `./todo.json`. Every success prints one result line on stdout and exits 0; every failure prints exactly one `usage:` or `error:` line on stderr and exits 1 or 2. The program performs no network access and declares no run-time dependency.
+`todo` is a short-lived TypeScript command-line process that resolves one storage file path from `TODO_FILE` (default `./todo.json`), performs exactly one command (`add`, `list`, `done`, `rm`, `--help`), writes at most one line set to stdout and exits with 0, 1 or 2. Task records live in a UTF-8 JSON file of the contract shape `{"nextId": n, "tasks": [...]}`; a new task receives `nextId` and `nextId` is bumped, so a removed id is never handed out again. Failure classes are fixed: argument mistakes are exit 2 with one `usage:` stderr line, store failures are exit 1 with one `error:` stderr line. There is no network, no stdin, no interactive mode and no concurrency handling.
 
 ## 2. Module map
 
 ### M-01 errors
-- responsibility: define the stable error codes, their exit codes and the one-line rendering of a failure, plus the shared command-result union.
-- covers: [todo-cli:POL-001]
+- responsibility: Own the error code vocabulary, the stderr line of each code and the exit code of each code.
+- covers: [todo-cli:POL-001, todo-cli:INV-005]
 - owns: src/errors/**
 - entry: src/errors/index.ts
 - depends_on: []
 - public interface:
   ```ts
-  export type ErrorCode = "E_USAGE" | "E_NO_TASK" | "E_STORAGE";
+  export type ErrorCode =
+    | "E_USAGE_MISSING_ARGUMENT"
+    | "E_USAGE_EMPTY_TEXT"
+    | "E_USAGE_UNKNOWN_OPTION"
+    | "E_USAGE_INVALID_ID"
+    | "E_NO_TASK"
+    | "E_CANNOT_READ";
 
   export interface CliError {
     readonly code: ErrorCode;
-    readonly exitCode: 1 | 2;
-    readonly message: string;
+    readonly line: string;
   }
 
-  export type CommandResult =
-    | { readonly ok: true; readonly stdout: string }
-    | { readonly ok: false; readonly error: CliError };
-
-  export function usageError(detail: string): CliError;
-  export function noTaskError(id: number): CliError;
-  export function storageError(path: string): CliError;
-  export function formatErrorLine(error: CliError): string;
+  export function makeError(code: ErrorCode, subject?: string): CliError;
+  export function exitCodeFor(error: CliError): 1 | 2;
   export function isCliError(value: unknown): value is CliError;
   ```
-- notes: raises no error itself; `usageError` builds message `usage: <detail>`, `noTaskError` builds `error: no task #<id>`, `storageError` builds `error: cannot read <path>`; `formatErrorLine` returns the single stderr line without a trailing newline. The module imports nothing, which keeps it a leaf of the dependency graph.
+- notes: total mapping of code to stderr line (DD-01): `usage: missing argument` for E_USAGE_MISSING_ARGUMENT, `usage: empty text` for E_USAGE_EMPTY_TEXT, `usage: unknown argument <subject>` for E_USAGE_UNKNOWN_OPTION, `usage: invalid id <subject>` for E_USAGE_INVALID_ID, `error: no task #<subject>` for E_NO_TASK, `error: cannot read <subject>` for E_CANNOT_READ. `line` never carries a trailing newline. Exit codes: every `E_USAGE_*` and E_USAGE_* family is 2, E_NO_TASK and E_CANNOT_READ are 1. No state is held.
 
 ### M-02 store
-- responsibility: resolve the storage path, read and validate the JSON task array, write it back, allocate the next id and stamp `createdAt`.
-- covers: [todo-cli:CTR-006, todo-cli:INV-001, todo-cli:INV-002, todo-cli:INV-004, todo-cli:BEH-003, todo-cli:BEH-004, todo-cli:BEH-017, todo-cli:BEH-018, todo-cli:BEH-019]
+- responsibility: Resolve the storage path, read the storage file into a validated task list, write a task list back, and format `createdAt` values.
+- covers: [todo-cli:CTR-006, todo-cli:CTR-007, todo-cli:BEH-016, todo-cli:BEH-017, todo-cli:BEH-018, todo-cli:BEH-019, todo-cli:INV-001, todo-cli:INV-002, todo-cli:INV-003, todo-cli:INV-006, todo-cli:INV-007, todo-cli:POL-003]
 - owns: src/store/**
 - entry: src/store/index.ts
 - depends_on: []
@@ -49,176 +48,192 @@
     readonly createdAt: string;
   }
 
-  export type TaskList = readonly Task[];
+  export interface TaskList {
+    readonly nextId: number;
+    readonly tasks: readonly Task[];
+  }
 
-  export type StoreReadResult =
-    | { readonly ok: true; readonly tasks: TaskList }
-    | { readonly ok: false; readonly path: string };
+  export type StoreResult<T> =
+    | { readonly ok: true; readonly value: T }
+    | { readonly ok: false };
 
-  export type StoreWriteResult =
-    | { readonly ok: true }
-    | { readonly ok: false; readonly path: string };
-
-  export function resolveStoragePath(env: NodeJS.ProcessEnv, cwd: string): string;
-  export function readTasks(path: string): StoreReadResult;
-  export function writeTasks(path: string, tasks: TaskList): StoreWriteResult;
-  export function nextTaskId(tasks: TaskList): number;
-  export function createTask(id: number, text: string, now: Date): Task;
+  export function resolveStorePath(env: Readonly<Record<string, string | undefined>>): string;
+  export function emptyTaskList(): TaskList;
+  export function readTaskList(path: string): StoreResult<TaskList>;
+  export function writeTaskList(path: string, list: TaskList): StoreResult<null>;
+  export function formatCreatedAt(date: Date): string;
   ```
-- notes: `readTasks` returns an empty list for a missing file and never creates it (INV-004); a file that is not a JSON array of four-field task objects yields `{ ok: false, path }` (BEH-018). `writeTasks` creates a missing file on first write (BEH-003). `nextTaskId` returns `max(id) + 1`, or 1 for an empty list. `createTask` sets `createdAt` from `now.toISOString()`. All filesystem calls are synchronous and use UTF-8. The module imports nothing: it reports failures as result values so it stays a leaf.
+- notes: `ok: false` means the file exists and cannot be parsed as JSON, does not match the contract shape, or cannot be written; the module never creates a file on read, so read-only commands leave an absent file absent (INV-007) and every write is a single explicit `writeTaskList` call (INV-006). Validation of the read file: root is a non-array object whose `nextId` is an integer at least 1 and whose `tasks` is an array of objects with integer `id` at least 1, non-empty `text`, boolean `done` and `createdAt` string matching `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`; ids strictly ascending and therefore unique (INV-001, INV-002). A file of any other shape is `ok: false` and stays byte-unchanged (POL-003).
 
-### M-03 parse
-- responsibility: turn `process.argv.slice(2)` into one typed command or one usage error, rejecting unknown commands, unknown flags, wrong argument counts, blank text and invalid ids before any storage access.
-- covers: [todo-cli:BEH-002, todo-cli:BEH-013, todo-cli:BEH-014, todo-cli:BEH-015, todo-cli:POL-002]
-- owns: src/parse/**
-- entry: src/parse/index.ts
+### M-03 args
+- responsibility: Turn argv into one parsed command or one usage error.
+- covers: [todo-cli:BEH-012, todo-cli:BEH-013, todo-cli:BEH-014, todo-cli:BEH-015, todo-cli:BEH-021, todo-cli:POL-002]
+- owns: src/args/**
+- entry: src/args/index.ts
 - depends_on: [M-01]
 - public interface:
   ```ts
   import type { CliError } from "../errors/index.js";
 
   export type ParsedCommand =
-    | { readonly kind: "add"; readonly text: string }
-    | { readonly kind: "list"; readonly all: boolean }
-    | { readonly kind: "done"; readonly id: number }
-    | { readonly kind: "rm"; readonly id: number }
-    | { readonly kind: "help" };
+    | { readonly command: "help" }
+    | { readonly command: "add"; readonly text: string }
+    | { readonly command: "list"; readonly all: boolean }
+    | { readonly command: "done"; readonly idToken: string }
+    | { readonly command: "rm"; readonly idToken: string };
 
   export function parseArgs(argv: readonly string[]): ParsedCommand | CliError;
   ```
-- notes: usage errors are produced here and nowhere else; every rejected argv returns a `CliError` with code `E_USAGE`, exit code 2 and a message starting with `usage:`.
+- notes: raises E_USAGE_MISSING_ARGUMENT, E_USAGE_EMPTY_TEXT, E_USAGE_UNKNOWN_OPTION, E_USAGE_INVALID_ID. Parsing never reads the storage file, which is what makes argument errors win over store errors (BEH-021). Returns `CliError` itself (not a union wrapper) so the caller discriminates with `isCliError`. `idToken` keeps the token exactly as typed (ASM-005, ASM-011).
 
-### M-04 read commands
-- responsibility: execute `list` and `--help`, rendering the one-line-per-task output and the usage text.
-- covers: [todo-cli:CTR-002, todo-cli:CTR-005, todo-cli:BEH-005, todo-cli:BEH-006, todo-cli:BEH-007, todo-cli:BEH-016]
-- owns: src/read-commands/**
-- entry: src/read-commands/index.ts
+### M-04 commands
+- responsibility: Apply one parsed command to an in-memory task list and produce the stdout lines plus the list to persist.
+- covers: [todo-cli:BEH-001, todo-cli:BEH-002, todo-cli:BEH-003, todo-cli:BEH-004, todo-cli:BEH-005, todo-cli:BEH-006, todo-cli:BEH-007, todo-cli:BEH-008, todo-cli:BEH-009, todo-cli:BEH-010, todo-cli:BEH-011, todo-cli:CTR-001, todo-cli:CTR-002, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:INV-004]
+- owns: src/commands/**
+- entry: src/commands/index.ts
 - depends_on: [M-01, M-02]
 - public interface:
   ```ts
-  import type { CommandResult } from "../errors/index.js";
-  import type { Task, TaskList } from "../store/index.js";
+  import type { CliError } from "../errors/index.js";
+  import type { TaskList } from "../store/index.js";
+  import { formatCreatedAt } from "../store/index.js";
 
-  export function runList(path: string, all: boolean): CommandResult;
-  export function runHelp(): CommandResult;
-  export function renderList(tasks: TaskList, all: boolean): string;
+  export type CommandOutcome =
+    | { readonly ok: true; readonly lines: readonly string[]; readonly list: TaskList | null }
+    | { readonly ok: false; readonly error: CliError };
+
+  export function runAdd(list: TaskList, text: string, clock: () => Date): CommandOutcome;
+  export function runList(list: TaskList, all: boolean): CommandOutcome;
+  export function runDone(list: TaskList, idToken: string): CommandOutcome;
+  export function runRm(list: TaskList, idToken: string): CommandOutcome;
+  ```
+- notes: raises E_NO_TASK only. `list: null` means the file must not be written (list). Line formats: `#<id> <text>`, `[x] #<id> <text>`, `#<token> done`, `#<token> removed`; `#<token>` echoes the typed token (ASM-011). `runList` sorts ascending by id (INV-004) and prints nothing for an empty selection. `runAdd` builds the task with `id = list.nextId`, `done = false`, `createdAt = formatCreatedAt(clock())` and returns `nextId + 1`. `runDone` on an already completed task returns the same line and an unchanged list value; it still returns a list, and writing an identical list is allowed. `runRm` removes the task and leaves every other id untouched.
+
+### M-05 root
+- responsibility: Wire argv, environment, storage and commands into one process run: resolve the path, read, execute, write, print, return the exit code; own the built entry point.
+- covers: [todo-cli:BEH-020, todo-cli:CTR-005, todo-cli:SCN-001, todo-cli:SCN-002, todo-cli:SCN-003, todo-cli:NFR-001, todo-cli:CON-001, todo-cli:CON-002, todo-cli:GA-001, todo-cli:IMP-001]
+- owns: src/index.ts, src/cli.ts, tsconfig.build.json
+- entry: src/index.ts
+- depends_on: [M-01, M-02, M-03, M-04]
+- public interface:
+  ```ts
+  import { isCliError, exitCodeFor } from "./errors/index.js";
+  import { readTaskList, resolveStorePath, writeTaskList } from "./store/index.js";
+  import { parseArgs } from "./args/index.js";
+  import { runAdd, runDone, runList, runRm } from "./commands/index.js";
+
+  export interface Streams {
+    readonly out: (line: string) => void;
+    readonly err: (line: string) => void;
+  }
+
   export function usageText(): string;
+
+  export function main(
+    argv: readonly string[],
+    env: Readonly<Record<string, string | undefined>>,
+    streams: Streams,
+    clock?: () => Date,
+  ): Promise<number>;
   ```
-- notes: `runList` reads through M-02 and maps `{ ok: false }` to `storageError(path)`; it never writes and never creates the file (BEH-017). `renderList` shows open tasks in ascending id; with `all` it shows every task in one ascending id order, completed tasks prefixed `[x] `; it returns `""` when nothing is shown (BEH-007). `usageText` contains the tokens `add`, `list`, `done`, `rm` and `--help` (BEH-016) and is rendered to stdout with exit 0.
-
-### M-05 write commands
-- responsibility: execute `add`, `done` and `rm`, including id lookup, id allocation, persistence and the success lines.
-- covers: [todo-cli:CTR-001, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:BEH-001, todo-cli:BEH-008, todo-cli:BEH-009, todo-cli:BEH-010, todo-cli:BEH-011, todo-cli:BEH-012]
-- owns: src/write-commands/**
-- entry: src/write-commands/index.ts
-- depends_on: [M-01, M-02]
-- public interface:
-  ```ts
-  import type { CommandResult } from "../errors/index.js";
-
-  export function runAdd(path: string, text: string, now: Date): CommandResult;
-  export function runDone(path: string, id: number): CommandResult;
-  export function runRm(path: string, id: number): CommandResult;
-  ```
-- notes: each reads the storage file first, then acts. `runAdd` allocates the id with `nextTaskId`, stamps `createdAt` from `now`, writes, and prints `#<id> <text>`; it creates the file when absent (BEH-003). `runDone` prints `#<id> done` and leaves an already-completed task unchanged (BEH-009); `runRm` prints `#<id> removed`. A missing id yields `noTaskError(id)` with exit 1 and no write (BEH-010, BEH-012); a read or write failure yields `storageError(path)` with exit 1.
-
-### M-06 cli (composition root)
-- responsibility: process entry: parse argv, dispatch the parsed command to one command module, write the result line to stdout or the error line to stderr, and set the exit code.
-- covers: [todo-cli:INV-003, todo-cli:CON-001, todo-cli:CON-002, todo-cli:CON-003, todo-cli:CON-004, todo-cli:CON-005, todo-cli:CON-006]
-- owns: src/cli.ts, tsconfig.build.json, package.json scripts (build, test, typecheck)
-- entry: src/cli.ts
-- depends_on: [M-01, M-02, M-03, M-04, M-05]
-- public interface:
-  ```ts
-  import type { CommandResult } from "./errors/index.js";
-  import type { ParsedCommand } from "./parse/index.js";
-  import type { CliError } from "./errors/index.js";
-
-  export function run(argv: readonly string[], env: NodeJS.ProcessEnv, cwd: string): CommandResult;
-  export function main(argv: readonly string[], env: NodeJS.ProcessEnv, cwd: string): number;
-  ```
-- notes: `run` resolves the path with `resolveStoragePath(env, cwd)` and dispatches on `ParsedCommand.kind`; a `CliError` returned by `parseArgs` is folded into `{ ok: false, error }`. `main` writes `result.stdout` to stdout on success and `formatErrorLine(error)` plus one `\n` to stderr on failure, returning 0, 1 or 2, and catching any unexpected exception as `storageError(path)` so no stack trace escapes (INV-003, POL-002). When executed as the process entry it sets `process.exitCode = main(process.argv.slice(2), process.env, process.cwd())`. This module is the only one allowed to depend on all others. It owns `tsconfig.build.json` (`rootDir: "src"`, `outDir: "dist"`, `noEmit: false`, `include: ["src"]`) so `npm run build` emits `dist/cli.js`, and verifies that `package.json` carries `"type": "module"` and the `build`, `test` and `typecheck` scripts.
+- notes: the only module allowed to depend on every other module. Order of a run: parse argv (usage errors exit 2 before any file access, BEH-021); `help` prints `usageText()` to `streams.out` and exits 0 without touching the file (CTR-005, BEH-020); otherwise resolve the path, read (a failed read is E_CANNOT_READ with that path, exit 1), run the command, on success write the returned list when it is not `null` and only then print the lines to `streams.out`, and on failure write nothing to stdout and one line to `streams.err` (ASM-009). `main` never throws: it returns 0, 1 or 2 (INV-005). `main` returns the exit code and does not call `process.exit`. src/cli.ts is the built entry: it imports `main` from `./index.js`, passes `process.argv.slice(2)`, `process.env`, streams writing to `process.stdout`/`process.stderr`, sets `process.exitCode`, and is the source of `dist/cli.js` (GA-001, IMP-001). src/cli.ts holds no logic; `usageText()` is a non-empty multi-line text listing the five command forms (the wording is not contractual, ASM-006). The root task also owns `tsconfig.build.json` (`rootDir: "src"`, `outDir: "dist"`, `module: NodeNext`, `moduleResolution: NodeNext`, `target: ES2022`, `strict: true`, `noEmit: false`) and the `build` script `tsc -p tsconfig.build.json` in package.json; `test` stays the foreman `vitest run` (NFR-001).
 
 ## 3. Data shapes
 
 ```ts
-// src/store/index.ts
+// M-02 src/store/index.ts
+// covers: todo-cli:CTR-006, todo-cli:INV-003
 export interface Task {
-  readonly id: number;          // positive integer, unique per file, never changed for an existing task
-  readonly text: string;        // non-blank after trim, as given
+  readonly id: number;
+  readonly text: string;
   readonly done: boolean;
-  readonly createdAt: string;   // UTC ISO-8601 with milliseconds and a Z suffix, from Date.prototype.toISOString
+  readonly createdAt: string;
 }
-export type TaskList = readonly Task[];
-```
-covers: [todo-cli:CTR-006, todo-cli:INV-001, todo-cli:INV-002, todo-cli:BEH-004, todo-cli:ASM-003, todo-cli:ASM-007]
 
-```ts
-// src/parse/index.ts
-export type ParsedCommand =
-  | { readonly kind: "add"; readonly text: string }
-  | { readonly kind: "list"; readonly all: boolean }
-  | { readonly kind: "done"; readonly id: number }
-  | { readonly kind: "rm"; readonly id: number }
-  | { readonly kind: "help" };
-```
-covers: [todo-cli:CTR-001, todo-cli:CTR-002, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:CTR-005, todo-cli:BEH-014, todo-cli:BEH-015, todo-cli:ASM-005, todo-cli:ASM-008]
+// M-02 src/store/index.ts
+// covers: todo-cli:CTR-006, todo-cli:INV-002
+export interface TaskList {
+  readonly nextId: number;
+  readonly tasks: readonly Task[];
+}
 
-```ts
-// src/errors/index.ts
+// M-02 src/store/index.ts
+// covers: todo-cli:CTR-006, todo-cli:POL-003
+export type StoreResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false };
+
+// M-01 src/errors/index.ts
+// covers: todo-cli:POL-001, todo-cli:INV-005
+export type ErrorCode =
+  | "E_USAGE_MISSING_ARGUMENT"
+  | "E_USAGE_EMPTY_TEXT"
+  | "E_USAGE_UNKNOWN_OPTION"
+  | "E_USAGE_INVALID_ID"
+  | "E_NO_TASK"
+  | "E_CANNOT_READ";
+
+// M-01 src/errors/index.ts
+// covers: todo-cli:POL-001
 export interface CliError {
-  readonly code: "E_USAGE" | "E_NO_TASK" | "E_STORAGE";
-  readonly exitCode: 1 | 2;
-  readonly message: string;     // one line, first token usage: or error:
+  readonly code: ErrorCode;
+  readonly line: string;
 }
-export type CommandResult =
-  | { readonly ok: true; readonly stdout: string }   // one or more lines, "\n"-terminated, "" when nothing is printed
-  | { readonly ok: false; readonly error: CliError };
-```
-covers: [todo-cli:POL-001, todo-cli:INV-003, todo-cli:BEH-007, todo-cli:BEH-016]
 
-```ts
-// src/store/index.ts
-export type StoreReadResult =
-  | { readonly ok: true; readonly tasks: TaskList }
-  | { readonly ok: false; readonly path: string };
+// M-03 src/args/index.ts
+// covers: todo-cli:CTR-001, todo-cli:CTR-002, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:CTR-005
+export type ParsedCommand =
+  | { readonly command: "help" }
+  | { readonly command: "add"; readonly text: string }
+  | { readonly command: "list"; readonly all: boolean }
+  | { readonly command: "done"; readonly idToken: string }
+  | { readonly command: "rm"; readonly idToken: string };
+
+// M-04 src/commands/index.ts
+// covers: todo-cli:CTR-001, todo-cli:INV-004
+export type CommandOutcome =
+  | { readonly ok: true; readonly lines: readonly string[]; readonly list: TaskList | null }
+  | { readonly ok: false; readonly error: CliError };
+
+// M-05 src/index.ts
+// covers: todo-cli:IMP-001, todo-cli:GA-001
+export interface Streams {
+  readonly out: (line: string) => void;
+  readonly err: (line: string) => void;
+}
 ```
-covers: [todo-cli:BEH-017, todo-cli:BEH-018, todo-cli:CTR-006]
 
 ## 4. Error mapping
 
-| Code | Meaning | Raising module | Exit code | stderr shape | stdout |
-| --- | --- | --- | --- | --- | --- |
-| `E_SUCCESS` | command succeeded | M-04 (list, help), M-05 (add, done, rm) | 0 | empty | one result line, `\n`-terminated; empty for `list` with nothing to show and for nothing else |
-| `E_USAGE` | unknown command, unknown flag, missing/extra argument, blank text, invalid id | M-03 | 2 | one line `usage: <safe usage detail>` | empty |
-| `E_NO_TASK` | `done` or `rm` names an id absent from the storage file | M-05 | 1 | one line `error: no task #<id>` | empty |
-| `E_STORAGE` | storage file unreadable: malformed JSON, content that is not a task array, or a read/write failure | M-02 (reported by M-04 and M-05) | 1 | one line `error: cannot read <path>` | empty |
+| error code | raising module | exit code | stderr shape |
+| --- | --- | --- | --- |
+| E_OK | M-05 (success path, no error) | 0 | none |
+| E_USAGE_MISSING_ARGUMENT | M-03 | 2 | `usage: missing argument` |
+| E_USAGE_EMPTY_TEXT | M-03 | 2 | `usage: empty text` |
+| E_USAGE_UNKNOWN_OPTION | M-03 | 2 | `usage: unknown argument <token>` |
+| E_USAGE_INVALID_ID | M-03 | 2 | `usage: invalid id <token>` |
+| E_NO_TASK | M-04 | 1 | `error: no task #<token>` |
+| E_CANNOT_READ | M-02 detects, M-05 raises | 1 | `error: cannot read <resolved path>` |
 
-`E_SUCCESS` result lines: `add` → `#<id> <text>`; `done` → `#<id> done`; `rm` → `#<id> removed`; `list` → `#<id> <text>` per open task and `[x] #<id> <text>` per completed task with `--all`; `--help` → the usage text. covers: [todo-cli:POL-001, todo-cli:POL-002, todo-cli:CTR-001, todo-cli:CTR-002, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:CTR-005, todo-cli:CTR-006, todo-cli:BEH-002, todo-cli:BEH-010, todo-cli:BEH-012, todo-cli:BEH-013, todo-cli:BEH-014, todo-cli:BEH-015, todo-cli:BEH-018]
+Every failure prints exactly one line on stderr, terminated by `\n`, and nothing on stdout (POL-001, ASM-009). E_USAGE_UNKNOWN_OPTION covers both an option the invoked command does not define and a command word that names no command (DD-01). E_CANNOT_READ is also used when `writeTaskList` fails, because the spec's taxonomy has no separate write-failure code (DD-06).
 
 ## 5. Process and IO boundaries
 
-argv grammar, `argv` being `process.argv.slice(2)`:
-
-```
-todo <command> [args]
-  add <text>          exactly one positional; reject 0 or 2+; reject text that is empty or blank after trim
-  list [--all]        no positional; the only accepted flag is --all; any other flag is E_USAGE
-  done <id>           exactly one positional; id matches /^[1-9][0-9]*$/
-  rm <id>             exactly one positional; id matches /^[1-9][0-9]*$/
-  --help              no positional, no flag
-  (empty argv)        E_USAGE
-```
-
-- stdin: never read.
-- env: `TODO_FILE` names the storage file. Any value, including an empty string, is used verbatim as the path; when the variable is unset (`undefined`) the path is `./todo.json`.
-- path resolution: a relative `TODO_FILE` value and the default `./todo.json` resolve against `process.cwd()`; the module receives `cwd` as a parameter. No parent directory is created.
-- storage file: UTF-8 text containing a JSON array of task objects, written as `JSON.stringify(tasks, null, 2) + "\n"`; a missing file reads as an empty list; the file is only created by a successful `add`, `done` or `rm` write.
-- stdout: UTF-8, result lines only, each terminated by `\n`; nothing on failure; `list` with nothing to show writes zero bytes.
-- stderr: UTF-8, exactly one line on failure, terminated by `\n`, first token `usage:` or `error:`; nothing on success.
-- exit: 0 success, 1 `E_NO_TASK` and `E_STORAGE`, 2 `E_USAGE`; any unexpected exception is caught at M-06 and reported as `E_STORAGE` with exit 1.
-- no network access, no child processes, no timers, no signal handlers.
-covers: [todo-cli:CTR-001, todo-cli:CTR-002, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:CTR-005, todo-cli:CTR-006, todo-cli:INV-003, todo-cli:INV-004, todo-cli:BEH-002, todo-cli:BEH-013, todo-cli:BEH-014, todo-cli:BEH-015, todo-cli:BEH-016, todo-cli:BEH-017, todo-cli:BEH-019, todo-cli:POL-002, todo-cli:CON-002, todo-cli:CON-004, todo-cli:CON-006, todo-cli:ASM-010]
+- Invocation: `node dist/cli.js <command> [args...]`; the CLI reads `process.argv.slice(2)` and nothing else (IMP-001). No stdin is ever read.
+- argv grammar, in order:
+  1. `argv` empty -> E_USAGE_MISSING_ARGUMENT.
+  2. `argv[0] === "--help"` -> `help`; every remaining token after `--help` is ignored.
+  3. `argv[0] === "add"` -> the tokens after it are the text: any token beginning with `--` -> E_USAGE_UNKNOWN_OPTION; no token -> E_USAGE_MISSING_ARGUMENT; the tokens joined with a single space and trimmed empty -> E_USAGE_EMPTY_TEXT; otherwise `add` with the joined, trimmed text (ASM-007).
+  4. `argv[0] === "list"` -> `--all` sets `all` true (a repeated `--all` is still `all` true); any other token beginning with `--` -> E_USAGE_UNKNOWN_OPTION; a token not beginning with `--` is ignored (ASM-012).
+  5. `argv[0] === "done"` or `"rm"` -> any token beginning with `--` -> E_USAGE_UNKNOWN_OPTION; no token -> E_USAGE_MISSING_ARGUMENT; the first token must match `^[0-9]+$` with a value at least 1, else E_USAGE_INVALID_ID; further tokens are ignored (ASM-005, ASM-012).
+  6. any other `argv[0]` -> E_USAGE_UNKNOWN_OPTION (a `--` token or an unknown command word; BEH-012, ASM-004).
+- Environment: `TODO_FILE`. Resolution: the value verbatim when it is set and non-empty, otherwise the relative path `./todo.json` resolved against the process working directory (CTR-007, ASM-008). The resolved string is what E_CANNOT_READ names, verbatim.
+- File: UTF-8, read and written with the Node.js standard library only. Absent file = empty list with `nextId` 1; `readTaskList` never creates it. On success of a writing command the whole file is replaced by one `writeFileSync` of `JSON.stringify(list, null, 2) + "\n"` (DD-02).
+- stdout: one `\n` after each printed line, zero bytes when a command prints nothing; failure paths print zero bytes to stdout.
+- stderr: exactly one line plus `\n` per failure.
+- Exit: 0 success, 1 store error, 2 usage error, never another value (INV-005). `main` returns the code; `src/cli.ts` assigns it to `process.exitCode` and lets the process end naturally.
+- Time: `createdAt` is `new Date().toISOString()` via `formatCreatedAt`, which the root passes as the clock into `runAdd` so a test can inject a fixed clock.
+- Network: none (CON-001); the only imports are `node:fs`, `node:path`, `node:url` and the product's own modules (CON-002).
 
 ## 6. TD-TOOLING
 
@@ -228,115 +243,104 @@ TD-TOOLING:
   test_cmd: "npx vitest run"
   typecheck_cmd: "npx tsc --noEmit"
   dependencies: []
-  dev_dependencies: ["typescript@5.6.3", "vitest@2.1.4", "@types/node@22.9.0"]
+  dev_dependencies: ["typescript@5.6.3", "vitest@2.1.4", "@types/node@22.7.5"]
   tsconfig: { module: NodeNext, moduleResolution: NodeNext, target: ES2022, strict: true, noEmit: true }
 ```
 
-covers: [todo-cli:CON-001, todo-cli:CON-002, todo-cli:CON-003, todo-cli:CON-005]
-
 ## 7. Design decisions
 
-### DD-01 Two-layer module graph with leaf store and leaf errors
-- evidence: [todo-cli:CON-001, todo-cli:POL-001, todo-cli:CTR-006]
-- decision: six modules in two layers below the root: M-01 errors, M-02 store and M-03 parse import no other module (M-03 imports only M-01); M-04 read commands and M-05 write commands import M-01 and M-02; M-06 cli imports all five. Longest chain is three modules (`errors` → `parse` → `cli`, and `errors`/`store` → command module → `cli`).
-- alternatives_rejected: a single commands module (would have covered more than 16 spec IDs and one responsibility); a store that raises `CliError` directly (would place `store` on the chain `errors` → `store` → `commands` → `cli`, four modules); splitting parsing into a dependency of the command modules (same four-module chain).
-- consequence: the store reports storage defects as `{ ok: false, path }` values and command modules translate them into `E_STORAGE`; the planner may merge read and write commands into one task if it needs one fewer task, but not with `parse` or `store`.
+DD-01 usage error codes and their stderr lines
+- evidence: [todo-cli:POL-001, todo-cli:CTR-001, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:BEH-012]
+- decision: the six codes of the taxonomy are the whole vocabulary; the four usage codes exit 2 with one `usage:` line, E_NO_TASK and E_CANNOT_READ exit 1 with one `error:` line. E_USAGE_UNKNOWN_OPTION is the code for any argument token the invoked command does not define, including a command word that names no command (`todo frobnicate`, `todo --bogus`), whose text is `usage: unknown argument <token>`. E_NO_TASK renders the typed token: `error: no task #<token>`. E_CANNOT_READ renders the resolved path: `error: cannot read <path>`. The remaining wording inside the `usage:` lines is free.
+- alternatives_rejected: a new code E_USAGE_UNKNOWN_COMMAND (no approved record names it, and section 3 of the spec fixes the code set); a fixed full usage block on every usage error (only the prefix is contractual, ASM-009 and POL-001 leave the line free).
+- consequence: three commands share the same usage line, tests assert prefix, exit code and the two `error:` texts only, and the planner has one home for every code.
 
-### DD-02 Error codes, exit codes and total mapping
-- evidence: [todo-cli:POL-001, todo-cli:POL-002, todo-cli:CTR-001, todo-cli:CTR-006]
-- decision: exactly three failure codes. `E_USAGE` exits 2 with `usage:`; `E_NO_TASK` exits 1 with `error: no task #<id>`; `E_STORAGE` exits 1 with `error: cannot read <path>`. Every write failure (for example a write permission error) is reported as `E_STORAGE` with the documented `error: cannot read <path>` prefix; no fourth code and no second `error:` wording exist.
-- alternatives_rejected: a distinct `E_WRITE` code and `cannot write` wording (the approved contracts list only the three codes and fix the `cannot read` prefix); exit 3 for unexpected exceptions (violates `POL-002`).
-- consequence: `storageError(path)` is the single constructor for both read and write failures, and `main` catches any unexpected exception with it.
+DD-02 storage file serialization and validation
+- evidence: [todo-cli:CTR-006, todo-cli:POL-003, todo-cli:INV-002]
+- decision: the file is UTF-8 JSON, written as `JSON.stringify({nextId, tasks}, null, 2)` followed by one `\n`, with the tasks array kept in ascending id order. A read accepts only a root object with integer `nextId` at least 1 and a `tasks` array of objects carrying integer `id` at least 1, non-empty `text`, boolean `done` and a `createdAt` string matching `YYYY-MM-DDTHH:MM:SS.sssZ`; ids must ascend strictly. Anything else, including a JSON array, a scalar, a missing key or `{oops`, is `ok: false`, never an empty list, and the file is left untouched.
+- alternatives_rejected: a root array with the next id derived from the highest stored id (a removed highest id becomes reusable, breaking INV-002); a lenient read that fills missing keys (a foreign file would be overwritten, breaking POL-003).
+- consequence: a corrupt or foreign file fails every command with E_CANNOT_READ until a human removes it; the writer is a single full-file replacement, which is enough because concurrency handling is out of scope.
 
-### DD-03 Storage document shape and strict validation
-- evidence: [todo-cli:CTR-006, todo-cli:INV-001, todo-cli:BEH-018, todo-cli:ASM-007, todo-cli:ASM-006]
-- decision: the file is a JSON array whose items are objects with `id` (integer ≥ 1), `text` (string), `done` (boolean) and `createdAt` (string matching `/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/`). Anything else — malformed JSON, a JSON object, an empty file, a missing field, a wrong field type — is unreadable and maps to `E_STORAGE`. Extra fields on an item are ignored on read and dropped on write.
-- alternatives_rejected: treating a non-array document as an empty list (silently discards user data); a `{ tasks: [...] }` wrapper (adds metadata the spec does not need).
-- consequence: `readTasks` returns a single failure shape and `list` on a corrupt file never overwrites it.
+DD-03 createdAt through an injected clock
+- evidence: [todo-cli:CTR-006, todo-cli:BEH-001, todo-cli:INV-003]
+- decision: `createdAt` is `new Date().toISOString()`, the UTC millisecond form fixed by ASM-002, produced by `formatCreatedAt` in the store and passed into `runAdd` as a `() => Date` clock supplied by the root.
+- alternatives_rejected: calling `new Date()` inside the command function (a test cannot observe the value deterministically); second precision (ASM-002 fixes milliseconds).
+- consequence: the store owns the timestamp text, the root owns the time source, and a test can inject a fixed instant.
 
-### DD-04 Id allocation is max-of-present plus one
-- evidence: [todo-cli:BEH-004, todo-cli:INV-002, todo-cli:ASM-002]
-- decision: `nextTaskId` returns `1` for an empty list and `Math.max(...ids) + 1` otherwise; no high-water mark is persisted, so the number of a removed highest id becomes available again.
-- alternatives_rejected: a persisted high-water field (needs extra file state and the spec fixes four task fields with no document metadata).
-- consequence: `add` needs no extra state beyond the file; ids stay unique within the file at every write.
+DD-04 in-process command execution and the built artifact
+- evidence: [todo-cli:NFR-001, todo-cli:GA-001, todo-cli:IMP-001]
+- decision: all command logic runs through `main(argv, env, streams, clock)` from `src/index.ts`; tests call it in process with recording streams and a temporary directory behind `TODO_FILE`, so the vitest suite needs no build and no subprocess. `src/cli.ts` is a thin process wrapper and the source of `dist/cli.js`; `tsconfig.build.json` (owned by the root module) emits `dist/` and `npm run build` runs it, which is what makes `node dist/cli.js --help` work.
+- alternatives_rejected: spawning `node dist/cli.js` from every test (the suite would depend on a completed build and break `npx vitest run` on a clean tree); running TypeScript sources through Node's type stripping (the `.js` specifiers of the ESM source are not remapped).
+- consequence: behavioural tests are fast and offline; the artifact obligation is checked by `npm run build` plus one `node dist/cli.js --help` smoke check.
 
-### DD-05 Synchronous single-writer filesystem access
-- evidence: [todo-cli:CON-004, todo-cli:INV-004, todo-cli:BEH-011, todo-cli:ASM-010]
-- decision: use `node:fs` synchronous calls (`existsSync`, `readFileSync`, `writeFileSync`) with UTF-8, no locking and no temp-file rename; one process handles one command and exits.
-- alternatives_rejected: asynchronous fs with a promise-based CLI (adds an event-loop layer with no benefit for one command); lock files (concurrent access is out of scope).
-- consequence: command modules are plain synchronous functions returning `CommandResult`, which keeps unit tests free of async plumbing; `list` and `--help` never write.
+DD-05 id tokens and text normalization
+- evidence: [todo-cli:BEH-001, todo-cli:BEH-003, todo-cli:BEH-014, todo-cli:CTR-003]
+- decision: an id argument is valid only when it consists of decimal digits and its value is at least 1 (`+5`, `-1`, `0`, `1.0`, ` 5` and `abc` are usage errors); the typed token is echoed verbatim in `#<token> done`, `#<token> removed` and `error: no task #<token>`, while comparison against stored ids uses its integer value. Text is the words joined with a single space and trimmed before the blank check, so `add "  buy   milk  "` stores `buy milk`.
+- alternatives_rejected: accepting any numeric token and printing the canonical integer (the printed line would differ from the typed token); storing the raw argument including surrounding spaces (blank-surrounded text would reach the file).
+- consequence: `done 007` prints `#007 done` for a task whose stored id is 7.
 
-### DD-06 createdAt from an injected Date
-- evidence: [todo-cli:CTR-006, todo-cli:INV-001, todo-cli:BEH-001, todo-cli:ASM-003]
-- decision: `createTask(id, text, now: Date)` builds `createdAt` with `now.toISOString()`, and `runAdd(path, text, now)` takes the same `now`; M-06 passes `new Date()`.
-- alternatives_rejected: calling `new Date()` inside the store (untestable format and ordering); `Date.now()` arithmetic (reimplements ISO formatting).
-- consequence: the stored format is exactly `YYYY-MM-DDTHH:mm:ss.sssZ`, and tests can pin the clock through the public interface.
+DD-06 write failures reuse E_CANNOT_READ
+- evidence: [todo-cli:POL-001, todo-cli:INV-005, todo-cli:CTR-007]
+- decision: the taxonomy has no code for a write that the file system rejects, so `writeTaskList` returns `ok: false` and the root reports E_CANNOT_READ, exit 1, `error: cannot read <resolved path>`.
+- alternatives_rejected: a new code such as E_CANNOT_WRITE (outside the approved taxonomy); letting the exception escape (it would break the 0/1/2 exit-code invariant).
+- consequence: some failures carry a message that says "read" for a write; the code set and exit classes stay exactly as the spec fixes them.
 
-### DD-07 Argument grammar and validation
-- evidence: [todo-cli:BEH-002, todo-cli:BEH-013, todo-cli:BEH-014, todo-cli:BEH-015, todo-cli:ASM-005, todo-cli:ASM-008]
-- decision: `parseArgs` matches the first token against the five commands, rejects an empty argv, rejects any second positional for `add` rather than joining, treats blank-after-trim text as a usage error, accepts only `--all` as a flag and only on `list`, and accepts an id only when it matches `/^[1-9][0-9]*$/` (so `0`, `-1`, `1.5`, `abc`, `+1` and `01` are rejected).
-- alternatives_rejected: joining multiple `add` arguments (the spec fixes one positional); `Number.isInteger(Number(x))` alone (accepts `1.0` and hex forms).
-- consequence: every rejected argv is rejected before any storage read, so the storage file is untouched for all usage failures.
-
-### DD-08 Help text and list ordering
-- evidence: [todo-cli:BEH-016, todo-cli:BEH-006, todo-cli:CTR-005, todo-cli:ASM-009, todo-cli:ASM-004]
-- decision: `usageText()` returns one multi-line block containing `--help`, `add <text>`, `list [--all]`, `done <id>` and `rm <id>` plus a line documenting the `usage:` and `error:` prefixes; `--help` prints it to stdout with exit 0 and never reads the storage file. `list --all` renders all tasks in one ascending-id order with `[x] ` before completed ones; plain `list` renders only open tasks in ascending-id order.
-- alternatives_rejected: a fixed, contract-tested help wording (the spec fixes only the five tokens); completed tasks grouped after open ones (the `--all` example contradicts it).
-- consequence: no storage read on `--help`, and one ordering rule for both list forms.
-
-### DD-09 Build entry and emitting tsconfig
-- evidence: [todo-cli:CON-006, todo-cli:CON-001, todo-cli:CON-002, todo-cli:CON-003]
-- decision: the process entry is `src/cli.ts`; `tsconfig.build.json` sets `rootDir: "src"`, `outDir: "dist"`, `noEmit: false`, `include: ["src"]` and otherwise extends `tsconfig.json`, so `tsc -p tsconfig.build.json` emits `dist/cli.js`. `package.json` stays `"type": "module"` with `build` running that command, `test` running vitest and `typecheck` running `tsc --noEmit`. The default `tsconfig.json` keeps `noEmit: true` and no `rootDir`, so tests and `src` type-check together.
-- alternatives_rejected: emitting from the shared `tsconfig.json` (a `rootDir` there breaks the verifier on test files); a separate `src/index.ts` entry (would emit `dist/index.js`, not the `dist/cli.js` the spec invokes).
-- consequence: M-06 owns `tsconfig.build.json` and the package scripts; the acceptance path is `npm run build` then `node dist/cli.js --help`.
-
-### DD-10 No run-time dependencies, pinned dev toolchain
-- evidence: [todo-cli:CON-005, todo-cli:CON-003, todo-cli:CON-001, todo-cli:ASM-011]
-- decision: `dependencies` is empty; every capability comes from the Node.js 22 standard library (`node:fs`, `node:process`, `node:path`). Dev dependencies are pinned to `typescript@5.6.3`, `vitest@2.1.4` and `@types/node@22.9.0`.
-- alternatives_rejected: a CLI framework or a JSON-schema validator (both are run-time dependencies the spec forbids); floating versions (non-reproducible installs).
-- consequence: lanes add no package; the product build and test path work offline from the product root.
+DD-07 write before print
+- evidence: [todo-cli:INV-006, todo-cli:INV-007, todo-cli:BEH-009]
+- decision: the root writes the returned list first and emits the stdout lines only after the write succeeded; a failing command never reaches the write, and a read-only command returns `list: null` and never calls the writer.
+- alternatives_rejected: printing first and writing afterwards (a failed write would leave a success line on stdout); writing on every invocation (a failed parse or a `--no-task` error would rewrite the file).
+- consequence: stdout is only produced for commands that are fully committed, and stderr never follows partial stdout.
 
 ## 8. Traceability
 
-| Spec ID | Module |
+| spec id | module |
 | --- | --- |
-| todo-cli:CTR-001 | M-05 |
-| todo-cli:CTR-002 | M-04 |
-| todo-cli:CTR-003 | M-05 |
-| todo-cli:CTR-004 | M-05 |
-| todo-cli:CTR-005 | M-04 |
-| todo-cli:CTR-006 | M-02 |
-| todo-cli:BEH-001 | M-05 |
-| todo-cli:BEH-002 | M-03 |
-| todo-cli:BEH-003 | M-02 |
-| todo-cli:BEH-004 | M-02 |
+| todo-cli:BEH-001 | M-04 |
+| todo-cli:BEH-002 | M-04 |
+| todo-cli:BEH-003 | M-04 |
+| todo-cli:BEH-004 | M-04 |
 | todo-cli:BEH-005 | M-04 |
 | todo-cli:BEH-006 | M-04 |
 | todo-cli:BEH-007 | M-04 |
-| todo-cli:BEH-008 | M-05 |
-| todo-cli:BEH-009 | M-05 |
-| todo-cli:BEH-010 | M-05 |
-| todo-cli:BEH-011 | M-05 |
-| todo-cli:BEH-012 | M-05 |
+| todo-cli:BEH-008 | M-04 |
+| todo-cli:BEH-009 | M-04 |
+| todo-cli:BEH-010 | M-04 |
+| todo-cli:BEH-011 | M-04 |
+| todo-cli:BEH-012 | M-03 |
 | todo-cli:BEH-013 | M-03 |
 | todo-cli:BEH-014 | M-03 |
 | todo-cli:BEH-015 | M-03 |
-| todo-cli:BEH-016 | M-04 |
+| todo-cli:BEH-016 | M-02 |
 | todo-cli:BEH-017 | M-02 |
 | todo-cli:BEH-018 | M-02 |
 | todo-cli:BEH-019 | M-02 |
+| todo-cli:BEH-020 | M-05 |
+| todo-cli:BEH-021 | M-03 |
+| todo-cli:SCN-001 | M-05 |
+| todo-cli:SCN-002 | M-05 |
+| todo-cli:SCN-003 | M-05 |
+| todo-cli:NFR-001 | M-05 |
+| todo-cli:CTR-001 | M-04 |
+| todo-cli:CTR-002 | M-04 |
+| todo-cli:CTR-003 | M-04 |
+| todo-cli:CTR-004 | M-04 |
+| todo-cli:CTR-005 | M-05 |
+| todo-cli:CTR-006 | M-02 |
+| todo-cli:CTR-007 | M-02 |
 | todo-cli:INV-001 | M-02 |
 | todo-cli:INV-002 | M-02 |
-| todo-cli:INV-003 | M-06 |
-| todo-cli:INV-004 | M-02 |
+| todo-cli:INV-003 | M-02 |
+| todo-cli:INV-004 | M-04 |
+| todo-cli:INV-005 | M-01 |
+| todo-cli:INV-006 | M-02 |
+| todo-cli:INV-007 | M-02 |
 | todo-cli:POL-001 | M-01 |
 | todo-cli:POL-002 | M-03 |
-| todo-cli:CON-001 | M-06 |
-| todo-cli:CON-002 | M-06 |
-| todo-cli:CON-003 | M-06 |
-| todo-cli:CON-004 | M-06 |
-| todo-cli:CON-005 | M-06 |
-| todo-cli:CON-006 | M-06 |
+| todo-cli:POL-003 | M-02 |
+| todo-cli:CON-001 | M-05 |
+| todo-cli:CON-002 | M-05 |
+| todo-cli:GA-001 | M-05 |
+| todo-cli:IMP-001 | M-05 |
 
 ## 9. Revisions
 

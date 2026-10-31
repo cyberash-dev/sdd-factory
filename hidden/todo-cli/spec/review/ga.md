@@ -7,141 +7,98 @@ decision: accept
 ```yaml
 - id: GA-001
   kind: gap
-  target_ids: [todo-cli:CON-006]
+  target_ids: []
   source: L34
   resolution: decide
   required_change: |
-    CON-006 constraint becomes: the acceptance build is `npm run build`, which compiles the
-    TypeScript sources with tsc and emits dist/cli.js, and the compiled CLI is invoked as
-    node dist/cli.js <command>; title, rationale and test_obligation name `npm run build`
-    as the observed build command. Verification: section 13 CON-006 carries exactly this
-    constraint, title "acceptance build via npm run build", the rationale naming the source
-    clause, and the predicate "`npm run build` exits 0, emits dist/cli.js and
-    node dist/cli.js --help runs".
+    "Add a record of type NFR for the acceptance criterion of source L34: the project builds with `npm run build` and its tests pass with `npm test`, with a test_obligation asserting that both commands succeed on the product tree. No record of the product currently names either entry point; todo-cli:GA-001 covers only the existence of dist/cli.js and todo-cli:IMP-001 only the invocation form."
   assumption: null
   applied: yes
 - id: GA-002
-  kind: untestable
-  target_ids: [todo-cli:BEH-016, todo-cli:CTR-005]
-  source: L17
-  resolution: decide
-  required_change: |
-    BEH-016 then becomes: exit 0, stdout contains each of the tokens add, list, done, rm and
-    --help, and stderr is empty; CTR-005 test_obligation predicate is aligned to the same
-    observable; the body of todo-cli:ASM-009 is replaced with the round-1 replacement body.
-    Verification: BEH-016 then is exactly the token-set predicate, CTR-005 predicate reads
-    "--help exits 0 and prints to stdout a usage text containing add, list, done, rm and
-    --help", and the ASM-009 body in section 18 is inserted verbatim including
-    notes 'decided by GA-002; source: L17'.
-  assumption: todo-cli:ASM-009
-  applied: yes
-- id: GA-003
-  kind: unmodeled_term
-  target_ids: [todo-cli:BEH-003, todo-cli:BEH-017, todo-cli:CTR-006]
+  kind: gap
+  target_ids: [todo-cli:CTR-001, todo-cli:CTR-002, todo-cli:BEH-015, todo-cli:ASM-004]
   source: none
   resolution: decide
   required_change: |
-    The Glossary `path` definition is extended to state that a relative TODO_FILE value and
-    the default ./todo.json both resolve against the current working directory of the
-    invocation, and todo-cli:ASM-010 is inserted. Verification: the Glossary row `path`
-    carries the extended definition, and the ASM-010 body in section 18 is inserted
-    verbatim with source_open_q null and notes 'decided by GA-003; source: none'.
-  assumption: todo-cli:ASM-010
-  applied: yes
-- id: GA-004
-  kind: gap
-  target_ids: [todo-cli:INV-001, todo-cli:CTR-006]
-  source: L9
-  resolution: decide
-  required_change: |
-    OQ-003 is closed with opt-utc-ms and the normative text states the chosen precision:
-    INV-001 statement names a UTC ISO-8601 createdAt with millisecond precision and a Z
-    suffix and CTR-006 item_fields.createdAt carries the same wording; ASM-003 stays as is.
-    Verification: INV-001 statement and CTR-006 item_fields.createdAt both carry "UTC
-    ISO-8601 timestamp with millisecond precision and a Z suffix", and ASM-003 is unchanged.
-  assumption: todo-cli:ASM-003
-  applied: yes
-- id: GA-005
-  kind: gap
-  target_ids: [todo-cli:BEH-006]
-  source: L14
-  resolution: decide
-  required_change: |
-    OQ-004 is closed with opt-global-id and BEH-006 must distinguish it from opt-open-first:
-    its given gains a file where the completed task has the lower id with the expected
-    interleaved output, and its then states that --all prints all shown tasks in one
-    ascending id order regardless of done; ASM-004 stays as is. Verification: BEH-006 given
-    holds a second file with completed task 1 and open task 2, its then ends with "--all
-    prints all shown tasks in one ascending id order regardless of done", and the
-    test_obligation carries the same predicate and the boundary class "completed task with
-    lowest id".
+    "The token `--help` in an argument position has no recorded outcome: todo-cli:CTR-001 exempts it from E_USAGE_UNKNOWN_OPTION (\"an option other than --help is given\") without recording what it does to `add`, and todo-cli:CTR-002 exempts it from E_USAGE_UNKNOWN_OPTION (\"an option other than --all and --help is given\") while giving `list` no other behaviour for it, so `todo list --help` and `todo add --help` are undefined. Decide: `--help` is recognized only as the command of todo-cli:CTR-005; in an argument position every token beginning with `--` is an option, and every option the Contract of the command does not define is E_USAGE_UNKNOWN_OPTION with exit 2. Edit todo-cli:CTR-001: replace the taxonomy entry \"exit 2 - E_USAGE_UNKNOWN_OPTION: an option other than --help is given\" with \"exit 2 - E_USAGE_UNKNOWN_OPTION: a token beginning with -- is given\". Edit todo-cli:CTR-002: replace that taxonomy entry with \"exit 2 - E_USAGE_UNKNOWN_OPTION: a token other than --all beginning with -- is given\". Edit todo-cli:BEH-015: change the test_obligation predicate to \"an option other than `--all` exits 2 with a `usage:` line\" and add `todo list --help` to its boundary_classes. Replace the body of todo-cli:ASM-004 with the ASSUMPTION in this review, rewriting the superseded statement under its id."
   assumption: todo-cli:ASM-004
   applied: yes
-- id: GA-006
+- id: GA-003
   kind: gap
-  target_ids: [todo-cli:BEH-014, todo-cli:CTR-001]
-  source: L13
-  resolution: decide
-  required_change: |
-    OQ-005 is closed with opt-single-arg and the normative text states the rule: BEH-014
-    when covers `todo add "a" "b"` with two arguments and its then gives exit 2, one stderr
-    line starting with usage:, empty stdout and an unchanged storage file, stating that add
-    accepts exactly one positional argument; CTR-001 schema keeps exactly one positional;
-    ASM-005 stays as is. Verification: BEH-014 when and then carry the two-argument case
-    and the one-positional rule, and CTR-001 schema is {subcommand: add, positional: [text],
-    flags: []}.
-  assumption: todo-cli:ASM-005
-  applied: yes
-- id: GA-007
-  kind: gap
-  target_ids: [todo-cli:BEH-013, todo-cli:CTR-002]
-  source: L14
-  resolution: decide
-  required_change: |
-    OQ-008 is closed with opt-usage and the normative text states the rule: BEH-013 title,
-    when and then cover an unknown flag on a known command (`todo list --verbose`) as exit
-    2 with a stderr line starting with usage: and an unchanged storage file; CTR-002
-    error_taxonomy carries the E_USAGE entry this case needs; ASM-008 stays as is.
-    Verification: BEH-013 title reads "unknown command or unknown flag exits 2 with a usage
-    line", its when includes `todo list --verbose`, and CTR-002 error_taxonomy lists
-    "exit 2 E_USAGE - usage line on stderr starting with usage:".
-  assumption: todo-cli:ASM-008
-  applied: yes
-- id: GA-008
-  kind: gap
-  target_ids: [todo-cli:CON-005]
+  target_ids: [todo-cli:CTR-002, todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:ASM-012]
   source: none
   resolution: decide
   required_change: |
-    CON-005 is grounded on an ASSUMPTION instead of the source: its rationale records the
-    zero-dependency rule as an engineering choice with basis todo-cli:ASM-011 and its notes
-    carry 'basis: todo-cli:ASM-011; source: L3-L17'; todo-cli:ASM-011 is inserted.
-    Verification: CON-005 rationale and notes reference todo-cli:ASM-011, and the ASM-011
-    body in section 18 is inserted verbatim with source_open_q null and notes 'decided by
-    GA-008; source: none'.
-  assumption: todo-cli:ASM-011
+    "Positional arguments beyond the ones a Contract's schema defines (for example `todo done 1 2` or `todo list foo`) are an input class the source leaves open with no recorded reading in todo-cli:CTR-002, todo-cli:CTR-003 and todo-cli:CTR-004. Decide: such extra positional arguments are ignored and the command runs on its defined arguments (only `add` consumes every word as its text). Edit todo-cli:CTR-002, todo-cli:CTR-003 and todo-cli:CTR-004: add a compatibility rule stating that positional arguments beyond the ones the schema defines are ignored. Insert the ASSUMPTION todo-cli:ASM-012."
+  assumption: todo-cli:ASM-012
+  applied: yes
+- id: GA-004
+  kind: unmodeled_term
+  target_ids: [todo-cli:CTR-006, todo-cli:POL-003, todo-cli:BEH-017, todo-cli:BEH-021]
+  source: none
+  resolution: decide
+  required_change: |
+    "The nouns `store` (used in the test_obligation predicates of todo-cli:BEH-021 and several Behaviors, e.g. \"empty store\", \"the store is rewritten\") and `contract shape` (used in todo-cli:CTR-006, todo-cli:BEH-017, todo-cli:POL-003) appear in normative fields but are absent from the Glossary of section 2. Add Glossary entries: `store` as the storage file of one invocation, and `contract shape` as the JSON root and task shape defined by todo-cli:CTR-006."
+  assumption: null
   applied: yes
 ```
 
 ## Assumptions
 
-No new or replacement ASSUMPTION body is written in this round: the three bodies this review owns (todo-cli:ASM-009, todo-cli:ASM-010, todo-cli:ASM-011) are present in section 18 of spec.md verbatim as required by GA-002, GA-003 and GA-008, and every other ASSUMPTION in section 18 (ASM-001 to ASM-008) was already present and is untouched.
+```yaml
+---
+id: todo-cli:ASM-004
+type: ASSUMPTION
+lifecycle: {status: proposed}
+partition_id: todo-cli
+title: an unknown option is a usage error
+assumption: "any token beginning with `--` in an argument position is an option, and every option that the Contract of the invoked command does not define, `--help` included, exits 2 with exactly one stderr line starting with `usage:` (code E_USAGE_UNKNOWN_OPTION); `--help` is recognized only as the command of todo-cli:CTR-005"
+source_open_q: todo-cli:OQ-004
+blocking: no
+review_by: "2027-01-29"
+default_if_unresolved: keep_assumption
+tests:
+  - "an option other than `--all` exits 2 with a `usage:` line"
+  - "`todo list --help` and `todo add --help` exit 2 with a `usage:` line"
+notes: "decided by GA-002; source: L14, L21"
+---
+```
+
+```yaml
+---
+id: todo-cli:ASM-012
+type: ASSUMPTION
+lifecycle: {status: proposed}
+partition_id: todo-cli
+title: extra positional arguments are ignored
+assumption: "positional arguments beyond the ones the Contract of the invoked command defines are ignored: `todo done 1 2` marks task 1 done and leaves task 2 open, and `todo list foo` behaves as `todo list`; only `add` consumes every word as its text"
+source_open_q: null
+blocking: no
+review_by: "2027-01-29"
+default_if_unresolved: keep_assumption
+tests:
+  - "`todo done 1 2` exits 0, prints `#1 done` and leaves task 2 open"
+  - "`todo list foo` behaves as `todo list`"
+notes: "decided by GA-003; source: none"
+---
+```
 
 ## Open-Q decisions
 
 | Open-Q | option | finding | rationale |
 | --- | --- | --- | --- |
-| todo-cli:OQ-001 | opt-usage | none | closed in round 1; BEH-002 (exit 2, usage:) and ASM-001 verified present |
-| todo-cli:OQ-002 | opt-max-plus-one | none | closed in round 1; BEH-004 and ASM-002 verified present |
-| todo-cli:OQ-003 | opt-utc-ms | GA-004 | closed in round 1 via GA-004; INV-001 and CTR-006 wording verified applied |
-| todo-cli:OQ-004 | opt-global-id | GA-005 | closed in round 1 via GA-005; BEH-006 ordering rule verified applied |
-| todo-cli:OQ-005 | opt-single-arg | GA-006 | closed in round 1 via GA-006; BEH-014 rule and CTR-001 schema verified applied |
-| todo-cli:OQ-006 | opt-storage-error | none | closed in round 1; BEH-018 and ASM-006 verified present |
-| todo-cli:OQ-007 | opt-array | none | closed in round 1; CTR-006 format json_array and ASM-007 verified present |
-| todo-cli:OQ-008 | opt-usage | GA-007 | closed in round 1 via GA-007; BEH-013 and CTR-002 E_USAGE verified applied |
-| todo-cli:OQ-009 | opt-stdout-0 | GA-002 | closed in round 1 via GA-002; checkable predicate and ASM-009 verified applied |
+| todo-cli:OQ-001 | A | none | Verified applied in round 1; already stated by todo-cli:BEH-002, todo-cli:CTR-001 and todo-cli:ASM-001. |
+| todo-cli:OQ-002 | A | none | Verified applied in round 1; already stated by todo-cli:CTR-006 with todo-cli:ASM-002. |
+| todo-cli:OQ-003 | A | none | Verified applied in round 1; already stated by todo-cli:CTR-006 with todo-cli:ASM-003. |
+| todo-cli:OQ-004 | A | GA-002 | Verified applied in round 2; the generalised reading is stated by todo-cli:BEH-015, todo-cli:CTR-001, todo-cli:CTR-002 and the replaced todo-cli:ASM-004. |
+| todo-cli:OQ-005 | A | none | Verified applied in round 1; already stated by todo-cli:CTR-003, todo-cli:CTR-004, todo-cli:BEH-014 and todo-cli:ASM-005. |
+| todo-cli:OQ-006 | A | none | Verified applied in round 1; already stated by todo-cli:CTR-005 and todo-cli:ASM-006. |
+| todo-cli:OQ-007 | A | none | Verified applied in round 1; already stated by todo-cli:CTR-001, todo-cli:BEH-003 and todo-cli:ASM-007. |
+| todo-cli:OQ-008 | A | none | Verified applied in round 1; already stated by todo-cli:CTR-007 and todo-cli:ASM-008. |
+| todo-cli:OQ-009 | A | none | Verified applied in round 1; already stated by todo-cli:BEH-009, todo-cli:BEH-011, todo-cli:BEH-012 and todo-cli:ASM-009. |
+| todo-cli:OQ-010 | A | none | Verified applied in round 1; already stated by todo-cli:BEH-005, todo-cli:INV-004 and todo-cli:ASM-010. |
+| todo-cli:OQ-011 | A | none | Verified applied in round 1; already stated by todo-cli:ASM-011. |
 
 ## Coverage
 
-- Coverage mapping is unchanged from round 1 and was re-checked against the current spec.md: the L34 build clause is now recorded by CON-006 (GA-001 applied), npm test by CON-003, and the invocation `node dist/cli.js <command>` by CON-006 and the Context; L3, L7-L9, L13-L17, L21-L24 and L28-L30 carry records as listed in round 1.
-- No new finding is opened in round 2: this round verifies the round-1 `decide` findings only, and every one is applied.
+Round 2 is verification only; no new coverage findings. The round-1 coverage gap L34 is closed by todo-cli:NFR-001.
