@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "partition": "expense-ledger-cli",
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "persist the ledger document and allocate expense ids",
+      "covers": [
+        "expense-ledger-cli:CTR-007",
+        "expense-ledger-cli:BEH-017",
+        "expense-ledger-cli:BEH-018",
+        "expense-ledger-cli:INV-001",
+        "expense-ledger-cli:EXT-001"
+      ],
+      "writes": ["src/store/**", "tests/store/**"],
+      "dependsOn": [],
+      "designRefs": ["M-01"],
+      "testBudget": { "maxTests": 30 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-002",
+      "title": "compute amounts, calendar days and categories",
+      "covers": [
+        "expense-ledger-cli:INV-002",
+        "expense-ledger-cli:INV-003",
+        "expense-ledger-cli:INV-008"
+      ],
+      "writes": ["src/domain/**", "tests/domain/**"],
+      "dependsOn": [],
+      "designRefs": ["M-02"],
+      "testBudget": { "maxTests": 18 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-003",
+      "title": "map failures to the stable codes and exit statuses",
+      "covers": [
+        "expense-ledger-cli:POL-001",
+        "expense-ledger-cli:INV-007",
+        "expense-ledger-cli:CTR-008"
+      ],
+      "writes": ["src/diagnostics/**", "tests/diagnostics/**"],
+      "dependsOn": [],
+      "designRefs": ["M-03"],
+      "testBudget": { "maxTests": 18 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-004",
+      "title": "parse argv into a command or a usage error",
+      "covers": [
+        "expense-ledger-cli:BEH-002",
+        "expense-ledger-cli:BEH-003",
+        "expense-ledger-cli:BEH-004",
+        "expense-ledger-cli:BEH-015",
+        "expense-ledger-cli:BEH-016",
+        "expense-ledger-cli:CTR-006",
+        "expense-ledger-cli:POL-002"
+      ],
+      "writes": ["src/parse/**", "tests/parse/**"],
+      "dependsOn": ["T-002", "T-003"],
+      "designRefs": ["M-04"],
+      "testBudget": { "maxTests": 60 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-005",
+      "title": "run list, summary and export against the ledger",
+      "covers": [
+        "expense-ledger-cli:BEH-006",
+        "expense-ledger-cli:BEH-007",
+        "expense-ledger-cli:BEH-008",
+        "expense-ledger-cli:BEH-009",
+        "expense-ledger-cli:BEH-010",
+        "expense-ledger-cli:BEH-011",
+        "expense-ledger-cli:BEH-014",
+        "expense-ledger-cli:CTR-002",
+        "expense-ledger-cli:CTR-003",
+        "expense-ledger-cli:CTR-005",
+        "expense-ledger-cli:INV-004",
+        "expense-ledger-cli:INV-005",
+        "expense-ledger-cli:INV-006"
+      ],
+      "writes": ["src/query/**", "tests/query/**"],
+      "dependsOn": ["T-001", "T-002", "T-003"],
+      "designRefs": ["M-05"],
+      "testBudget": { "maxTests": 80 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-006",
+      "title": "run add and rm and write the ledger file",
+      "covers": [
+        "expense-ledger-cli:BEH-001",
+        "expense-ledger-cli:BEH-005",
+        "expense-ledger-cli:BEH-012",
+        "expense-ledger-cli:BEH-013",
+        "expense-ledger-cli:CTR-001",
+        "expense-ledger-cli:CTR-004"
+      ],
+      "writes": ["src/mutate/**", "tests/mutate/**"],
+      "dependsOn": ["T-001", "T-002", "T-003"],
+      "designRefs": ["M-06"],
+      "testBudget": { "maxTests": 51 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-007",
+      "title": "dispatch commands and build the CLI entry point",
+      "covers": [
+        "expense-ledger-cli:SCN-001",
+        "expense-ledger-cli:SCN-002",
+        "expense-ledger-cli:SCN-003",
+        "expense-ledger-cli:GEN-001",
+        "expense-ledger-cli:CON-001",
+        "expense-ledger-cli:CON-002",
+        "expense-ledger-cli:CON-003",
+        "expense-ledger-cli:CON-004",
+        "expense-ledger-cli:CON-005",
+        "expense-ledger-cli:CON-006"
+      ],
+      "writes": [
+        "src/index.ts",
+        "src/cli.ts",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "vitest.config.ts",
+        "tests/cli/**"
+      ],
+      "dependsOn": ["T-001", "T-003", "T-004", "T-005", "T-006"],
+      "designRefs": ["M-07"],
+      "testBudget": { "maxTests": 23 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    }
+  ]
+}
