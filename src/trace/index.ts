@@ -3,12 +3,15 @@ import { createRedactor as createEnvRedactor, redactDeep } from "../shared/redac
 import type { Slice, SliceContext } from "../shared/slice.js";
 import { createCloudMirror, type CloudMirror } from "./adapters/mozaik/cloud-mirror.js";
 import { createTracerParticipants } from "./adapters/mozaik/participants.js";
+import { earlierRunReader } from "./adapters/outbound/run-chain.js";
 import { productTextReader, TraceFiles } from "./adapters/outbound/trace-files.js";
 import { Tracer } from "./application/tracer.js";
 import { createRedactor, secretValuesOf, type Environment } from "./domain/redaction.js";
 
 export { activeIntervals, overlaps, type ActiveInterval } from "./domain/intervals.js";
 export { TRACE_FILE_NAMES } from "./adapters/outbound/trace-files.js";
+export { earlierTraceDirs } from "./adapters/outbound/run-chain.js";
+export { CHAIN_DIR } from "./domain/trace-md.js";
 
 export interface CloudTransportOptions {
   readonly fetch?: typeof fetch;
@@ -44,6 +47,7 @@ function createTracer(context: SliceContext, secrets: readonly string[]): Tracer
     pricing: context.config.pricing,
     store: new TraceFiles(context.paths.traceDir, createRedactor(secrets)),
     readProductText: productTextReader(context.paths.productDir),
+    readEarlierRuns: earlierRunReader(context.paths.runDir),
     now: context.now,
     publish: (pending) => {
       context.runtime.publisher.publish(pending);

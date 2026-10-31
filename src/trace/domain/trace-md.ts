@@ -1,8 +1,11 @@
 import { RUN_STAGES } from "../../bus/domain/catalogue.js";
 import { MID_RUN_COUNT_PREFIX } from "./interventions.js";
-import type { FixNote, RunOutcome, TraceReport } from "./report.js";
+import type { ChainRun, FixNote, RunChain, RunOutcome, TraceReport } from "./report.js";
 
 export const TRACE_MD_SECTIONS = ["## Stages", "## Tasks", "## Totals", "## Assumptions", "## Interventions", "## Warnings"] as const;
+
+/* Publication places each earlier run's trace directory here, next to this trace.md (assembly-stage:DLT-007). */
+export const CHAIN_DIR = "chain";
 
 export function usdCell(value: number | null): string {
   return value === null ? "n/a" : value.toFixed(4);
@@ -37,6 +40,31 @@ function fixCountOf(report: TraceReport, taskId: string): number {
 
 function section(heading: string, bullets: readonly string[]): readonly string[] {
   return bullets.length === 0 ? [] : [heading, "", ...bullets, ""];
+}
+
+function chainRow(run: ChainRun, reportLink: string): string {
+  return `| ${run.runId} | ${outcomeText(run.outcome)} | ${run.startedAt} | ${run.finishedAt ?? "in progress"} | ${run.durationMs} | ${usdCell(run.costUsd)} | ${reportLink} |`;
+}
+
+function chainSection(chain: RunChain | null): readonly string[] {
+  if (chain === null) {
+    return [];
+  }
+  return [
+    "## Chain",
+    "",
+    "| runId | outcome | startedAt | finishedAt | durationMs | costUsd | report |",
+    "|---|---|---|---|---|---|---|",
+    ...chain.earlier.map((run) => (run.kind === "available" ? chainRow(run, `[trace.md](${CHAIN_DIR}/${run.runId}/trace.md)`) : `| ${run.runId} | unavailable | n/a | n/a | n/a | n/a | n/a |`)),
+    chainRow(chain.current, "this report"),
+    "",
+    `- chain durationMs: ${chain.totals.durationMs}`,
+    `- chain costUsd: ${usdCell(chain.totals.costUsd)}`,
+    `- chain inputTokens: ${chain.totals.inputTokens}`,
+    `- chain outputTokens: ${chain.totals.outputTokens}`,
+    `- chain unavailable runs: ${chain.totals.unavailableRuns}`,
+    "",
+  ];
 }
 
 /* Trailing sections appear only when they have content, so a run without fixes or advisory reviews ends at Warnings as before. */
@@ -99,6 +127,7 @@ export function renderTraceMd(report: TraceReport): string {
     "",
     ...bulletsOrNone(report.warnings),
     "",
+    ...chainSection(report.chain),
     ...detailSections(report),
   ];
   return lines.join("\n");

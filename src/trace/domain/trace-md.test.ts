@@ -25,6 +25,7 @@ function fixtureReport(overrides: Partial<TraceReport> = {}): TraceReport {
     midRunInterventions: 1,
     warnings: [],
     cloudSessionUrl: null,
+    chain: null,
     ...overrides,
   };
 }

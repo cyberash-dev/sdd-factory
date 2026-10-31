@@ -3,7 +3,7 @@ import type { RunStage } from "../../bus/domain/run-state.js";
 import type { ModelPricing } from "../../shared/config.js";
 import type { AssumptionNote } from "./assumptions.js";
 import { integerOf, millisOf, numberOrNull, stringOf } from "./guards.js";
-import { aggregateCost, type TraceCostEntry } from "./ledger.js";
+import { aggregateCost, roundUsd, type TraceCostEntry } from "./ledger.js";
 import { stageOfEvent } from "./stage.js";
 import type { TraceRecord } from "./trace-record.js";
 
@@ -67,6 +67,26 @@ export interface ReportTotals {
   readonly unknownCostEntries: number;
 }
 
+export interface ChainRun {
+  readonly runId: string;
+  readonly outcome: RunOutcome;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly durationMs: number;
+  readonly costUsd: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
+/* An unavailable run is one whose run.json, costs.json or totals could not be read; reason names the path. */
+export type EarlierRun = ({ readonly kind: "available" } & ChainRun) | { readonly kind: "unavailable"; readonly runId: string; readonly reason: string };
+
+export interface RunChain {
+  readonly earlier: readonly EarlierRun[];
+  readonly current: ChainRun;
+  readonly totals: Omit<ReportTotals, "unknownCostEntries"> & { readonly unavailableRuns: number };
+}
+
 export interface TraceReport {
   readonly runId: string;
   readonly slug: string;
@@ -86,6 +106,7 @@ export interface TraceReport {
   readonly midRunInterventions: number;
   readonly warnings: readonly string[];
   readonly cloudSessionUrl: string | null;
+  readonly chain: RunChain | null;
 }
 
 export interface ReportInput {
@@ -102,6 +123,7 @@ export interface ReportInput {
   /* Set by the publish step: the copy is written before run.published is recorded. */
   readonly finished: { readonly finishedAt: string } | null;
   readonly cloudSessionUrl: string | null;
+  readonly earlierRuns: readonly EarlierRun[];
 }
 
 export class TraceReportError extends Error {
@@ -273,6 +295,31 @@ function advisoryNotes(bus: readonly BusRecord[]): readonly AdvisoryNote[] {
   });
 }
 
+/* trace:DLT-005: the chain's duration is the sum of its runs' durations, not the wall time from the first start to this run's end. */
+function chainOf(earlier: readonly EarlierRun[], current: ChainRun): RunChain | null {
+  if (earlier.length === 0) {
+    return null;
+  }
+  const available = earlier.flatMap((run) => (run.kind === "available" ? [run] : []));
+  const runs: readonly ChainRun[] = [...available, current];
+  const sumOf = (amount: (run: ChainRun) => number): number => runs.reduce((sum, run) => sum + amount(run), 0);
+  return {
+    earlier,
+    current,
+    totals: {
+      durationMs: sumOf((run) => run.durationMs),
+      costUsd: roundUsd(sumOf((run) => run.costUsd)),
+      inputTokens: sumOf((run) => run.inputTokens),
+      outputTokens: sumOf((run) => run.outputTokens),
+      unavailableRuns: earlier.length - available.length,
+    },
+  };
+}
+
+function unavailableRunWarnings(earlier: readonly EarlierRun[]): readonly string[] {
+  return earlier.flatMap((run) => (run.kind === "unavailable" ? [`warning: earlier run ${run.runId} unavailable: ${run.reason}`] : []));
+}
+
 export function buildReport(input: ReportInput): TraceReport {
   const bus = input.records.filter(isBusRecord);
   const started = bus.find((record) => record.type === "run.started");
@@ -283,6 +330,14 @@ export function buildReport(input: ReportInput): TraceReport {
   const { outcome, finishedAt } = outcomeOf(bus, input.finished);
   const nowAt = finishedAt ?? last.occurredAt;
   const cost = aggregateCost(input.entries);
+  const totals: ReportTotals = {
+    durationMs: millisOf(nowAt) - millisOf(started.occurredAt),
+    costUsd: cost.costUsd ?? 0,
+    inputTokens: cost.inputTokens,
+    outputTokens: cost.outputTokens,
+    unknownCostEntries: cost.unknownCostEntries,
+  };
+  const current: ChainRun = { runId: input.runId, outcome, startedAt: started.occurredAt, finishedAt, durationMs: totals.durationMs, costUsd: totals.costUsd, inputTokens: totals.inputTokens, outputTokens: totals.outputTokens };
   return {
     runId: input.runId,
     slug: input.slug,
@@ -295,18 +350,13 @@ export function buildReport(input: ReportInput): TraceReport {
     tasks: taskRows(bus, input.entries, input.titles, nowAt),
     participants: participantRows(input.entries),
     entries: input.entries,
-    totals: {
-      durationMs: millisOf(nowAt) - millisOf(started.occurredAt),
-      costUsd: cost.costUsd ?? 0,
-      inputTokens: cost.inputTokens,
-      outputTokens: cost.outputTokens,
-      unknownCostEntries: cost.unknownCostEntries,
-    },
+    totals,
     fixes: fixNotes(bus),
     advisories: advisoryNotes(bus),
     assumptions: input.assumptions,
     midRunInterventions: input.midRunInterventions,
-    warnings: input.warnings,
+    warnings: [...input.warnings, ...unavailableRunWarnings(input.earlierRuns)],
     cloudSessionUrl: input.cloudSessionUrl,
+    chain: chainOf(input.earlierRuns, current),
   };
 }

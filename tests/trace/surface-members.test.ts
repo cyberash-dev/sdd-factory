@@ -32,9 +32,10 @@ describe("trace-files surface after the member and cloud deltas", () => {
 
   // @covers trace:DLT-003
   // @covers trace:DLT-004
-  it("carries version 0.4.0 after fixer runs joined the cost ledger and the report", async () => {
+  // @covers trace:DLT-005
+  it("carries version 0.5.0 after a resumed run's report took in every run of its chain", async () => {
     const surface = await surfaceRecord("trace.md", "trace:SUR-001");
 
-    expect(surface.version).toBe("0.4.0");
+    expect(surface.version).toBe("0.5.0");
   });
 });

@@ -20,6 +20,7 @@ async function tracerInTempDir(): Promise<{ readonly tracer: Tracer; readonly di
     pricing: {},
     store: new TraceFiles(dir, createRedactor([])),
     readProductText: () => null,
+    readEarlierRuns: () => [],
     now: () => new Date("2026-10-29T12:10:00.000Z"),
     publish: () => undefined,
     log: () => undefined,

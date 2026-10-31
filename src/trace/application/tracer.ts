@@ -14,7 +14,7 @@ import { buildReport, type TraceReport } from "../domain/report.js";
 import { isRunStage, stageOpenedBy } from "../domain/stage.js";
 import { renderTraceMd } from "../domain/trace-md.js";
 import { RUNTIME_PRODUCER, serializeRecord, type RuntimeEventType, type TraceRecord } from "../domain/trace-record.js";
-import type { ProductTextReader, TraceStore } from "../ports/outbound/trace-store.js";
+import type { EarlierRunReader, ProductTextReader, TraceStore } from "../ports/outbound/trace-store.js";
 
 export interface TracerDeps {
   readonly runId: string;
@@ -23,6 +23,7 @@ export interface TracerDeps {
   readonly pricing: Readonly<Record<string, ModelPricing>>;
   readonly store: TraceStore;
   readonly readProductText: ProductTextReader;
+  readonly readEarlierRuns: EarlierRunReader;
   readonly now: () => Date;
   readonly publish: (pending: PendingEvent) => void;
   readonly log: (line: string) => void;
@@ -353,6 +354,7 @@ export class Tracer {
       pricing: this.deps.pricing,
       finished,
       cloudSessionUrl: this.cloudSessionUrl,
+      earlierRuns: this.deps.readEarlierRuns(),
     });
   }
 

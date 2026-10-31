@@ -32,6 +32,7 @@ function report(records: readonly TraceRecord[], entries: readonly TraceCostEntr
     pricing: { m: { inputPerMillion: 3, outputPerMillion: 15 } },
     finished: null,
     cloudSessionUrl: null,
+    earlierRuns: [],
     ...overrides,
   });
 }
