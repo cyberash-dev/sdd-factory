@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "partition": "todo-cli",
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "Define error codes and storage file access",
+      "covers": [
+        "todo-cli:POL-001",
+        "todo-cli:CTR-006",
+        "todo-cli:INV-001",
+        "todo-cli:INV-002",
+        "todo-cli:INV-004",
+        "todo-cli:BEH-003",
+        "todo-cli:BEH-004",
+        "todo-cli:BEH-017",
+        "todo-cli:BEH-018",
+        "todo-cli:BEH-019"
+      ],
+      "writes": ["src/errors/**", "src/store/**", "tests/errors/**", "tests/store/**"],
+      "dependsOn": [],
+      "designRefs": ["M-01", "M-02"],
+      "testBudget": { "maxTests": 53 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-002",
+      "title": "Parse command-line arguments into typed commands",
+      "covers": [
+        "todo-cli:BEH-002",
+        "todo-cli:BEH-013",
+        "todo-cli:BEH-014",
+        "todo-cli:BEH-015",
+        "todo-cli:POL-002"
+      ],
+      "writes": ["src/parse/**", "tests/parse/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-03"],
+      "testBudget": { "maxTests": 36 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-003",
+      "title": "Render list output and the usage text",
+      "covers": [
+        "todo-cli:CTR-002",
+        "todo-cli:CTR-005",
+        "todo-cli:BEH-005",
+        "todo-cli:BEH-006",
+        "todo-cli:BEH-007",
+        "todo-cli:BEH-016"
+      ],
+      "writes": ["src/read-commands/**", "tests/read-commands/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-04"],
+      "testBudget": { "maxTests": 38 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-004",
+      "title": "Execute add, done and rm against the storage file",
+      "covers": [
+        "todo-cli:CTR-001",
+        "todo-cli:CTR-003",
+        "todo-cli:CTR-004",
+        "todo-cli:BEH-001",
+        "todo-cli:BEH-008",
+        "todo-cli:BEH-009",
+        "todo-cli:BEH-010",
+        "todo-cli:BEH-011",
+        "todo-cli:BEH-012"
+      ],
+      "writes": ["src/write-commands/**", "tests/write-commands/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-05"],
+      "testBudget": { "maxTests": 63 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-005",
+      "title": "Wire the process entry, build and test scripts",
+      "covers": [
+        "todo-cli:INV-003",
+        "todo-cli:CON-001",
+        "todo-cli:CON-002",
+        "todo-cli:CON-003",
+        "todo-cli:CON-004",
+        "todo-cli:CON-005",
+        "todo-cli:CON-006"
+      ],
+      "writes": [
+        "src/cli.ts",
+        "src/index.ts",
+        "tests/cli/**",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "vitest.config.ts"
+      ],
+      "dependsOn": ["T-001", "T-002", "T-003", "T-004"],
+      "designRefs": ["M-06"],
+      "testBudget": { "maxTests": 33 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    }
+  ]
+}

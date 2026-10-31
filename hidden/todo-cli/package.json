@@ -1,0 +1,20 @@
+{
+  "name": "todo-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "agent-sdd": "2.1.1",
+    "typescript": "5.6.3",
+    "vitest": "2.1.4"
+  }
+}
