@@ -187,7 +187,6 @@ describe("approval probe on a scratch copy of the product", () => {
     const testDependent = [
       uncovered("todo:BEH-001"),
       { kind: "orphan_covers", id: "todo:BEH-999", file: "tests/orphan.test.ts", remediation: "remove the marker" },
-      { kind: "unapproved", id: "todo:ASM-001", partition: "todo", status: "proposed", file: "spec/spec.md", line: 70, remediation: "promote via `sdd approve` or move into sandbox_paths" },
       { kind: "aggregated_check", remediation: "baseline-dirty: 2 uncommitted path(s) inside discovery_scope", file: "src/" },
       { kind: "debt_budget_increased", id: "todo", remediation: "unmodeled budget grew" },
     ];
@@ -196,5 +195,15 @@ describe("approval probe on a scratch copy of the product", () => {
     const findings = await probeApproval(sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() }, APPROVALS);
 
     expect(findings).toEqual([]);
+  });
+  // @covers spec-stage:DLT-013
+  it("returns an unapproved violation as a finding naming the record left proposed", async () => {
+    const ws = await probeWorkspace();
+    const unapproved = { kind: "unapproved", id: "todo:BEH-004", partition: "todo", status: "proposed", file: "spec/spec.md", line: 70, remediation: "promote via `sdd approve` or move into sandbox_paths" };
+    const commands = recordingCommands({ finalize: FINALIZED, ready: readyResult(1, [unapproved, uncovered("todo:BEH-001")]) });
+
+    const findings = await probeApproval(sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() }, APPROVALS);
+
+    expect(findings).toEqual([{ kind: "unapproved", recordId: "todo:BEH-004", message: "promote via `sdd approve` or move into sandbox_paths" }]);
   });
 });

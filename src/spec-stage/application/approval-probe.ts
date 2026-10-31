@@ -11,8 +11,8 @@ export interface ProbeFinding {
   readonly message: string;
 }
 
-/* spec-stage:DLT-010: these depend on tests and git state that do not exist before the build. */
-const TEST_DEPENDENT_KINDS: ReadonlySet<string> = new Set(["uncovered", "orphan_covers", "unapproved", "aggregated_check", "debt_budget_increased"]);
+/* spec-stage:DLT-010, DLT-013: these depend on tests and git state that do not exist before the build; unapproved does not. */
+const TEST_DEPENDENT_KINDS: ReadonlySet<string> = new Set(["uncovered", "orphan_covers", "aggregated_check", "debt_budget_increased"]);
 
 async function scratchDirectory(runDir: string): Promise<string> {
   const parent = join(runDir, "tmp");

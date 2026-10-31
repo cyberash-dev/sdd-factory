@@ -111,7 +111,7 @@ describe("approval gate failure goes back to the analyst", () => {
       commands.productCalls.map((argv) => argv[0]),
       published,
       gate.includes('  target_ids: ["todo-cli:CTR-001"]\n  source: none\n  resolution: decide\n  required_change: "surface_member_drift: add record todo-cli:CTR-001 to members"'),
-    ]).toEqual([["lint"], [{ type: "spec.gate_failed", producer: "foreman", payload: { findingsPath: "spec/review/gate.md", detail: "approval_probe: surface_member_drift: add record todo-cli:CTR-001 to members" } }], true]);
+    ]).toEqual([["lint", "record"], [{ type: "spec.gate_failed", producer: "foreman", payload: { findingsPath: "spec/review/gate.md", detail: "approval_probe: surface_member_drift: add record todo-cli:CTR-001 to members" } }], true]);
   });
 
   // @covers spec-stage:DLT-011

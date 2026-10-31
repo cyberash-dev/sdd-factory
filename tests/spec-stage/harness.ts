@@ -69,13 +69,13 @@ export interface FakeCommands extends CommandRunner {
   readonly calls: string[][];
 }
 
-export function scriptedCommands(reply: (argv: readonly string[], call: number) => CommandResult): FakeCommands {
+export function scriptedCommands(reply: (argv: readonly string[], call: number, cwd: string) => CommandResult): FakeCommands {
   const calls: string[][] = [];
   return {
     calls,
-    async run(argv) {
+    async run(argv, cwd) {
       calls.push([...argv]);
-      return reply(argv, calls.length);
+      return reply(argv, calls.length, cwd);
     },
   };
 }
@@ -84,9 +84,35 @@ export const exitZero = (): CommandResult => ({ exitCode: 0, stdout: "", stderr:
 
 const READY_CLEAN: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"violations":[]}\n', stderr: "" };
 
+export interface ListedSpecRecord {
+  readonly id: string;
+  readonly file: string;
+}
+
+export function recordListReply(records: readonly ListedSpecRecord[], statusOf: (id: string) => string): CommandResult {
+  const listed = records.map((record) => ({ id: record.id, type: "Behavior", status: statusOf(record.id), title: null, file: record.file, line: 1 }));
+  return { exitCode: 0, stdout: `${JSON.stringify({ format_version: 1, count: listed.length, records: listed })}\n`, stderr: "" };
+}
+
 export function sddReplies(overrides: Readonly<Record<string, CommandResult>>): (argv: readonly string[]) => CommandResult {
-  const replies: Readonly<Record<string, CommandResult>> = { ready: READY_CLEAN, ...overrides };
+  const replies: Readonly<Record<string, CommandResult>> = { ready: READY_CLEAN, record: recordListReply([], () => "proposed"), ...overrides };
   return (argv) => replies[argv[0] ?? ""] ?? exitZero();
+}
+
+/* Like the real CLI, a record reads as approved once finalize has succeeded in its directory, unless it is one of stillProposed. */
+export function approvalReplies(records: readonly ListedSpecRecord[], overrides: Readonly<Record<string, CommandResult>>, stillProposed: readonly string[] = []): (argv: readonly string[], call: number, cwd: string) => CommandResult {
+  const replies = sddReplies(overrides);
+  const finalizedDirs = new Set<string>();
+  return (argv, _call, cwd) => {
+    if (argv[0] === "record") {
+      return recordListReply(records, (id) => (finalizedDirs.has(cwd) && !stillProposed.includes(id) ? "approved" : "proposed"));
+    }
+    const reply = replies(argv);
+    if (argv[0] === "finalize" && reply.exitCode === 0) {
+      finalizedDirs.add(cwd);
+    }
+    return reply;
+  };
 }
 
 export function sliceContext(workspace: StageWorkspace, roles: ApiRoleRunner, config: FactoryConfig = DEFAULT_CONFIG): SliceContext {

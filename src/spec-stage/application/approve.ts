@@ -11,6 +11,7 @@ import { renderGateFindings, type GateFailure } from "../domain/gate-findings.js
 import { specIntegrityProblems, specIntegrityWarnings } from "../domain/spec-records.js";
 import { probeApproval, type ProbeFinding } from "./approval-probe.js";
 import { repairSpecForApproval } from "./approval-repairs.js";
+import { listedRecords, sandboxPaths } from "./listed-records.js";
 import { concludeStage, outputTail, specBlocked, type StageDeps } from "./stage-deps.js";
 import { lintProductSpecWithFix } from "./spec-lint.js";
 
@@ -75,15 +76,33 @@ async function probeReport(slice: SliceContext, deps: StageDeps, approvals: read
   };
 }
 
-async function approveAndFinalize(slice: SliceContext, deps: StageDeps, approveAll: readonly string[], approveBaseline: readonly string[]): Promise<ApprovalOutcome> {
-  const productDir = slice.paths.productDir;
-  const all = await deps.commands.run(approveAll, productDir);
-  if (all.exitCode !== 0) {
-    return { kind: "failed", report: textReport("approve_failed", outputTail(all)) };
+/* spec-stage:DLT-013: one attestation per proposed record, BL-001 included; sdd finalize applies a pattern attestation in the first spec file it matches only. */
+async function proposedApprovals(slice: SliceContext, deps: StageDeps): Promise<readonly (readonly string[])[]> {
+  const records = await listedRecords(deps.commands, slice.paths.productDir);
+  return records.filter((record) => record.status === "proposed").map((record) => approveArgv(slice, record.id));
+}
+
+/* spec-stage:DLT-013: a record outside the sandbox that finalize left proposed fails the gate. */
+async function leftProposedReport(slice: SliceContext, deps: StageDeps): Promise<GateReport | null> {
+  const sandbox = await sandboxPaths(slice.paths.productDir, slice.slug);
+  const records = await listedRecords(deps.commands, slice.paths.productDir);
+  const leftIds = records.filter((record) => record.status === "proposed" && !sandbox.includes(record.file ?? "")).map((record) => record.id);
+  if (leftIds.length === 0) {
+    return null;
   }
-  const baseline = await deps.commands.run(approveBaseline, productDir);
-  if (baseline.exitCode !== 0 && !baseline.stdout.includes("no-id-match")) {
-    return { kind: "failed", report: textReport("approve_failed", outputTail(baseline)) };
+  return {
+    detail: `left_proposed_after_finalize: ${leftIds.join(", ")}`,
+    failures: leftIds.map((id) => recordGateFailure(id, `left_proposed_after_finalize: ${id} is still proposed after sdd finalize`)),
+  };
+}
+
+async function approveAndFinalize(slice: SliceContext, deps: StageDeps, approvals: readonly (readonly string[])[]): Promise<ApprovalOutcome> {
+  const productDir = slice.paths.productDir;
+  for (const argv of approvals) {
+    const approve = await deps.commands.run(argv, productDir);
+    if (approve.exitCode !== 0 && !approve.stdout.includes("no-id-match")) {
+      return { kind: "failed", report: textReport("approve_failed", outputTail(approve)) };
+    }
   }
   const finalize = await deps.commands.run(["finalize", "--format=json"], productDir);
   if (finalize.exitCode !== 0) {
@@ -120,17 +139,26 @@ async function reportGateFailure(context: EffectContext, slice: SliceContext, de
 
 export async function runApprove(_effect: Effect, context: EffectContext, slice: SliceContext, deps: StageDeps): Promise<void> {
   const specText = await repairSpecForApproval(slice, deps);
-  const approveAll = approveArgv(slice, `${slice.slug}:*`);
-  const approveBaseline = approveArgv(slice, `${slice.slug}:BL-001`);
-  const preApproval = (await lintReport(slice, deps, context)) ?? integrityReport(slice, specText) ?? (await probeReport(slice, deps, [approveAll, approveBaseline]));
+  const preApproval = (await lintReport(slice, deps, context)) ?? integrityReport(slice, specText);
   if (preApproval !== null) {
     await reportGateFailure(context, slice, deps, preApproval);
     return;
   }
-  const approval = await approveAndFinalize(slice, deps, approveAll, approveBaseline);
+  const approvals = await proposedApprovals(slice, deps);
+  const probed = await probeReport(slice, deps, approvals);
+  if (probed !== null) {
+    await reportGateFailure(context, slice, deps, probed);
+    return;
+  }
+  const approval = await approveAndFinalize(slice, deps, approvals);
   if (approval.kind === "failed") {
     await removeQueuedPlan(slice.paths.productDir);
     await reportGateFailure(context, slice, deps, approval.report);
+    return;
+  }
+  const leftProposed = await leftProposedReport(slice, deps);
+  if (leftProposed !== null) {
+    await reportGateFailure(context, slice, deps, leftProposed);
     return;
   }
   /* Records are approved and frozen here (spec-stage:BEH-004), so a redraft cannot repair them. */
