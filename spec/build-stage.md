@@ -2831,6 +2831,62 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-012
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T07:23:36.793Z
+    change_request: "operator decision 2026-10-31: raise the test-writer rework cap to 2"
+    scope: first-time-approval
+partition_id: build-stage
+title: a task's tests may be re-authored twice before the test-writer cap fails it
+target_ids:
+  - build-stage:CST-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  build-stage:CST-002 fails a task on its second counted test-writer
+  rework. On 2026-10-30 and 2026-10-31 that ended four runs (todo T-004,
+  todo T-003 twice, room booking T-006); in room booking run
+  20261031-021626 the reviewer correctly rejected brittle tests twice
+  and the resumed run re-authored valid tests with one more attempt.
+  Each ended run cost a resume, which the hackathon scores against
+  autonomy, while one more test-writer attempt costs about four minutes.
+  Change: the shipped profiles factory.config.json,
+  factory.config.target.json and factory.config.example.json carry
+  caps.testWriterRework 2, so a task's tests are re-authored at most
+  twice and the third counted rework or rejection fails the task with
+  cap_exhausted test-writer. The rule keeps reading the configured
+  value; the built-in default stays 1 like the other widened caps, and
+  design-driven restarts stay outside the cap (build-stage:DLT-011).
+tests_old_behavior:
+  - a counted rework beyond the configured cap still ends in task.failed cap_exhausted test-writer
+tests_new_behavior:
+  - to:build-stage:CST-002
+test_obligation:
+  predicate: |
+    Every shipped profile loads with caps.testWriterRework equal to 2;
+    under a configured cap of 2 a task whose tests were re-authored once
+    restarts its lane on the next counted rejection, and a task whose
+    tests were re-authored twice fails with cap_exhausted test-writer.
+  test_template: unit
+  boundary_classes:
+    - second counted rework
+    - third counted rework
+    - each shipped profile
+  failure_scenarios:
+    - a third test-writer rework allowed
+    - a shipped profile still carrying cap 1
+---
+```
+
 ---
 
 ## 16. Implementation bindings

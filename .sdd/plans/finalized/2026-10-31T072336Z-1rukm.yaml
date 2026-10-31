@@ -1,0 +1,10 @@
+plan_id: 2026-10-31T072336Z-1rukm
+created_at: 2026-10-31T07:23:36.794Z
+pending_attestations:
+  - id: build-stage:DLT-012
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T07:23:36.793Z
+    change_request: "operator decision 2026-10-31: raise the test-writer rework cap to 2"
+    scope: first-time-approval
+    target_status: approved
