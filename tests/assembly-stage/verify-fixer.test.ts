@@ -24,6 +24,7 @@ interface ScenarioInput {
   readonly tsc: (productDir: string) => Promise<CommandResult>;
   readonly vitest: (productDir: string) => string;
   readonly install?: () => CommandResult;
+  readonly build?: (productDir: string) => Promise<CommandResult>;
   readonly fixerWrites: Readonly<Record<string, string>>;
   readonly fixerOverrides?: Partial<CliRoleOutcome>;
 }
@@ -64,7 +65,7 @@ async function runFixerScenario(input: ScenarioInput): Promise<FixerScenario> {
   const root = await tempDir("assembly-fixer");
   const productDir = join(root, "product");
   const baseSha = await initRepo(productDir, "integration", {
-    "package.json": '{"name":"todo-cli","version":"0.0.0","private":true}\n',
+    "package.json": input.build === undefined ? '{"name":"todo-cli","version":"0.0.0","private":true}\n' : '{"name":"todo-cli","version":"0.0.0","private":true,"scripts":{"build":"tsc"}}\n',
     "spec/spec.md": baselineSpec(SLUG, "0".repeat(40), "0".repeat(64)),
     "src/answer.ts": BROKEN_SOURCE,
   });
@@ -75,6 +76,9 @@ async function runFixerScenario(input: ScenarioInput): Promise<FixerScenario> {
     }
     if (line.startsWith("npx tsc")) {
       return input.tsc(productDir);
+    }
+    if (line === "npm run build" && input.build !== undefined) {
+      return input.build(productDir);
     }
     if (line.startsWith("npx vitest")) {
       const report = input.vitest(productDir);
@@ -231,5 +235,25 @@ describe("assembly.verify simple-fixer on a mechanical red step", () => {
     const scenario = await runFixerScenario({ tsc: async () => ok(), vitest: () => vitestReport({ passing: ["x"] }), install: () => failed(1, "npm ERR! code ENOTFOUND registry.npmjs.org"), fixerWrites: {} });
 
     expect([scenario.fixerRequests.length, stepCommands(scenario.runner), eventsOf(scenario.context)]).toEqual([0, ["npm ci --prefer-offline", "npm ci --offline"], ["assembly.verified install red"]]);
+  });
+
+  // @covers assembly-stage:DLT-005
+  it("runs the simple-fixer with the typecheck trigger on a red build and publishes the red build after two unfixed runs", async () => {
+    const scenario = await runFixerScenario({ ...neverRepairedTypecheck(), tsc: async () => ok(), build: typecheckOf });
+
+    expect(eventsOf(scenario.context)).toEqual([
+      "assembly.verified install green",
+      "assembly.verified typecheck green",
+      "fix.attempted assembly_typecheck unfixed",
+      "fix.attempted assembly_typecheck unfixed",
+      "assembly.verified build red",
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-005
+  it("restarts the sequence at install after the fixer repairs a red build and runs the build again before the tests", async () => {
+    const scenario = await runFixerScenario({ ...repairedTypecheck(), tsc: async () => ok(), build: typecheckOf });
+
+    expect(stepCommands(scenario.runner)).toEqual(["npm ci --prefer-offline", "npx tsc --noEmit", "npm run build", "npm run build", "npm ci --prefer-offline", "npx tsc --noEmit", "npm run build", "npx vitest run", "npx sdd token", "npx sdd ready"]);
   });
 });

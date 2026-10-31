@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import YAML from "yaml";
 import { verifyEffect } from "../../src/assembly-stage/application/verify.js";
-import type { CommandInvocation } from "../../src/assembly-stage/ports/outbound/command-runner.js";
-import { writeTextAtomic } from "../../src/shared/fs/text.js";
+import type { CommandInvocation, CommandResult } from "../../src/assembly-stage/ports/outbound/command-runner.js";
+import { readTextOrNull, writeTextAtomic } from "../../src/shared/fs/text.js";
 import { baselineSpec, collectingContext, commandLine, coversMarker, commitFiles, failed, fakeCommandRunner, git, initRepo, ok, runState, sddReadyReport, sliceContext, SLUG, taskState, tempDir, tokenEnvelope, vitestReport, type CommandScript, type FakeCommandRunner } from "./support.js";
 
 const STALE_SHA = "0".repeat(40);
@@ -23,10 +24,15 @@ interface Fixture {
   readonly baseSha: string;
 }
 
-async function productRepo(): Promise<Fixture> {
+const BUILD_PRODUCT_FILES = {
+  ...PRODUCT_FILES,
+  "package.json": '{"name":"todo-cli","version":"0.0.0","private":true,"scripts":{"test":"node --test tests/","build":"tsc -p tsconfig.build.json"}}\n',
+};
+
+async function productRepo(files: Readonly<Record<string, string>> = PRODUCT_FILES): Promise<Fixture> {
   const root = await tempDir("assembly-verify");
   const productDir = join(root, "product");
-  const baseSha = await initRepo(productDir, "integration", PRODUCT_FILES);
+  const baseSha = await initRepo(productDir, "integration", files);
   return { root, productDir, baseSha };
 }
 
@@ -68,6 +74,14 @@ async function runVerify(fixture: Fixture, runner: FakeCommandRunner, tasks: Par
 
 function stepsOf(context: { readonly published: readonly { readonly type: string; readonly payload: Readonly<Record<string, unknown>> }[] }): readonly string[] {
   return context.published.map((event) => `${event.type} ${String(event.payload["step"] ?? event.payload["target"])} ${String(event.payload["result"] ?? event.payload["reason"])}`);
+}
+
+function withBuild(build: CommandResult, script: CommandScript): CommandScript {
+  return (invocation) => (commandLine(invocation) === "npm run build" ? build : script(invocation));
+}
+
+function stepCommands(runner: FakeCommandRunner): readonly string[] {
+  return runner.calls.filter((call) => call.argv[0] === "npm" || call.argv[0] === "npx").map((call) => call.argv.slice(0, 3).join(" "));
 }
 
 describe("assembly.verify straggler merge", () => {
@@ -338,5 +352,71 @@ describe("assembly.verify verification sequence", () => {
 
     delete process.env["ASSEMBLY_TEST_TOKEN"];
     expect(await readFile(join(fixture.root, "run/handoffs/assembly/round-1/install.log"), "utf8")).toBe("--- stdout ---\n\n--- stderr ---\nauth failed with [REDACTED]\n");
+  });
+});
+
+describe("assembly.verify build step", () => {
+  // @covers assembly-stage:DLT-005
+  // @covers assembly-stage:BEH-003
+  it("runs npm run build after the typecheck and before the tests when package.json defines a build script", async () => {
+    const fixture = await productRepo(BUILD_PRODUCT_FILES);
+    const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([stepCommands(runner), stepsOf(context)]).toEqual([
+      ["npm ci --prefer-offline", "npx tsc --noEmit", "npm run build", "npx vitest run", "npx sdd token", "npx sdd ready"],
+      ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified build green", "assembly.verified test green", "assembly.verified sdd_ready green"],
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-005
+  // @covers assembly-stage:CTR-001
+  it("lists the build step between typecheck and test in the verification entries of the committed report", async () => {
+    const fixture = await productRepo(BUILD_PRODUCT_FILES);
+    const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
+
+    await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    const report = await git(fixture.productDir, "show", "integration:assembly/report.md");
+    const frontmatter: unknown = YAML.parse(report.split("\n---\n")[0]?.replace(/^---\n/, "") ?? "");
+    expect(frontmatter).toMatchObject({
+      verification: [
+        { step: "install" },
+        { step: "typecheck" },
+        { round: 1, step: "build", argv: ["npm", "run", "build"], exit_code: 0, result: "green", evidence_path: join(fixture.root, "run/handoffs/assembly/round-1/build.log") },
+        { step: "test" },
+        { step: "sdd_ready" },
+      ],
+    });
+  });
+
+  // @covers assembly-stage:DLT-005
+  // @covers assembly-stage:BEH-003
+  it("stops after a red build with the captured build output and never runs the tests", async () => {
+    const fixture = await productRepo(BUILD_PRODUCT_FILES);
+    const runner = fakeCommandRunner(withBuild(failed(2, "", "src/index.ts(3,7): error TS2322"), allGreen(vitestReport({ passing: ["x"] }))));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    const evidencePath = join(fixture.root, "run/handoffs/assembly/round-1/build.log");
+    expect([context.published.at(-1)?.payload, stepCommands(runner).some((command) => command.startsWith("npx vitest")), await readTextOrNull(evidencePath)]).toEqual([
+      { result: "red", step: "build", evidencePath, failingCovers: [] },
+      false,
+      "--- stdout ---\nsrc/index.ts(3,7): error TS2322\n--- stderr ---\n\n",
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-005
+  it("runs no build command for a product whose package.json defines no build script", async () => {
+    const fixture = await productRepo();
+    const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([stepCommands(runner).filter((command) => command.startsWith("npm ")), stepsOf(context)]).toEqual([
+      ["npm ci --prefer-offline"],
+      ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified test green", "assembly.verified sdd_ready green"],
+    ]);
   });
 });

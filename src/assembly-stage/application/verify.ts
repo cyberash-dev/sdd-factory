@@ -15,7 +15,7 @@ import { repairSurfaceMembers } from "../../shared/sdd/surface-members.js";
 import { refreshBaselineBlock } from "../domain/baseline-block.js";
 import { failingCoversOf } from "../domain/sdd-ready-routing.js";
 import { parseTokenEnvelope } from "../domain/sdd-token.js";
-import { INSTALL_ARGV, NETWORK_FAILURE, OFFLINE_INSTALL_ARGV, VERIFICATION_SEQUENCE, VITEST_REPORT_FILE, stepArgv, type AssemblyStep } from "../domain/verification-steps.js";
+import { definesBuildScript, INSTALL_ARGV, NETWORK_FAILURE, OFFLINE_INSTALL_ARGV, VITEST_REPORT_FILE, stepArgv, verificationSequence, type AssemblyStep } from "../domain/verification-steps.js";
 import { parseVitestReport } from "../domain/vitest-report.js";
 import type { Argv, CommandResult, CommandRunner } from "../ports/outbound/command-runner.js";
 import { captureCommand, commandLog, evidenceDirFor } from "./evidence.js";
@@ -25,6 +25,7 @@ import { REPORT_FILE, updateLedger, writeProductReport, type LedgerIdentity } fr
 const INTEGRATION_BRANCH = "integration";
 const SDD_READY_REPORT_FILE = "sdd_ready.json";
 const SPEC_FILE = join("spec", "spec.md");
+const PACKAGE_FILE = "package.json";
 const ROLE_WRITTEN_DIRS = ["design", "spec"] as const;
 const ROLE_WRITTEN_COMMIT = "assembly: role-written design and spec files";
 const MEMBERSHIP_REPAIR_COMMIT = "spec: surface membership repair";
@@ -125,11 +126,12 @@ async function runInstall(run: VerifyRun): Promise<StepOutcome> {
   return plainOutcome(run, entryOf(run, "install", argv, result, result.exitCode === 0 ? "green" : "red", evidencePath), result, isNetworkFailure ? null : "assembly_install");
 }
 
-async function runTypecheck(run: VerifyRun): Promise<StepOutcome> {
-  const argv = stepArgv("typecheck", run.evidenceDir);
+/* assembly-stage:DLT-005: a red build is a mechanical failure and takes the simple-fixer trigger of a red typecheck. */
+async function runCompileStep(run: VerifyRun, step: "typecheck" | "build"): Promise<StepOutcome> {
+  const argv = stepArgv(step, run.evidenceDir);
   const result = await execute(run, argv);
-  const evidencePath = await captureCommand(run.evidenceDir, "typecheck", result, run.secrets);
-  return plainOutcome(run, entryOf(run, "typecheck", argv, result, result.exitCode === 0 ? "green" : "red", evidencePath), result, "assembly_typecheck");
+  const evidencePath = await captureCommand(run.evidenceDir, step, result, run.secrets);
+  return plainOutcome(run, entryOf(run, step, argv, result, result.exitCode === 0 ? "green" : "red", evidencePath), result, "assembly_typecheck");
 }
 
 function productRelative(run: VerifyRun, file: string): string {
@@ -230,7 +232,8 @@ function runStep(run: VerifyRun, step: AssemblyStep): Promise<StepOutcome> {
     case "install":
       return runInstall(run);
     case "typecheck":
-      return runTypecheck(run);
+    case "build":
+      return runCompileStep(run, step);
     case "test":
       return runTest(run);
     case "sdd_ready":
@@ -317,7 +320,8 @@ async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutco
 }
 
 async function runSequence(run: VerifyRun): Promise<"restart" | "terminated" | "done"> {
-  for (const step of VERIFICATION_SEQUENCE) {
+  const hasBuildScript = definesBuildScript(await readTextOrNull(join(run.slice.paths.productDir, PACKAGE_FILE)));
+  for (const step of verificationSequence(hasBuildScript)) {
     let outcome = await runStep(run, step);
     if (outcome.fixTrigger !== null) {
       const unrepaired = await repairStep(run, step, outcome, outcome.fixTrigger);
