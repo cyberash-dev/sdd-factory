@@ -1630,6 +1630,66 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: assembly-stage:DLT-006
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:56:43.762Z
+    change_request: missing npm start on the room booking product; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: assembly-stage
+title: the build step first checks that every npm script the source spec names exists
+target_ids:
+  - assembly-stage:BEH-003
+  - assembly-stage:DLT-005
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The room booking spec says "Start it with npm start after npm run
+  build"; the published product had no start script, its tests started
+  the server in-process, and nothing in the sequence noticed. The
+  acceptance runs the commands the source spec names verbatim. Change
+  to the build step of DLT-005: before `npm run build`, the assembler
+  collects every `npm start`, `npm test` and `npm run <name>` the
+  operator's source spec (the Markdown the run was launched with)
+  mentions, and checks that the product package.json defines scripts
+  for them. A missing script makes the build step red without running
+  the build: the evidence lists the missing names, and the round routes
+  task.rework{target: implementer, reason: "missing npm scripts named by
+  the spec: <names>"} to the task whose writes contain package.json
+  (no fixer, no triage); without such a task, triage applies. When the
+  product has no scripts.build but the spec names other scripts, the
+  check still runs as the build step.
+tests_old_behavior:
+  - a product defining every named script runs npm run build as DLT-005 states
+tests_new_behavior:
+  - to:assembly-stage:BEH-003
+test_obligation:
+  predicate: |
+    Given a source spec naming "npm start" and "npm run build" and a
+    package.json defining only build, the build step is red with
+    evidence naming start, npm run build is not run, and task.rework
+    {target: implementer} with a reason naming start goes to the task
+    whose writes contain package.json; given both scripts defined, npm
+    run build runs; given a spec naming no npm command and no
+    scripts.build, no build step runs.
+  test_template: integration
+  boundary_classes:
+    - missing named script
+    - all named scripts present
+    - spec naming no command
+  failure_scenarios:
+    - a product published without a script its spec runs
+---
+```
+
 ---
 
 ## 16. Implementation bindings
