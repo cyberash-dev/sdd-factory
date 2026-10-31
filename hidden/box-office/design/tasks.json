@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "partition": "box-office",
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "Provide the error vocabulary and request helpers",
+      "covers": [
+        "box-office:POL-001",
+        "box-office:POL-002",
+        "box-office:INV-004",
+        "box-office:INV-008"
+      ],
+      "writes": ["src/core/**", "tests/core/**"],
+      "dependsOn": [],
+      "designRefs": ["M-01"],
+      "testBudget": { "maxTests": 30 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-002",
+      "title": "Store records, derive availability and serve waitlists",
+      "covers": [
+        "box-office:CST-001",
+        "box-office:CST-004",
+        "box-office:INV-003",
+        "box-office:INV-005",
+        "box-office:INV-007",
+        "box-office:INV-009",
+        "box-office:INV-010",
+        "box-office:BEH-018",
+        "box-office:BEH-027",
+        "box-office:BEH-028",
+        "box-office:SCN-001",
+        "box-office:SCN-004"
+      ],
+      "writes": ["src/store/**", "tests/store/**"],
+      "dependsOn": [],
+      "designRefs": ["M-02"],
+      "testBudget": { "maxTests": 74 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-003",
+      "title": "Serve registration, sessions and the caller account",
+      "covers": [
+        "box-office:CTR-001",
+        "box-office:CTR-002",
+        "box-office:CTR-003",
+        "box-office:BEH-001",
+        "box-office:BEH-002",
+        "box-office:BEH-003",
+        "box-office:BEH-004",
+        "box-office:BEH-006",
+        "box-office:INV-001"
+      ],
+      "writes": ["src/accounts/**", "tests/accounts/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-03"],
+      "testBudget": { "maxTests": 68 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-004",
+      "title": "Serve event creation, listing, cancel and report",
+      "covers": [
+        "box-office:CTR-004",
+        "box-office:CTR-005",
+        "box-office:CTR-006",
+        "box-office:CTR-007",
+        "box-office:CTR-015",
+        "box-office:BEH-007",
+        "box-office:BEH-008",
+        "box-office:BEH-009",
+        "box-office:BEH-010",
+        "box-office:BEH-011",
+        "box-office:BEH-012",
+        "box-office:BEH-013",
+        "box-office:BEH-029",
+        "box-office:INV-002",
+        "box-office:SCN-003"
+      ],
+      "writes": ["src/events/**", "tests/events/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-04"],
+      "testBudget": { "maxTests": 80 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-005",
+      "title": "Serve checkout, payment, cancellation and order reads",
+      "covers": [
+        "box-office:CTR-008",
+        "box-office:CTR-009",
+        "box-office:CTR-010",
+        "box-office:CTR-011",
+        "box-office:CTR-012",
+        "box-office:BEH-014",
+        "box-office:BEH-015",
+        "box-office:BEH-016",
+        "box-office:BEH-017",
+        "box-office:BEH-019",
+        "box-office:BEH-020",
+        "box-office:BEH-021",
+        "box-office:BEH-022",
+        "box-office:BEH-025",
+        "box-office:INV-006",
+        "box-office:SCN-002"
+      ],
+      "writes": ["src/orders/**", "tests/orders/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-05"],
+      "testBudget": { "maxTests": 80 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-006",
+      "title": "Serve discount code creation for an event",
+      "covers": [
+        "box-office:CTR-013",
+        "box-office:BEH-023",
+        "box-office:BEH-024"
+      ],
+      "writes": ["src/discounts/**", "tests/discounts/**"],
+      "dependsOn": ["T-001", "T-002"],
+      "designRefs": ["M-06"],
+      "testBudget": { "maxTests": 47 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-007",
+      "title": "Wire the route table, waitlist endpoints and start",
+      "covers": [
+        "box-office:CTR-014",
+        "box-office:BEH-005",
+        "box-office:BEH-026",
+        "box-office:BEH-030",
+        "box-office:BEH-031",
+        "box-office:INV-011",
+        "box-office:CST-002",
+        "box-office:CST-003",
+        "box-office:CST-005"
+      ],
+      "writes": [
+        "src/app/**",
+        "src/waitlist/**",
+        "src/index.ts",
+        "tests/app/**",
+        "tests/waitlist/**",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "vitest.config.ts"
+      ],
+      "dependsOn": ["T-001", "T-002", "T-003", "T-004", "T-005", "T-006"],
+      "designRefs": ["M-07", "M-08"],
+      "testBudget": { "maxTests": 80 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    }
+  ]
+}
