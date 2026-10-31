@@ -41,7 +41,8 @@
       "triage": "medium",
       "test-writer": "medium",
       "implementer": "medium",
-      "simple-fixer": "medium"
+      "simple-fixer": "medium",
+      "spec-critic": "medium"
     }
   },
   "pricing": {

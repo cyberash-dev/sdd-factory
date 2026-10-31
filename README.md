@@ -46,7 +46,7 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 | Stage | Role | Model (`factory.config.json`) | Runs as | Concurrency |
 |---|---|---|---|---|
 | spec | spec-analyst | `deepseek/deepseek-v4.1-flash-1017`, effort medium | Mozaik agent | loops on `sdd lint` (cap 8) |
-| spec | spec-critic | `z-ai/glm-5.3-flash:nitro` | Mozaik agent, fresh context | after each draft (cap 4 rounds) |
+| spec | spec-critic | `openai/gpt-6.1-terra`, effort medium | Mozaik agent, fresh context, another vendor than the analyst | after each draft (cap 4 rounds) |
 | spec | foreman | none | deterministic Mozaik participant | runs `sdd approve` + `sdd finalize` |
 | design | architect | DeepSeek V4.1 Flash, effort medium | Mozaik agent | in parallel with verification-designer |
 | design | verification-designer | DeepSeek V4.1 Flash, effort high | Mozaik agent | in parallel with architect |
@@ -66,7 +66,7 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 4. **Assembly.** The assembler runs `npm ci`, `tsc`, `vitest` and `sdd ready` on `integration` and routes an attributed failure back to the owning lane, an unattributed one to triage.
 5. **Publication.** Product tree plus `trace/` to `hidden/<slug>/`, commit, push.
 
-The critic and the reviewer run on a different vendor's model than the roles whose output they judge, so judge and author share fewer blind spots.
+The critic and the reviewer run on a different vendor's model than the roles whose output they judge, so judge and author share fewer blind spots. The critic moved from GLM-5.3 Flash to GPT-6.1 Terra after micro-evals on the critic's own rules: GLM passed 20 of 25 calls, every failure a stall at its 32k output cap, at 24 to 207 s per call; Terra passed 25 of 25 at 8 to 12 s per call and a similar cost per call.
 
 ## How agents run concurrently
 
