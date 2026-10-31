@@ -1,70 +1,9 @@
 import YAML from "yaml";
+import { parseSpecRecords, stripDocumentMarkers, YAML_FENCE, type SpecRecord } from "../../shared/sdd/spec-records.js";
 import { isRecord, isStringArray } from "./guards.js";
 
-export interface SpecRecord {
-  readonly id: string;
-  readonly type: string;
-  readonly fields: Readonly<Record<string, unknown>>;
-}
-
-const YAML_FENCE = /^```ya?ml\s*\n([\s\S]*?)\n```/gm;
-
-const CANONICAL_TYPES = [
-  "Partition",
-  "BrownfieldBaseline",
-  "Surface",
-  "Behavior",
-  "Invariant",
-  "Contract",
-  "Scenario",
-  "NFR",
-  "Constraint",
-  "Policy",
-  "Migration",
-  "Delta",
-  "GeneratedArtifact",
-  "ExternalDependency",
-  "LocalizationContract",
-  "ImplementationBinding",
-  "Open-Q",
-  "ASSUMPTION",
-] as const;
-
-const TYPE_ALIASES: Readonly<Record<string, string>> = { openquestion: "Open-Q", openq: "Open-Q" };
-
-function typeKey(type: string): string {
-  return type.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-/* sdd lint accepts alternative spellings of the template names; records are compared by their canonical type. */
-export function canonicalRecordType(type: string): string {
-  const key = typeKey(type);
-  return TYPE_ALIASES[key] ?? CANONICAL_TYPES.find((candidate) => typeKey(candidate) === key) ?? type;
-}
-
-function stripDocumentMarkers(body: string): string {
-  return body
-    .split("\n")
-    .filter((line) => line.trim() !== "---")
-    .join("\n");
-}
-
-export function parseSpecRecords(specText: string): readonly SpecRecord[] {
-  const records: SpecRecord[] = [];
-  for (const match of specText.matchAll(YAML_FENCE)) {
-    let parsed: unknown;
-    try {
-      parsed = YAML.parse(stripDocumentMarkers(match[1] ?? ""));
-    } catch {
-      continue;
-    }
-    if (!isRecord(parsed) || typeof parsed["id"] !== "string" || typeof parsed["type"] !== "string") {
-      continue;
-    }
-    records.push({ id: parsed["id"], type: canonicalRecordType(parsed["type"]), fields: parsed });
-  }
-  return records;
-}
+export { parseSpecRecords, type SpecRecord } from "../../shared/sdd/spec-records.js";
+export { repairSurfaceMembers } from "../../shared/sdd/surface-members.js";
 
 function idsOf(records: readonly SpecRecord[], type: string): readonly string[] {
   return records.filter((record) => record.type === type).map((record) => record.id);
@@ -136,48 +75,6 @@ function surfaceProblems(records: readonly SpecRecord[]): readonly string[] {
   return idsOf(records, "Contract")
     .filter((contractId) => !memberIds.includes(contractId))
     .map((contractId) => `${contractId} is not a member of ${surfaces[0]?.id ?? "the Surface"}`);
-}
-
-export interface SurfaceRepair {
-  readonly surfaceId: string;
-  readonly added: readonly string[];
-  readonly text: string;
-}
-
-const MEMBERS_FIELD = /^members:[^\n]*(?:\n[ \t]+-[^\n]*)*/m;
-
-function fenceOfRecord(specText: string, id: string): RegExpExecArray | null {
-  for (const match of specText.matchAll(YAML_FENCE)) {
-    if (new RegExp(`^id:\\s*${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m").test(match[1] ?? "")) {
-      return match;
-    }
-  }
-  return null;
-}
-
-/* spec-stage:DLT-004: the single Surface lists every Contract; a missing id is appended in record order, nothing else moves. */
-export function repairSurfaceMembers(specText: string): SurfaceRepair | null {
-  const records = parseSpecRecords(specText);
-  const surfaces = records.filter((record) => record.type === "Surface");
-  const surface = surfaces[0];
-  if (surfaces.length !== 1 || surface === undefined) {
-    return null;
-  }
-  const members = surface.fields["members"];
-  const memberIds = isStringArray(members) ? members : [];
-  const added = idsOf(records, "Contract").filter((contractId) => !memberIds.includes(contractId));
-  if (added.length === 0) {
-    return { surfaceId: surface.id, added, text: specText };
-  }
-  const fence = fenceOfRecord(specText, surface.id);
-  const body = fence?.[1];
-  if (fence === null || body === undefined) {
-    return null;
-  }
-  const rendered = ["members:", ...[...memberIds, ...added].map((memberId) => `  - ${memberId}`)].join("\n");
-  const repairedBody = MEMBERS_FIELD.test(body) ? body.replace(MEMBERS_FIELD, rendered) : `${body}\n${rendered}`;
-  const start = fence.index + fence[0].indexOf(body);
-  return { surfaceId: surface.id, added, text: `${specText.slice(0, start)}${repairedBody}${specText.slice(start + body.length)}` };
 }
 
 /* spec-stage:DLT-005: sdd lint skips a fence its yaml parser rejects; the factory reports it so the author repairs it. */

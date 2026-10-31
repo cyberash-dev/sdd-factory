@@ -32,7 +32,7 @@ async function decideByDefault(slice: SliceContext, specPath: string): Promise<s
   return next;
 }
 
-/* spec-stage:DLT-004: a Contract absent from the single Surface's members is appended; zero or several Surfaces stay for the integrity check. */
+/* spec-stage:DLT-004, DLT-007: a Contract or a surface_ref record absent from the single Surface's members is appended; zero or several Surfaces stay for the integrity check. */
 async function repairMembers(slice: SliceContext, specPath: string, specText: string): Promise<string> {
   const repair = repairSurfaceMembers(specText);
   if (repair === null || repair.added.length === 0) {
