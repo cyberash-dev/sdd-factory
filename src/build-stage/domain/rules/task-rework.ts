@@ -2,7 +2,7 @@ import type { TransitionRule, TransitionResult } from "../../../bus/domain/trans
 import { withCriticAttempt, type RunState, type TaskState } from "../../../bus/domain/run-state.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { PayloadFieldError, stringField, stringOrNullField } from "../payload.js";
-import { capExhausted, designReworkAttempt, findingTextOf, foreman, laneEffect, specAssumeEffect, specIdsOf, tasksCovering, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
+import { capExhausted, countedTestWriterAttempts, designReworkAttempt, findingTextOf, foreman, laneEffect, specAssumeEffect, specIdsOf, tasksCovering, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
 
 function implementerRestart(state: RunState, task: TaskState, taskId: string, reworkFinding: ReworkFinding, lastEvent: string): TransitionResult {
   const attempt = task.attempts.implementer + 1;
@@ -10,12 +10,18 @@ function implementerRestart(state: RunState, task: TaskState, taskId: string, re
   return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.implementer, { taskId, attempt, reworkFinding })] };
 }
 
+function isDesignRestartReason(reason: string): boolean {
+  return reason.startsWith("architect_repair") || reason === "planner_recut";
+}
+
 function laneRestart(state: RunState, task: TaskState, taskId: string, caps: RuleDeps["caps"], reworkFinding: ReworkFinding, lastEvent: string): TransitionResult {
-  if (task.attempts.testWriter > caps.testWriterRework) {
+  const isDesignRestart = isDesignRestartReason(reworkFinding.reason);
+  if (!isDesignRestart && countedTestWriterAttempts(task) > caps.testWriterRework) {
     return { state: withTask(state, taskId, { ...task, lastEvent }), emits: [capExhausted(taskId, "test-writer")], effects: [] };
   }
   const attempt = task.attempts.testWriter + 1;
-  const next = { ...task, status: "tests_pending" as const, attempts: { ...task.attempts, testWriter: attempt }, implementerAtRestart: task.attempts.implementer, testsSha: null, implSha: null, lastEvent };
+  const designRestarts = isDesignRestart ? { designRestarts: (task.designRestarts ?? 0) + 1 } : {};
+  const next = { ...task, ...designRestarts, status: "tests_pending" as const, attempts: { ...task.attempts, testWriter: attempt }, implementerAtRestart: task.attempts.implementer, testsSha: null, implSha: null, lastEvent };
   return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.restartLane, { taskId, attempt, reworkFinding })] };
 }
 

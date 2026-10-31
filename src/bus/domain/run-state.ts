@@ -44,6 +44,8 @@ export interface TaskState {
   readonly status: TaskStatus;
   readonly attempts: TaskAttempts;
   readonly implementerAtRestart?: number;
+  /* build-stage:DLT-011: test-writer restarts caused by an architect repair or a planner re-cut; absent until the first one. */
+  readonly designRestarts?: number;
   readonly handoffReruns: Readonly<Record<string, number>>;
   readonly baseSha: string | null;
   readonly testsSha: string | null;

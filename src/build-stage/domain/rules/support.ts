@@ -45,6 +45,11 @@ export function implementerAttemptsSinceRestart(task: TaskState): number {
   return task.attempts.implementer - (task.implementerAtRestart ?? 0);
 }
 
+/* build-stage:DLT-011: design restarts re-author the tests without counting toward CST-002. */
+export function countedTestWriterAttempts(task: TaskState): number {
+  return task.attempts.testWriter - (task.designRestarts ?? 0);
+}
+
 export function implementerRework(task: TaskState, taskId: string, caps: Caps, reason: string, findingPath: string | null): PendingEvent {
   if (implementerAttemptsSinceRestart(task) >= caps.implementerAttempts) {
     return capExhausted(taskId, "implementer");
