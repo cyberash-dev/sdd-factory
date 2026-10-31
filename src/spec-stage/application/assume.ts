@@ -35,6 +35,22 @@ function taskFailed(taskId: string, reason: "cap_exhausted" | "unparseable_hando
   return { type: "task.failed", producer: "foreman", payload: { taskId, reason, detail } };
 }
 
+/* build-stage:DLT-014: a review-mode route runs only after task.verified{green}, so a failed assumption step approves on that evidence. */
+function assumptionStepFailed(context: EffectContext, slice: SliceContext, taskId: string, reason: "unparseable_handoff" | "blocked", detail: string): void {
+  const task = context.state.tasks[taskId];
+  const hasGreenEvidence = task !== undefined && task.status === "review_pending" && task.implSha !== null;
+  if (!hasGreenEvidence) {
+    context.publish(taskFailed(taskId, reason, detail));
+    return;
+  }
+  slice.log(`${taskId} approved on green evidence: contract route minted no assumption, review findings kept as advisory`);
+  context.publish({
+    type: "task.reviewed",
+    producer: "foreman",
+    payload: { taskId, decision: "advisory_only", target: "none", reportPath: "", specIds: [], findingText: `contract route minted no assumption: ${detail}` },
+  });
+}
+
 function firstOf(values: readonly string[], label: string): string {
   const first = values[0];
   if (first === undefined) {
@@ -48,6 +64,7 @@ export async function runAssume(effect: Effect, context: EffectContext, slice: S
   const taskIds = effectStrings(effect, "taskIds");
   const finding = effectString(effect, "finding");
   const firstTask = firstOf(taskIds, "taskId");
+  const originTask = Object.hasOwn(effect, "taskId") ? effectString(effect, "taskId") : firstTask;
   firstOf(specIds, "specId");
   const requestCounts = specIds.map((id) => context.state.assumptionsByRecord[id] ?? 0);
   if (requestCounts.some((count) => count > slice.config.caps.criticAssumptionsPerId)) {
@@ -95,11 +112,11 @@ export async function runAssume(effect: Effect, context: EffectContext, slice: S
     },
   });
   if (outcome.kind === "aborted") {
-    context.publish(taskFailed(firstTask, "blocked", outcome.error));
+    assumptionStepFailed(context, slice, originTask, "blocked", outcome.error);
     return;
   }
   if (outcome.kind === "unparseable") {
-    context.publish(taskFailed(firstTask, "unparseable_handoff", outcome.error));
+    assumptionStepFailed(context, slice, originTask, "unparseable_handoff", outcome.error);
     return;
   }
   const lint = await lintProductSpecWithFix(slice, deps, context);
