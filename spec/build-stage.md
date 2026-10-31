@@ -2717,6 +2717,62 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-010
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:13:48.636Z
+    change_request: stub re-anchoring follows depends_on; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: build-stage
+title: stub import re-anchoring checks the importing module's dependencies, not every module
+target_ids:
+  - build-stage:BEH-001
+  - build-stage:DLT-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  build-stage:DLT-009 keeps a relative import that resolves to the entry
+  of any listed module. In the URL shortener tech.md,
+  src/routes/redirect/index.ts imports LinkStore from
+  "../links/index.js", which resolves to src/routes/links/index.ts, a
+  listed module that the redirect module does not depend on and that
+  does not export LinkStore; the stub would still fail the typecheck.
+  Change to the rule of DLT-009: the module's own entry never counts;
+  a specifier is kept when it resolves to the entry of a module in the
+  importing module's depends_on (or, when depends_on is empty, of any
+  other listed module); otherwise the replacement candidates are the
+  entries of those same modules whose path ends with the specifier's
+  trailing segments, and exactly one candidate replaces the specifier.
+tests_old_behavior:
+  - an import that resolves to a dependency's entry is copied verbatim
+tests_new_behavior:
+  - to:build-stage:BEH-001
+test_obligation:
+  predicate: |
+    Given modules M-02 src/links/index.ts, M-03 src/routes/links/index.ts
+    and M-04 src/routes/redirect/index.ts with M-04 depends_on [M-02]
+    importing "../links/index.js", the stub of M-04 imports
+    "../../links/index.js"; M-03 importing "../links/index.js" with
+    depends_on [M-02] gets "../../links/index.js"; a module with empty
+    depends_on keeps an import that resolves to another listed entry.
+  test_template: unit
+  boundary_classes:
+    - resolves to a non-dependency module
+    - resolves to the module itself
+    - empty depends_on
+  failure_scenarios:
+    - an import into a non-dependency module kept
+---
+```
+
 ---
 
 ## 16. Implementation bindings
