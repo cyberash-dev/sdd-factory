@@ -21,8 +21,8 @@
   "maxParallelLanes": 4,
   "models": {
     "default": "anthropic/claude-opus-5.5",
-    "critic": "openai/gpt-6.1-terra",
-    "triage": "openai/gpt-6-luna",
+    "critic": "z-ai/glm-5.3",
+    "triage": "deepseek/deepseek-v4.1-flash-1017:nitro",
     "reviewer": "z-ai/glm-5.3",
     "lane": null,
     "effort": {
@@ -34,6 +34,10 @@
     }
   },
   "pricing": {
+    "deepseek/deepseek-v4.1-flash-1017:nitro": {
+      "inputPerMillion": 0.3,
+      "outputPerMillion": 1.2
+    },
     "z-ai/glm-5.3": {
       "inputPerMillion": 0.07,
       "outputPerMillion": 1.4

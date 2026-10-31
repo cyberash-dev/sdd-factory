@@ -24,7 +24,7 @@
   "maxParallelLanes": 4,
   "models": {
     "default": "deepseek/deepseek-v4.1-flash-1017:nitro",
-    "critic": "openai/gpt-6.1-terra",
+    "critic": "z-ai/glm-5.3",
     "triage": "deepseek/deepseek-v4.1-flash-1017:nitro",
     "reviewer": "z-ai/glm-5.3",
     "lane": null,
