@@ -5,9 +5,9 @@
     "implementerAttempts": 3,
     "testWriterRework": 2,
     "plannerRecuts": 2,
-    "architectRepairs": 2,
+    "architectRepairs": 3,
     "criticAssumptionsPerId": 1,
-    "assemblyRounds": 2,
+    "assemblyRounds": 3,
     "handoffRerun": 2,
     "graphDepth": 3,
     "minCoversPerTask": 3,
@@ -15,7 +15,7 @@
   },
   "timeouts": {
     "specStageMs": 2400000,
-    "apiRoleMs": 1200000,
+    "apiRoleMs": 1800000,
     "cliRoleMs": 1500000,
     "verifierMs": 300000,
     "shutdownMs": 10000
