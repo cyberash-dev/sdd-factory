@@ -4,6 +4,8 @@ import type { AssemblyTrigger, GreenTrigger } from "./fix-triggers.js";
 export interface PathScope {
   readonly allowed: readonly string[];
   readonly forbidden: readonly string[];
+  /* written by a role running beside the fixer in the same directory: never the fixer's change, never reverted */
+  readonly concurrent?: readonly string[];
 }
 
 export type FixScopeInput =
@@ -16,6 +18,8 @@ export const ANY_PATH = "**";
 const SPEC_FILES = ["spec/spec.md", "spec/assumptions.md"];
 const TESTS = "tests/**";
 const SPEC = "spec/**";
+/* design-stage:DLT-012: the architect and the verification-designer write in one product directory at the same time; the planner runs alone. */
+const CONCURRENT_DESIGN_FILES: Readonly<Record<string, readonly string[]>> = { "design/tech.md": ["design/verification.md"], "design/verification.md": ["design/tech.md"] };
 
 /* factory:BEH-012 trigger table, allowed-paths column; paths are relative to the fixer's directory. */
 export function fixScopeOf(input: FixScopeInput): PathScope {
@@ -23,7 +27,7 @@ export function fixScopeOf(input: FixScopeInput): PathScope {
     case "spec_yaml_invalid":
       return { allowed: SPEC_FILES, forbidden: [] };
     case "design_file_invalid":
-      return { allowed: [input.file], forbidden: [] };
+      return { allowed: [input.file], forbidden: [], concurrent: CONCURRENT_DESIGN_FILES[input.file] ?? [] };
     case "red_suite_error":
       return { allowed: input.writes, forbidden: [] };
     case "green_typecheck":
@@ -43,4 +47,8 @@ function pathMatches(glob: string, path: string): boolean {
 
 export function changedFilesOutside(scope: PathScope, changed: readonly string[]): readonly string[] {
   return changed.filter((path) => !scope.allowed.some((glob) => pathMatches(glob, path)) || scope.forbidden.some((glob) => pathMatches(glob, path)));
+}
+
+export function isConcurrentPath(scope: PathScope, path: string): boolean {
+  return (scope.concurrent ?? []).some((glob) => pathMatches(glob, path));
 }

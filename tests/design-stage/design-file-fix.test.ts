@@ -8,6 +8,7 @@ import { runArchitectEffect } from "../../src/design-stage/application/architect
 import { runPlanEffect } from "../../src/design-stage/application/plan-effect.js";
 import { runVerificationEffect } from "../../src/design-stage/application/verification-effect.js";
 import { createGitWorkingTree, type SimpleFixDeps } from "../../src/shared/fixer/index.js";
+import { readTextOrNull } from "../../src/shared/fs/text.js";
 import type { CliRoleOutcome, CliRoleRequest } from "../../src/shared/llm/cli-role-runner.js";
 import type { SliceContext } from "../../src/shared/slice.js";
 import { ARCHITECT_HANDOFF_LINES, handoffPathIn, handoffText, harness, PLANNER_HANDOFF_LINES, stateIn, tasksJsonText, techMdText, VALID_TASKS, VERIFICATION_HANDOFF_LINES, verificationMdText, writeVia, type Harness, type RoleScript } from "./harness.js";
@@ -56,6 +57,13 @@ async function withFixer(h: Harness, script: FixerScript): Promise<FixerSetup> {
 async function replaceIn(productDir: string, path: string, from: string, to: string): Promise<void> {
   const text = await readFile(join(productDir, path), "utf8");
   await writeFile(join(productDir, path), text.replace(from, to), "utf8");
+}
+
+function whileAnotherWriterWrites(path: string, text: string, fix: FixerScript): FixerScript {
+  return async (productDir) => {
+    await fix(productDir);
+    await writeFile(join(productDir, path), text, "utf8");
+  };
 }
 
 const leaveAsIs: FixerScript = async () => undefined;
@@ -202,5 +210,40 @@ describe("simple-fixer in front of a design file rework", () => {
     await runPlanEffect({ kind: "design.plan", attempt: 1, reworkFinding: "" }, h.context(stateIn("planning")), setup.slice, h.commandRunner, setup.fix);
 
     expect([eventTypes(h), setup.fixerCalls.length]).toEqual([["design.rework"], 0]);
+  });
+});
+
+describe("design simple-fixer beside the concurrent design role", () => {
+  // @covers design-stage:DLT-012
+  it("fixes tech.md and keeps the verification design written meanwhile, outside the fixer's changed files", async () => {
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText({ withTooling: false }))] }, caps: { simpleFixes: 2 } });
+    const setup = await withFixer(h, whileAnotherWriterWrites("design/verification.md", VALID_VERIFICATION, async (dir) => writeFile(join(dir, "design", "tech.md"), techMdText(), "utf8")));
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), setup.slice, setup.fix);
+
+    const attempted = h.published[0]?.payload;
+    expect([attempted?.["outcome"], attempted?.["filesChanged"], await readTextOrNull(join(h.productDir, "design", "verification.md"))]).toEqual(["fixed", ["design/tech.md"], VALID_VERIFICATION]);
+  });
+
+  // @covers design-stage:DLT-012
+  it("fixes verification.md and keeps the technical design written meanwhile, outside the fixer's changed files", async () => {
+    const concurrentTechMd = techMdText();
+    const h = await harness({ scripts: { "verification-designer": [designerWriting(BROKEN_VERIFICATION)] }, caps: { simpleFixes: 2 } });
+    const setup = await withFixer(h, whileAnotherWriterWrites("design/tech.md", concurrentTechMd, (dir) => replaceIn(dir, "design/verification.md", UNTERMINATED, 'notes: "terminated"')));
+
+    await runVerificationEffect({ kind: "design.verification", attempt: 1 }, h.context(stateIn("designing")), setup.slice, h.commandRunner, setup.fix);
+
+    const attempted = h.published[0]?.payload;
+    expect([attempted?.["outcome"], attempted?.["filesChanged"], await readTextOrNull(join(h.productDir, "design", "tech.md"))]).toEqual(["fixed", ["design/verification.md"], concurrentTechMd]);
+  });
+
+  // @covers design-stage:DLT-012
+  it("discards a tech.md fix that also writes design/plan.md and deletes that file", async () => {
+    const h = await harness({ scripts: { architect: [architectWriting(techMdText({ withTooling: false })), architectWriting(techMdText())] }, caps: { simpleFixes: 2 } });
+    const setup = await withFixer(h, whileAnotherWriterWrites("design/plan.md", "# Plan: todo-cli\n", async (dir) => writeFile(join(dir, "design", "tech.md"), techMdText(), "utf8")));
+
+    await runArchitectEffect({ kind: "design.architect", attempt: 1 }, h.context(stateIn("designing")), setup.slice, setup.fix);
+
+    expect([h.published[0]?.payload["outcome"], await readTextOrNull(join(h.productDir, "design", "plan.md"))]).toEqual(["discarded", null]);
   });
 });

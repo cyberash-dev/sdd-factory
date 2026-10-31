@@ -5,12 +5,20 @@ describe("simple-fixer allowed paths", () => {
   // @covers factory:BEH-012
   it.each([
     [{ trigger: "spec_yaml_invalid" }, { allowed: ["spec/spec.md", "spec/assumptions.md"], forbidden: [] }],
-    [{ trigger: "design_file_invalid", file: "design/tech.md" }, { allowed: ["design/tech.md"], forbidden: [] }],
     [{ trigger: "red_suite_error", writes: ["src/greet/**", "tests/greet/**"] }, { allowed: ["src/greet/**", "tests/greet/**"], forbidden: [] }],
     [{ trigger: "green_typecheck", writes: ["src/greet/**", "tests/greet/**"] }, { allowed: ["src/greet/**", "tests/greet/**"], forbidden: ["tests/**"] }],
     [{ trigger: "green_load_failure", writes: ["src/greet/**"] }, { allowed: ["src/greet/**"], forbidden: ["tests/**"] }],
     [{ trigger: "assembly_typecheck" }, { allowed: ["**"], forbidden: ["tests/**", "spec/**"] }],
   ] as const)("scopes %o to %o", (input, scope) => {
+    expect(fixScopeOf(input)).toEqual(scope);
+  });
+
+  // @covers design-stage:DLT-012
+  it.each([
+    [{ trigger: "design_file_invalid", file: "design/tech.md" }, { allowed: ["design/tech.md"], forbidden: [], concurrent: ["design/verification.md"] }],
+    [{ trigger: "design_file_invalid", file: "design/verification.md" }, { allowed: ["design/verification.md"], forbidden: [], concurrent: ["design/tech.md"] }],
+    [{ trigger: "design_file_invalid", file: "design/tasks.json" }, { allowed: ["design/tasks.json"], forbidden: [], concurrent: [] }],
+  ] as const)("scopes design fix %o to %o, leaving the concurrent design role's file out", (input, scope) => {
     expect(fixScopeOf(input)).toEqual(scope);
   });
 

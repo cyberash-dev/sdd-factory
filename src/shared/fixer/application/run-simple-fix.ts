@@ -7,7 +7,7 @@ import { readTextOrNull } from "../../fs/text.js";
 import { costFieldsOf, runCliLane, withLaneParticipant, type CostFields } from "../../llm/cli-lane.js";
 import { isTerminatedOutcome, type CliRoleOutcome } from "../../llm/cli-role-runner.js";
 import type { SliceContext } from "../../slice.js";
-import { changedFilesOutside, type PathScope } from "../domain/fix-scope.js";
+import { changedFilesOutside, isConcurrentPath, type PathScope } from "../domain/fix-scope.js";
 import { fixerInstructionVariables, fixerMessage, type FixerPromptInput } from "../domain/fixer-prompt.js";
 import { isOwnerOf, TRIGGER_TABLE, type FixOutcome, type FixOwner, type FixTrigger } from "../domain/fix-triggers.js";
 import { formatOnlyViolations } from "../domain/format-only.js";
@@ -81,6 +81,11 @@ async function violationsOf(request: SimpleFixRequest, changes: TreeChanges, bef
   return [...outside, ...formatOnly, ...(changes.headMoved ? ["HEAD moved"] : [])];
 }
 
+/* design-stage:DLT-012: a concurrent role's file changed during the run is left out of the verdict and the revert. */
+function fixerChanges(scope: PathScope, changes: TreeChanges): TreeChanges {
+  return { ...changes, files: changes.files.filter((change) => !isConcurrentPath(scope, change.path)) };
+}
+
 async function verdictOf(deps: SimpleFixDeps, request: SimpleFixRequest, snapshot: TreeSnapshot, changes: TreeChanges, before: ParsedFiles, output: string): Promise<RunVerdict> {
   const violations = await violationsOf(request, changes, before);
   if (violations.length > 0) {
@@ -147,7 +152,7 @@ async function fixOnce(slice: SliceContext, deps: SimpleFixDeps, context: Effect
       slice.log(`simple-fixer ${request.owner}:${request.unit} run ${input.attempt}: ended by a termination signal`);
       return null;
     }
-    const changes = await deps.tree.changesSince(request.directory, snapshot);
+    const changes = fixerChanges(request.scope, await deps.tree.changesSince(request.directory, snapshot));
     const verdict = await verdictOf(deps, request, snapshot, changes, before, input.failureOutput);
     await writeFile(files.answerPath, answerText(outcome), { encoding: "utf8", flag: "wx" });
     const answerPath = relative(slice.paths.runDir, files.answerPath);
