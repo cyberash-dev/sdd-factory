@@ -1721,12 +1721,12 @@ test_obligation:
 id: spec-stage:DLT-015
 type: Delta
 lifecycle:
-  status: approved
+  status: removed
   approval_record:
     owner_role: tech-lead
     approver_identity: cyberash
-    timestamp: 2026-10-31T21:11:45.332Z
-    change_request: "operator decision 2026-10-31 22:10: the spec-analyst moves to Claude Code on Opus"
+    timestamp: 2026-10-31T23:08:31.537Z
+    change_request: "operator decision 2026-11-01 00:15: the spec-analyst stays an API role; the Claude Code lane is withdrawn before implementation"
     scope: first-time-approval
 partition_id: spec-stage
 title: the spec-analyst runs as a Claude Code lane when a lane model is configured for it

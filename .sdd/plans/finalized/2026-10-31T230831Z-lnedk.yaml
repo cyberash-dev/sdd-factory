@@ -1,0 +1,10 @@
+plan_id: 2026-10-31T230831Z-lnedk
+created_at: 2026-10-31T23:08:31.538Z
+pending_attestations:
+  - id: spec-stage:DLT-015
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T23:08:31.537Z
+    change_request: "operator decision 2026-11-01 00:15: the spec-analyst stays an API role; the Claude Code lane is withdrawn before implementation"
+    scope: first-time-approval
+    target_status: removed
