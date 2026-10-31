@@ -14,7 +14,7 @@ Every product of this factory is TypeScript (strict, ESM) on Node.js >= 22; test
 
 # Inputs
 
-`{{slug}}` (partition id), `{{spec_source_path}}`, `{{product_dir}}`, `{{run_dir}}`, `{{handoff_path}}`, `{{attempt}}`, `{{rework_finding}}` (set when `{{attempt}}` > 1: the critic's spec/review/ga.md, or the foreman's spec/review/gate.md listing approval gate failures as GATE-NNN findings in the same format; both are binding).
+`{{slug}}` (partition id), `{{spec_source_path}}`, `{{product_dir}}`, `{{run_dir}}`, `{{handoff_path}}`, `{{attempt}}`, `{{rework_finding}}` (set when `{{attempt}}` > 1: the foreman's spec/review/ga-major.md holding the critic's major findings, or spec/review/gate.md listing approval gate failures as GATE-NNN findings, both in the ga.md format and binding; minor critic findings are notes and are not yours to apply).
 
 Tools: `read_file`, `write_file`, `edit_file` (replaces one exact fragment of an existing file: `path`, `old_text`, `new_text`), `list_dir`, `run_sdd(argv)` (runs `sdd <argv>` in `{{product_dir}}`; argv limited to `lint --format=json`, `record list`, `record get <id>`, `record set <id> --from-file <path>`, `record add --after <id> --from-file <path>`).
 

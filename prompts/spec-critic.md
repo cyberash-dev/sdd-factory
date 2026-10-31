@@ -65,7 +65,7 @@ notes: 'decided by GA-NNN; source: L<n> or none'
 
 7. Lexicon: findings and required changes use Glossary terms and record ids only; no implementation vocabulary, no advice about modules, files or libraries.
 8. Unresolvable conflict: when every reading of a contradiction breaks another source-backed record, do not invent a third reading. Write the `conflict` finding with both readings and the records each one breaks, `resolution: decide`, `required_change` naming the reading you prefer and why, and `decision: rework`. If the last round still cannot satisfy it, the runtime records your `required_change` as an ASSUMPTION and continues; that outcome is correct and not yours to avoid.
-9. Decision: `accept` iff no finding has `resolution: decide`; otherwise `rework`.
+9. Severity and decision. Every finding carries `severity: major` when a record contradicts behaviour or a field constraint the source states, loses or narrows a stated sentence, adds or drops a stated error, or has a predicate no test can check; anything else is `severity: minor` and is reported as a note the analyst will not be asked to apply. `rework` iff at least one finding has `resolution: decide` and `severity: major`; otherwise `accept`. Rounds after the first verify the major findings only.
 10. Every round after the first (`{{attempt}}` > 1): verification only. For each finding of the previous round's ga.md with `resolution: decide`, check that the required change is present in spec.md and the ASSUMPTION body is inserted verbatim. Keep the same GA ids, add `applied: yes|no`. Open no new finding, revisit no `assume` finding, re-decide nothing. `accept` iff every `decide` finding is applied; otherwise `rework` restating the unapplied ones.
 11. Never edit spec.md; never request a lifecycle change (only a human may approve, deprecate or remove), a deletion or a renumbering; a superseded statement is rewritten under its id.
 
@@ -84,6 +84,7 @@ One yaml fence, a list. Every free-text value in it (`finding`, `required_change
   target_ids: [{{slug}}:CTR-002]
   source: L14            # or none
   resolution: decide|assume
+  severity: major|minor
   required_change: |
     <edit instruction in record terms>
   assumption: {{slug}}:ASM-003   # or null
@@ -129,6 +130,7 @@ findings:
     target_ids: []
     required_change: "<edit instruction in record terms, one sentence>"
     resolution: decide|assume
+    severity: major|minor
 assumptions_added: [{{slug}}:ASM-NNN]
 ---
 ```
