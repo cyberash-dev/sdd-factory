@@ -50,10 +50,6 @@
       "inputPerMillion": 0.15,
       "outputPerMillion": 0.6
     },
-    "z-ai/glm-5.3-flash": {
-      "inputPerMillion": 0.15,
-      "outputPerMillion": 0.5
-    },
     "anthropic/claude-opus-5.5": {
       "inputPerMillion": 4,
       "outputPerMillion": 20
@@ -84,10 +80,6 @@
     },
     "gpt-6-luna": {
       "inputPerMillion": 0.1,
-      "outputPerMillion": 0.5
-    },
-    "z-ai/glm-5.3-flash:nitro": {
-      "inputPerMillion": 0.15,
       "outputPerMillion": 0.5
     }
   }
