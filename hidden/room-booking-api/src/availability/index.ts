@@ -1,46 +1,36 @@
-import { failure, success } from "../errors/index.js";
-import type { HandlerResult } from "../errors/index.js";
-import { idNumber } from "../store/index.js";
-import type { Store } from "../store/index.js";
-import { intervalOf, overlaps, parseUtcMinute } from "../time/index.js";
+import type { URLSearchParams } from "node:url";
+import { idNumber, overlaps, parseTime } from "../core/index.js";
+import type { ApiError, Booking, Room } from "../core/index.js";
 
-const DECIMAL_INTEGER = /^\d+$/;
+const INVALID_QUERY: ApiError = { error: "invalid_query" };
 
-function singleParameter(query: URLSearchParams, name: string): string | undefined {
-  const values = query.getAll(name);
-  return values.length === 1 ? values[0] : undefined;
+function isBookedWithin(roomId: string, bookings: readonly Booking[], start: number, end: number): boolean {
+  return bookings.some((booking) => {
+    if (booking.roomId !== roomId) return false;
+    const bookingStart = parseTime(booking.start);
+    const bookingEnd = parseTime(booking.end);
+    if (bookingStart === null || bookingEnd === null) return false;
+    return overlaps(bookingStart, bookingEnd, start, end);
+  });
 }
 
-export function findAvailableRooms(store: Store, query: URLSearchParams): HandlerResult {
-  const startMs = parseUtcMinute(singleParameter(query, "start"));
-  const endMs = parseUtcMinute(singleParameter(query, "end"));
-  const attendeesText = singleParameter(query, "attendees");
-  if (startMs === undefined || endMs === undefined || endMs <= startMs) {
-    return failure("invalid_query");
-  }
-  if (attendeesText === undefined || !DECIMAL_INTEGER.test(attendeesText)) {
-    return failure("invalid_query");
-  }
-  const attendees = Number.parseInt(attendeesText, 10);
-  if (!Number.isSafeInteger(attendees) || attendees < 1) {
-    return failure("invalid_query");
-  }
+export function findAvailableRooms(
+  rooms: readonly Room[],
+  bookings: readonly Booking[],
+  query: URLSearchParams,
+): Room[] | ApiError {
+  const startText = query.get("start");
+  const endText = query.get("end");
+  const attendeesText = query.get("attendees");
+  if (startText === null || endText === null || attendeesText === null) return INVALID_QUERY;
+  const start = parseTime(startText);
+  const end = parseTime(endText);
+  if (start === null || end === null || end <= start) return INVALID_QUERY;
+  if (!/^[0-9]+$/.test(attendeesText)) return INVALID_QUERY;
+  const attendees = Number(attendeesText);
+  if (!Number.isSafeInteger(attendees) || attendees < 1) return INVALID_QUERY;
 
-  const requested = intervalOf(startMs, endMs);
-  const rooms = store.rooms
-    .list()
-    .filter((room) => room.capacity >= attendees)
-    .filter((room) =>
-      store.bookings.listByRoom(room.id).every((booking) => {
-        const bookedStart = parseUtcMinute(booking.start);
-        const bookedEnd = parseUtcMinute(booking.end);
-        if (bookedStart === undefined || bookedEnd === undefined) {
-          return true;
-        }
-        return !overlaps(requested, intervalOf(bookedStart, bookedEnd));
-      }),
-    )
+  return rooms
+    .filter((room) => room.capacity >= attendees && !isBookedWithin(room.id, bookings, start, end))
     .sort((a, b) => a.capacity - b.capacity || idNumber(a.id) - idNumber(b.id));
-
-  return success(200, { rooms });
 }

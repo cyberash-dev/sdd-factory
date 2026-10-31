@@ -1,95 +1,127 @@
-import { failure, success } from "../errors/index.js";
-import type { HandlerResult } from "../errors/index.js";
-import { idNumber } from "../store/index.js";
-import type { Booking, NewBooking, Store } from "../store/index.js";
-import { intervalOf, lengthMs, overlaps, parseUtcMinute } from "../time/index.js";
+import type { URLSearchParams } from "node:url";
+import {
+  LIMITS,
+  formatId,
+  idNumber,
+  overlaps,
+  parseTime,
+  isValidText,
+} from "../core/index.js";
+import type { ApiError, Booking, Room } from "../core/index.js";
 
-const TITLE_MAX_CODE_POINTS = 80;
-const DURATION_MAX_MS = 8 * 3600 * 1000;
-
-interface ValidBooking {
-  readonly fields: Omit<NewBooking, "roomId">;
-  readonly startMs: number;
-  readonly endMs: number;
+export interface BookingStore {
+  readonly bookings: Booking[];
+  nextSequence: number;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+export function createBookingStore(): BookingStore {
+  return { bookings: [], nextSequence: 1 };
 }
 
-function validateFields(body: unknown): ValidBooking | undefined {
-  if (!isRecord(body)) {
-    return undefined;
-  }
-  const { title, start, end, attendees } = body;
-  if (typeof title !== "string" || title.trim() === "") {
-    return undefined;
-  }
-  if ([...title].length > TITLE_MAX_CODE_POINTS) {
-    return undefined;
-  }
-  const startMs = parseUtcMinute(start);
-  const endMs = parseUtcMinute(end);
-  if (typeof start !== "string" || typeof end !== "string") {
-    return undefined;
-  }
-  if (startMs === undefined || endMs === undefined || endMs <= startMs) {
-    return undefined;
-  }
-  if (lengthMs(intervalOf(startMs, endMs)) > DURATION_MAX_MS) {
-    return undefined;
-  }
-  if (typeof attendees !== "number" || !Number.isInteger(attendees) || attendees < 1) {
-    return undefined;
-  }
-  return { fields: { title, start, end, attendees }, startMs, endMs };
+function byStartThenId(a: Booking, b: Booking): number {
+  const startA = parseTime(a.start) ?? 0;
+  const startB = parseTime(b.start) ?? 0;
+  return startA - startB || idNumber(a.id) - idNumber(b.id);
 }
 
-function earliestConflict(existing: readonly Booking[], startMs: number, endMs: number): Booking | undefined {
-  const wanted = intervalOf(startMs, endMs);
-  let earliest: { booking: Booking; startMs: number } | undefined;
-  for (const booking of existing) {
-    const bookingStartMs = parseUtcMinute(booking.start);
-    const bookingEndMs = parseUtcMinute(booking.end);
-    if (bookingStartMs === undefined || bookingEndMs === undefined) {
-      continue;
-    }
-    if (!overlaps(wanted, intervalOf(bookingStartMs, bookingEndMs))) {
-      continue;
-    }
-    const earlier =
-      earliest === undefined ||
-      bookingStartMs < earliest.startMs ||
-      (bookingStartMs === earliest.startMs && idNumber(booking.id) < idNumber(earliest.booking.id));
-    if (earlier) {
-      earliest = { booking, startMs: bookingStartMs };
-    }
-  }
-  return earliest?.booking;
+function field(body: unknown, name: string): unknown {
+  if (typeof body !== "object" || body === null) return undefined;
+  return Reflect.get(body, name);
 }
 
-export function createBooking(store: Store, roomId: string, body: unknown): HandlerResult {
-  const valid = validateFields(body);
-  if (valid === undefined) {
-    return failure("invalid_booking");
+export function createBooking(
+  store: BookingStore,
+  rooms: readonly Room[],
+  roomId: string,
+  body: unknown,
+): Booking | ApiError {
+  const room = rooms.find((candidate) => candidate.id === roomId);
+  if (room === undefined) return { error: "room_not_found" };
+
+  const title = field(body, "title");
+  const startValue = field(body, "start");
+  const endValue = field(body, "end");
+  const attendees = field(body, "attendees");
+  const start = parseTime(startValue);
+  const end = parseTime(endValue);
+  if (
+    typeof title !== "string" ||
+    !isValidText(title, LIMITS.bookingTitleMax) ||
+    typeof startValue !== "string" ||
+    typeof endValue !== "string" ||
+    start === null ||
+    end === null ||
+    end <= start ||
+    end - start > LIMITS.bookingMaxMinutes * 60000 ||
+    typeof attendees !== "number" ||
+    !Number.isInteger(attendees) ||
+    attendees < 1
+  ) {
+    return { error: "invalid_booking" };
   }
-  const room = store.rooms.get(roomId);
-  if (room === undefined) {
-    return failure("room_not_found");
-  }
-  if (valid.fields.attendees > room.capacity) {
-    return failure("over_capacity");
-  }
-  const conflict = earliestConflict(store.bookings.listByRoom(roomId), valid.startMs, valid.endMs);
+  if (attendees > room.capacity) return { error: "over_capacity" };
+
+  const conflicts = store.bookings
+    .filter((existing) => existing.roomId === roomId)
+    .filter((existing) => {
+      const existingStart = parseTime(existing.start);
+      const existingEnd = parseTime(existing.end);
+      return (
+        existingStart !== null &&
+        existingEnd !== null &&
+        overlaps(start, end, existingStart, existingEnd)
+      );
+    })
+    .sort(byStartThenId);
+  const conflict = conflicts[0];
   if (conflict !== undefined) {
-    return failure("room_busy", conflict.id);
+    return { error: "room_busy", conflictingBookingId: conflict.id };
   }
-  return success(201, store.bookings.create({ roomId, ...valid.fields }));
+
+  const booking: Booking = {
+    id: formatId("booking", store.nextSequence),
+    roomId,
+    title,
+    start: startValue,
+    end: endValue,
+    attendees,
+  };
+  store.nextSequence += 1;
+  store.bookings.push(booking);
+  return booking;
 }
 
-export function deleteBooking(store: Store, bookingId: string): HandlerResult {
-  if (!store.bookings.remove(bookingId)) {
-    return failure("booking_not_found");
+export function listBookings(
+  store: BookingStore,
+  rooms: readonly Room[],
+  roomId: string,
+  query: URLSearchParams,
+): Booking[] | ApiError {
+  if (!rooms.some((candidate) => candidate.id === roomId)) {
+    return { error: "room_not_found" };
   }
-  return success(204, undefined);
+  const inRoom = store.bookings.filter((booking) => booking.roomId === roomId);
+  const hasFrom = query.has("from");
+  const hasTo = query.has("to");
+  if (!hasFrom && !hasTo) return inRoom.sort(byStartThenId);
+  if (hasFrom !== hasTo) return { error: "invalid_query" };
+  const from = parseTime(query.get("from"));
+  const to = parseTime(query.get("to"));
+  if (from === null || to === null || to <= from) {
+    return { error: "invalid_query" };
+  }
+  return inRoom
+    .filter((booking) => {
+      const start = parseTime(booking.start);
+      const end = parseTime(booking.end);
+      return start !== null && end !== null && overlaps(start, end, from, to);
+    })
+    .sort(byStartThenId);
+}
+
+export function deleteBooking(store: BookingStore, bookingId: string): ApiError | null {
+  const index = store.bookings.findIndex((booking) => booking.id === bookingId);
+  if (index === -1) return { error: "booking_not_found" };
+  store.bookings.splice(index, 1);
+  return null;
 }

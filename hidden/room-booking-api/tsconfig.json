@@ -5,6 +5,9 @@
     "target": "ES2022",
     "strict": true,
     "noEmit": true,
+    "types": [
+      "node"
+    ],
     "skipLibCheck": true,
     "typeRoots": [
       "./node_modules/@types"

@@ -1,233 +1,189 @@
-import { describe, expect, it } from "vitest";
-import { createRoom, listRooms } from "../../src/rooms/index.js";
-import { createStore } from "../../src/store/index.js";
+import { describe, it, expect } from "vitest";
+import { URLSearchParams } from "node:url";
+import { createRoomStore, createRoom, listRooms } from "../../src/rooms/index.js";
 
-const NAME_40 = "0123456789012345678901234567890123456789";
-const NAME_41 = "01234567890123456789012345678901234567890";
+const q = (s: string) => new URLSearchParams(s);
+const snapshot = (store: ReturnType<typeof createRoomStore>) => JSON.stringify(listRooms(store, q("")));
 
-const query = (qs = "") => new URLSearchParams(qs);
-
-const seedThree = () => {
-  const store = createStore();
-  store.rooms.create("Aurora", 4);
-  store.rooms.create("Borealis", 12);
-  store.rooms.create("Cirrus", 8);
-  return store;
-};
-
-const R1 = { id: "r1", name: "Aurora", capacity: 4 };
-const R2 = { id: "r2", name: "Borealis", capacity: 12 };
-const R3 = { id: "r3", name: "Cirrus", capacity: 8 };
-
-describe("room creation", () => {
+describe("room creation (POST /rooms)", () => {
   // @covers room-booking-api:BEH-001
-  it("a valid room body is accepted with id r1 and the next accepted room receives r2", () => {
-    const store = createStore();
-    expect(createRoom(store.rooms, { name: "Aurora", capacity: 6 })).toEqual({
-      ok: true,
-      status: 201,
-      body: { id: "r1", name: "Aurora", capacity: 6 },
-    });
-    expect(createRoom(store.rooms, { name: "Borealis", capacity: 2 })).toEqual({
-      ok: true,
-      status: 201,
-      body: { id: "r2", name: "Borealis", capacity: 2 },
-    });
-    expect(store.rooms.list().map((r) => r.id)).toEqual(["r1", "r2"]);
-  });
-
-  it("a room with capacity 0 is rejected with invalid_room and no room named Aurora exists", () => {
-    const store = createStore();
-    expect(createRoom(store.rooms, { name: "Aurora", capacity: 0 })).toMatchObject({ ok: false, code: "invalid_room" });
-    expect(store.rooms.list()).toHaveLength(0);
-  });
-
-  it("a room body without capacity is rejected with invalid_room", () => {
-    const store = createStore();
-    expect(createRoom(store.rooms, { name: "Cirrus" })).toMatchObject({ ok: false, code: "invalid_room" });
-    expect(store.rooms.list()).toHaveLength(0);
-  });
-
-  it.each([null, [], "Aurora", 5, { capacity: 3 }, { name: 7, capacity: 3 }, { name: "Aurora", capacity: "3" }])(
-    "a malformed room body %j is rejected with invalid_room",
-    (body) => {
-      const store = createStore();
-      expect(createRoom(store.rooms, body)).toMatchObject({ ok: false, code: "invalid_room" });
-      expect(store.rooms.list()).toHaveLength(0);
-    },
-  );
-
-  // @covers room-booking-api:BEH-002
-  it("each of empty name, 41-character name, capacity 0, capacity 101 and capacity 1.5 is rejected with invalid_room and leaves the room count unchanged", () => {
-    const bodies = [
-      { name: "", capacity: 2 },
-      { name: NAME_41, capacity: 1 },
-      { name: "Dorado", capacity: 0 },
-      { name: "Dorado", capacity: 101 },
-      { name: "Dorado", capacity: 1.5 },
-    ];
-    for (const body of bodies) {
-      const store = createStore();
-      store.rooms.create("Existing", 5);
-      expect(createRoom(store.rooms, body)).toMatchObject({ ok: false, code: "invalid_room" });
-      expect(store.rooms.list()).toHaveLength(1);
-    }
-  });
-
-  it("a whitespace-only name is rejected with invalid_room", () => {
-    const store = createStore();
-    expect(createRoom(store.rooms, { name: "   ", capacity: 2 })).toMatchObject({ ok: false, code: "invalid_room" });
-    expect(store.rooms.list()).toHaveLength(0);
+  it("creates a room with a server-assigned id and lists it", () => {
+    const store = createRoomStore();
+    expect(listRooms(store, q(""))).toEqual([]);
+    expect(createRoom(store, { name: "Focus", capacity: 6 })).toEqual({ id: "r1", name: "Focus", capacity: 6 });
+    expect(listRooms(store, q(""))).toEqual([{ id: "r1", name: "Focus", capacity: 6 }]);
   });
 
   it.each([
-    [NAME_40, 1],
-    ["Borealis", 1],
-    ["Cirrus", 100],
-  ])("the boundary room %s with capacity %i is accepted with 201", (name, capacity) => {
-    const store = createStore();
-    expect(createRoom(store.rooms, { name, capacity })).toEqual({
-      ok: true,
-      status: 201,
-      body: { id: "r1", name, capacity },
-    });
+    ["A", 1],
+    ["x".repeat(40), 100],
+  ])("accepts boundary name %j with capacity %i", (name, capacity) => {
+    const store = createRoomStore();
+    expect(createRoom(store, { name, capacity })).toEqual({ id: "r1", name, capacity });
+    expect(listRooms(store, q(""))).toHaveLength(1);
   });
 
-  it("a name counts code points, so 40 emoji are accepted and 41 emoji are rejected with invalid_room", () => {
-    const store = createStore();
-    expect(createRoom(store.rooms, { name: "😀".repeat(40), capacity: 1 })).toMatchObject({ ok: true, status: 201 });
-    expect(createRoom(store.rooms, { name: "😀".repeat(41), capacity: 1 })).toMatchObject({
-      ok: false,
-      code: "invalid_room",
-    });
-    expect(store.rooms.list()).toHaveLength(1);
+  // @covers room-booking-api:BEH-002
+  it("rejects an empty name with invalid_room and leaves the state unchanged", () => {
+    const store = createRoomStore();
+    const before = snapshot(store);
+    expect(createRoom(store, { name: "", capacity: 6 })).toEqual({ error: "invalid_room" });
+    expect(snapshot(store)).toBe(before);
   });
 
-  it("a client-supplied id is ignored and the server assigns r2", () => {
-    const store = createStore();
-    store.rooms.create("Aurora", 6);
-    expect(createRoom(store.rooms, { id: "r99", name: "Eurus", capacity: 4 })).toEqual({
-      ok: true,
-      status: 201,
-      body: { id: "r2", name: "Eurus", capacity: 4 },
-    });
+  it.each([
+    ["whitespace only", { name: "   ", capacity: 6 }],
+    ["missing", { capacity: 6 }],
+    ["not a string", { name: 42, capacity: 6 }],
+    ["41 characters", { name: "x".repeat(41), capacity: 6 }],
+  ])("rejects a name that is %s with invalid_room", (_label, body) => {
+    const store = createRoomStore();
+    const before = snapshot(store);
+    expect(createRoom(store, body)).toEqual({ error: "invalid_room" });
+    expect(snapshot(store)).toBe(before);
+  });
+
+  it("accepts a 40-character name", () => {
+    const store = createRoomStore();
+    const name = "y".repeat(40);
+    expect(createRoom(store, { name, capacity: 6 })).toEqual({ id: "r1", name, capacity: 6 });
   });
 
   // @covers room-booking-api:BEH-003
-  it("a room name differing only in case is rejected with room_name_taken and the room count stays unchanged", () => {
-    const store = createStore();
-    store.rooms.create("Aurora", 6);
-    expect(createRoom(store.rooms, { name: "AURORA", capacity: 3 })).toMatchObject({
-      ok: false,
-      code: "room_name_taken",
-    });
-    expect(store.rooms.list()).toHaveLength(1);
+  it("rejects capacity 0 with invalid_room and leaves the state unchanged", () => {
+    const store = createRoomStore();
+    const before = snapshot(store);
+    expect(createRoom(store, { name: "Lab", capacity: 0 })).toEqual({ error: "invalid_room" });
+    expect(snapshot(store)).toBe(before);
   });
 
-  it("an identical room name is rejected with room_name_taken, not invalid_room", () => {
-    const store = createStore();
-    store.rooms.create("Aurora", 6);
-    expect(createRoom(store.rooms, { name: "Aurora", capacity: 3 })).toMatchObject({
-      ok: false,
-      code: "room_name_taken",
-    });
-    expect(store.rooms.list()).toHaveLength(1);
+  it.each([
+    ["101", { name: "Lab", capacity: 101 }],
+    ["missing", { name: "Lab" }],
+    ["1.5", { name: "Lab", capacity: 1.5 }],
+    ['the string "6"', { name: "Lab", capacity: "6" }],
+  ])("rejects capacity %s with invalid_room", (_label, body) => {
+    const store = createRoomStore();
+    const before = snapshot(store);
+    expect(createRoom(store, body)).toEqual({ error: "invalid_room" });
+    expect(snapshot(store)).toBe(before);
   });
 
-  it("a distinct room name is accepted with id r2 while Aurora exists", () => {
-    const store = createStore();
-    store.rooms.create("Aurora", 6);
-    expect(createRoom(store.rooms, { name: "Borealis", capacity: 3 })).toEqual({
-      ok: true,
-      status: 201,
-      body: { id: "r2", name: "Borealis", capacity: 3 },
-    });
-    expect(store.rooms.list()).toHaveLength(2);
+  it.each([
+    ["Nook", 1],
+    ["Hall", 100],
+  ])("accepts boundary capacity of room %s", (name, capacity) => {
+    const store = createRoomStore();
+    expect(createRoom(store, { name, capacity })).toEqual({ id: "r1", name, capacity });
   });
 
-  it("an empty name while Aurora exists is rejected with invalid_room", () => {
-    const store = createStore();
-    store.rooms.create("Aurora", 6);
-    expect(createRoom(store.rooms, { name: "", capacity: 3 })).toMatchObject({ ok: false, code: "invalid_room" });
+  // @covers room-booking-api:BEH-004
+  it.each(["focus", "FOCUS", "Focus"])("rejects name %s while Focus exists with room_name_taken", (name) => {
+    const store = createRoomStore();
+    createRoom(store, { name: "Focus", capacity: 6 });
+    const before = snapshot(store);
+    expect(createRoom(store, { name, capacity: 6 })).toEqual({ error: "room_name_taken" });
+    expect(snapshot(store)).toBe(before);
+    expect(listRooms(store, q(""))).toEqual([{ id: "r1", name: "Focus", capacity: 6 }]);
+  });
+
+  it("accepts names that differ by one character", () => {
+    const store = createRoomStore();
+    createRoom(store, { name: "Focus", capacity: 6 });
+    expect(createRoom(store, { name: "Field", capacity: 6 })).toEqual({ id: "r2", name: "Field", capacity: 6 });
+    expect(createRoom(store, { name: "Focuz", capacity: 6 })).toEqual({ id: "r3", name: "Focuz", capacity: 6 });
+  });
+
+  // @covers room-booking-api:INV-005
+  it("keeps room names unique case-insensitively and stores the sent spelling", () => {
+    const store = createRoomStore();
+    createRoom(store, { name: "Focus", capacity: 6 });
+    expect(createRoom(store, { name: "focus", capacity: 6 })).toEqual({ error: "room_name_taken" });
+    expect(createRoom(store, { name: "Field", capacity: 6 })).toEqual({ id: "r2", name: "Field", capacity: 6 });
+    const names = (listRooms(store, q("")) as { name: string }[]).map((r) => r.name);
+    expect(names).toEqual(["Focus", "Field"]);
   });
 
   // @covers room-booking-api:CTR-001
-  it("create room contract: a valid body responds 201 with an r-prefixed id and invalid bodies respond with the documented code", () => {
-    const store = createStore();
-    const created = createRoom(store.rooms, { name: "Aurora", capacity: 6 });
-    expect(created).toEqual({ ok: true, status: 201, body: { id: "r1", name: "Aurora", capacity: 6 } });
-    expect(createRoom(store.rooms, { name: NAME_41, capacity: 2 })).toMatchObject({ ok: false, code: "invalid_room" });
-    expect(createRoom(store.rooms, { name: "Dorado", capacity: 101 })).toMatchObject({
-      ok: false,
-      code: "invalid_room",
-    });
-    expect(createRoom(store.rooms, { name: "aurora", capacity: 2 })).toMatchObject({
-      ok: false,
-      code: "room_name_taken",
-    });
-    expect(store.rooms.list()).toHaveLength(1);
+  it("answers every POST /rooms body with a room or one of invalid_room and room_name_taken", () => {
+    const store = createRoomStore();
+    expect(createRoom(store, { name: "Focus", capacity: 6 })).toEqual({ id: "r1", name: "Focus", capacity: 6 });
+    expect(createRoom(store, { name: "", capacity: 6 })).toEqual({ error: "invalid_room" });
+    expect(createRoom(store, { name: "focus", capacity: 6 })).toEqual({ error: "room_name_taken" });
+    expect(createRoom(store, null)).toEqual({ error: "invalid_room" });
+    expect(createRoom(store, "x")).toEqual({ error: "invalid_room" });
+    expect(listRooms(store, q(""))).toHaveLength(1);
+  });
+
+  it("ignores unknown body properties", () => {
+    const store = createRoomStore();
+    expect(createRoom(store, { name: "Focus", capacity: 6, floor: 3 })).toEqual({ id: "r1", name: "Focus", capacity: 6 });
   });
 });
 
-describe("room listing", () => {
-  // @covers room-booking-api:BEH-004
-  it("an empty store lists an empty rooms array, three rooms come back in ascending id order and minCapacity=8 keeps r2 and r3", () => {
-    expect(listRooms(createStore().rooms, query())).toEqual({ ok: true, status: 200, body: { rooms: [] } });
-    const store = seedThree();
-    expect(listRooms(store.rooms, query())).toEqual({ ok: true, status: 200, body: { rooms: [R1, R2, R3] } });
-    expect(listRooms(store.rooms, query("minCapacity=8"))).toEqual({
-      ok: true,
-      status: 200,
-      body: { rooms: [R2, R3] },
-    });
-  });
-
-  it("a single room r1 is listed alone", () => {
-    const store = createStore();
-    store.rooms.create("Aurora", 4);
-    expect(listRooms(store.rooms, query())).toEqual({ ok: true, status: 200, body: { rooms: [R1] } });
-  });
-
-  it("minCapacity above all capacities lists an empty rooms array", () => {
-    expect(listRooms(seedThree().rooms, query("minCapacity=13"))).toEqual({
-      ok: true,
-      status: 200,
-      body: { rooms: [] },
-    });
-  });
-
+describe("room listing (GET /rooms)", () => {
   // @covers room-booking-api:BEH-005
-  it("minCapacity values 0, -1, 1.5 and abc each respond invalid_query while 1 and an absent value respond 200", () => {
-    const store = seedThree();
-    for (const value of ["0", "-1", "1.5", "abc"]) {
-      expect(listRooms(store.rooms, query(`minCapacity=${value}`))).toMatchObject({
-        ok: false,
-        code: "invalid_query",
-      });
-    }
-    expect(listRooms(store.rooms, query("minCapacity=1"))).toEqual({
-      ok: true,
-      status: 200,
-      body: { rooms: [R1, R2, R3] },
-    });
-    expect(listRooms(store.rooms, query())).toMatchObject({ ok: true, status: 200 });
+  it("lists ten rooms in ascending id order past the ninth room", () => {
+    const store = createRoomStore();
+    for (let i = 1; i <= 10; i++) createRoom(store, { name: `Room ${i}`, capacity: 5 });
+    const ids = (listRooms(store, q("")) as { id: string }[]).map((r) => r.id);
+    expect(ids).toEqual(["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10"]);
+  });
+
+  it("lists an empty state as an empty array", () => {
+    expect(listRooms(createRoomStore(), q(""))).toEqual([]);
+  });
+
+  it("rejects minCapacity=abc with invalid_query", () => {
+    expect(listRooms(createRoomStore(), q("minCapacity=abc"))).toEqual({ error: "invalid_query" });
+  });
+
+  it("ignores unknown query parameters", () => {
+    const store = createRoomStore();
+    createRoom(store, { name: "Focus", capacity: 6 });
+    expect(listRooms(store, q("foo=bar"))).toEqual([{ id: "r1", name: "Focus", capacity: 6 }]);
+  });
+
+  // @covers room-booking-api:BEH-006
+  it("keeps rooms whose capacity is at least minCapacity in id order", () => {
+    const store = createRoomStore();
+    createRoom(store, { name: "A", capacity: 4 });
+    createRoom(store, { name: "B", capacity: 8 });
+    createRoom(store, { name: "C", capacity: 12 });
+    const ids = (s: string) => (listRooms(store, q(s)) as { id: string }[]).map((r) => r.id);
+    expect(ids("minCapacity=8")).toEqual(["r2", "r3"]);
+    expect(ids("minCapacity=4")).toEqual(["r1", "r2", "r3"]);
+    expect(ids("minCapacity=1")).toEqual(["r1", "r2", "r3"]);
+    expect(ids("minCapacity=20")).toEqual([]);
+    expect(ids("")).toEqual(["r1", "r2", "r3"]);
+  });
+
+  // @covers room-booking-api:BEH-007
+  it.each(["0", "-1", "abc", "1.5"])("rejects minCapacity=%s with invalid_query", (value) => {
+    const store = createRoomStore();
+    createRoom(store, { name: "Focus", capacity: 6 });
+    expect(listRooms(store, q(`minCapacity=${value}`))).toEqual({ error: "invalid_query" });
+    expect(listRooms(store, q(""))).toEqual([{ id: "r1", name: "Focus", capacity: 6 }]);
+  });
+
+  it("accepts minCapacity=1", () => {
+    const store = createRoomStore();
+    createRoom(store, { name: "Focus", capacity: 6 });
+    expect(listRooms(store, q("minCapacity=1"))).toEqual([{ id: "r1", name: "Focus", capacity: 6 }]);
   });
 
   // @covers room-booking-api:CTR-002
-  it("list rooms contract: rooms are ordered by id and minCapacity keeps capacity at least the value, including equality", () => {
-    const store = seedThree();
-    expect(listRooms(store.rooms, query())).toEqual({ ok: true, status: 200, body: { rooms: [R1, R2, R3] } });
-    expect(listRooms(store.rooms, query("minCapacity=1"))).toEqual({
-      ok: true,
-      status: 200,
-      body: { rooms: [R1, R2, R3] },
-    });
-    expect(listRooms(store.rooms, query("minCapacity=12"))).toEqual({
-      ok: true,
-      status: 200,
-      body: { rooms: [R2] },
-    });
-    expect(listRooms(store.rooms, query("minCapacity=0"))).toMatchObject({ ok: false, code: "invalid_query" });
-    expect(listRooms(store.rooms, query("minCapacity=abc"))).toMatchObject({ ok: false, code: "invalid_query" });
+  it("answers GET /rooms with every room in ascending id order or invalid_query", () => {
+    const store = createRoomStore();
+    expect(listRooms(store, q(""))).toEqual([]);
+    createRoom(store, { name: "A", capacity: 2 });
+    createRoom(store, { name: "B", capacity: 3 });
+    createRoom(store, { name: "C", capacity: 4 });
+    expect(listRooms(store, q(""))).toEqual([
+      { id: "r1", name: "A", capacity: 2 },
+      { id: "r2", name: "B", capacity: 3 },
+      { id: "r3", name: "C", capacity: 4 },
+    ]);
+    expect(listRooms(store, q("minCapacity=0"))).toEqual({ error: "invalid_query" });
   });
 });

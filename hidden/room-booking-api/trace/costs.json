@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "runId": "room-booking-api-20261031-012036",
+  "runId": "room-booking-api-20261031-030005",
   "pricing": {
     "deepseek/deepseek-v4.1-flash-1017": {
       "inputPerMTok": 0.15,
@@ -50,2373 +50,263 @@
   "stages": [
     {
       "stage": "workspace",
-      "startedAt": "2026-10-31T01:20:36.472Z",
-      "endedAt": "2026-10-31T01:22:43.194Z",
-      "durationMs": 126722,
-      "costUsd": 0,
-      "inputTokens": 0,
-      "outputTokens": 0
-    },
-    {
-      "stage": "spec",
-      "startedAt": "2026-10-31T01:22:43.194Z",
-      "endedAt": "2026-10-31T01:29:07.839Z",
-      "durationMs": 384645,
-      "costUsd": 0.250263,
-      "inputTokens": 1440261,
-      "outputTokens": 60832
-    },
-    {
-      "stage": "design",
-      "startedAt": "2026-10-31T01:29:07.839Z",
-      "endedAt": "2026-10-31T01:35:07.313Z",
-      "durationMs": 359474,
-      "costUsd": 0.996158,
-      "inputTokens": 5828168,
-      "outputTokens": 203223
+      "startedAt": "2026-10-31T03:00:05.211Z",
+      "endedAt": "2026-10-31T03:00:05.212Z",
+      "durationMs": 1,
+      "costUsd": 0.13709,
+      "inputTokens": 777538,
+      "outputTokens": 34098
     },
     {
       "stage": "build",
-      "startedAt": "2026-10-31T01:35:07.313Z",
-      "endedAt": "2026-10-31T01:50:37.826Z",
-      "durationMs": 930513,
-      "costUsd": 2.793963,
-      "inputTokens": 1889696,
-      "outputTokens": 296103
+      "startedAt": "2026-10-31T03:00:05.212Z",
+      "endedAt": "2026-10-31T03:09:16.581Z",
+      "durationMs": 551369,
+      "costUsd": 0.343823,
+      "inputTokens": 30,
+      "outputTokens": 10693
     },
     {
       "stage": "assembly",
-      "startedAt": "2026-10-31T01:50:37.826Z",
-      "endedAt": "2026-10-31T01:50:42.335Z",
-      "durationMs": 4509,
+      "startedAt": "2026-10-31T03:09:16.581Z",
+      "endedAt": "2026-10-31T03:09:23.363Z",
+      "durationMs": 6782,
       "costUsd": 0,
       "inputTokens": 0,
       "outputTokens": 0
     }
   ],
-  "tasks": [
-    {
-      "taskId": "T-001",
-      "title": "Provide the error catalogue, in-memory store and time rules",
-      "attempts": {
-        "implementer": 1,
-        "testWriter": 1
-      },
-      "durationMs": 242131,
-      "costUsd": 0.392187,
-      "inputTokens": 337860,
-      "outputTokens": 67629,
-      "models": [
-        "deepseek/deepseek-v4.1-flash-1017"
-      ],
-      "outcome": "approved"
-    },
-    {
-      "taskId": "T-002",
-      "title": "Create and list rooms with field and name validation",
-      "attempts": {
-        "implementer": 1,
-        "testWriter": 1
-      },
-      "durationMs": 292253,
-      "costUsd": 0.42055,
-      "inputTokens": 454478,
-      "outputTokens": 64480,
-      "models": [
-        "deepseek/deepseek-v4.1-flash-1017"
-      ],
-      "outcome": "approved"
-    },
-    {
-      "taskId": "T-003",
-      "title": "Create and delete bookings with capacity and overlap checks",
-      "attempts": {
-        "implementer": 1,
-        "testWriter": 2
-      },
-      "durationMs": 400081,
-      "costUsd": 0.786623,
-      "inputTokens": 396103,
-      "outputTokens": 68159,
-      "models": [
-        "deepseek/deepseek-v4.1-flash-1017"
-      ],
-      "outcome": "approved"
-    },
-    {
-      "taskId": "T-004",
-      "title": "List room bookings in start order with the interval filter",
-      "attempts": {
-        "implementer": 1,
-        "testWriter": 1
-      },
-      "durationMs": 177412,
-      "costUsd": 0.345002,
-      "inputTokens": 250277,
-      "outputTokens": 30401,
-      "models": [
-        "deepseek/deepseek-v4.1-flash-1017"
-      ],
-      "outcome": "approved"
-    },
-    {
-      "taskId": "T-005",
-      "title": "Query the rooms available for a requested interval",
-      "attempts": {
-        "implementer": 1,
-        "testWriter": 1
-      },
-      "durationMs": 150914,
-      "costUsd": 0.361764,
-      "inputTokens": 288679,
-      "outputTokens": 26402,
-      "models": [
-        "deepseek/deepseek-v4.1-flash-1017"
-      ],
-      "outcome": "approved"
-    },
-    {
-      "taskId": "T-006",
-      "title": "Compose the HTTP server, routing and JSON error envelope",
-      "attempts": {
-        "implementer": 1,
-        "testWriter": 1
-      },
-      "durationMs": 287552,
-      "costUsd": 0.487837,
-      "inputTokens": 162299,
-      "outputTokens": 39032,
-      "models": [
-        "deepseek/deepseek-v4.1-flash-1017"
-      ],
-      "outcome": "approved"
-    }
-  ],
+  "tasks": [],
   "participants": [
     {
-      "name": "spec-analyst",
-      "inferences": 42,
-      "costUsd": 0.21361,
-      "inputTokens": 1271815,
-      "outputTokens": 38063
-    },
-    {
-      "name": "spec-critic",
-      "inferences": 11,
-      "costUsd": 0.036653,
-      "inputTokens": 168446,
-      "outputTokens": 22769
-    },
-    {
-      "name": "verification-designer",
-      "inferences": 10,
-      "costUsd": 0.093256,
-      "inputTokens": 385920,
-      "outputTokens": 58948
-    },
-    {
-      "name": "architect",
-      "inferences": 12,
-      "costUsd": 0.074908,
-      "inputTokens": 311746,
-      "outputTokens": 46910
-    },
-    {
-      "name": "planner",
-      "inferences": 64,
-      "costUsd": 0.827994,
-      "inputTokens": 5130502,
-      "outputTokens": 97365
-    },
-    {
       "name": "test-writer",
-      "inferences": 7,
-      "costUsd": 1.602995,
-      "inputTokens": 66,
-      "outputTokens": 53978
+      "inferences": 1,
+      "costUsd": 0.188759,
+      "inputTokens": 14,
+      "outputTokens": 7207
     },
     {
       "name": "implementer",
-      "inferences": 6,
-      "costUsd": 0.771607,
-      "inputTokens": 60,
-      "outputTokens": 15585
+      "inferences": 1,
+      "costUsd": 0.155065,
+      "inputTokens": 16,
+      "outputTokens": 3486
     },
     {
       "name": "reviewer",
-      "inferences": 64,
-      "costUsd": 0.419361,
-      "inputTokens": 1889570,
-      "outputTokens": 226540
+      "inferences": 18,
+      "costUsd": 0.13709,
+      "inputTokens": 777538,
+      "outputTokens": 34098
     }
   ],
   "entries": [
     {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000695,
-      "inputTokens": 4084,
-      "outputTokens": 137,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4748
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000824,
-      "inputTokens": 5272,
-      "outputTokens": 56,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1179
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.016411,
-      "inputTokens": 5899,
-      "outputTokens": 25877,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 99513
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003621,
-      "inputTokens": 23961,
-      "outputTokens": 44,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1741
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003636,
-      "inputTokens": 24046,
-      "outputTokens": 49,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1196
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004608,
-      "inputTokens": 25427,
-      "outputTokens": 1324,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 11214
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004189,
-      "inputTokens": 26645,
-      "outputTokens": 320,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1788
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000544,
-      "inputTokens": 3330,
-      "outputTokens": 88,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 1218
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000689,
-      "inputTokens": 4435,
-      "outputTokens": 47,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 916
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.012749,
-      "inputTokens": 22062,
-      "outputTokens": 18879,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 83728
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003831,
-      "inputTokens": 23946,
-      "outputTokens": 478,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 2211
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003902,
-      "inputTokens": 24477,
-      "outputTokens": 461,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 2530
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000681,
-      "inputTokens": 4074,
-      "outputTokens": 116,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 954
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000819,
-      "inputTokens": 5262,
-      "outputTokens": 50,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 692
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.00368,
-      "inputTokens": 23268,
-      "outputTokens": 316,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2789
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003588,
-      "inputTokens": 23326,
-      "outputTokens": 149,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1279
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003533,
-      "inputTokens": 23380,
-      "outputTokens": 44,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 680
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.003915,
-      "inputTokens": 25188,
-      "outputTokens": 228,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1474
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004289,
-      "inputTokens": 26569,
-      "outputTokens": 506,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3984
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004212,
-      "inputTokens": 27039,
-      "outputTokens": 260,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1903
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.00414,
-      "inputTokens": 27399,
-      "outputTokens": 50,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 761
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004232,
-      "inputTokens": 28016,
-      "outputTokens": 49,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 746
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004265,
-      "inputTokens": 28240,
-      "outputTokens": 49,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1016
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004987,
-      "inputTokens": 28445,
-      "outputTokens": 1201,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6918
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.00442,
-      "inputTokens": 29080,
-      "outputTokens": 96,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 983
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004984,
-      "inputTokens": 29213,
-      "outputTokens": 1004,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4812
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004557,
-      "inputTokens": 29996,
-      "outputTokens": 96,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1038
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004925,
-      "inputTokens": 30131,
-      "outputTokens": 675,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3796
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004626,
-      "inputTokens": 30465,
-      "outputTokens": 94,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 951
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004749,
-      "inputTokens": 30597,
-      "outputTokens": 265,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1637
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004915,
-      "inputTokens": 30912,
-      "outputTokens": 463,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3004
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004836,
-      "inputTokens": 31205,
-      "outputTokens": 258,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1567
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004888,
-      "inputTokens": 31520,
-      "outputTokens": 266,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1579
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004877,
-      "inputTokens": 31813,
-      "outputTokens": 175,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2206
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.00505,
-      "inputTokens": 31945,
-      "outputTokens": 431,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2906
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004921,
-      "inputTokens": 32259,
-      "outputTokens": 137,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1195
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004918,
-      "inputTokens": 32396,
-      "outputTokens": 98,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 978
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004966,
-      "inputTokens": 32533,
-      "outputTokens": 144,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1204
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.00503,
-      "inputTokens": 32618,
-      "outputTokens": 228,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2383
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.008026,
-      "inputTokens": 51132,
-      "outputTokens": 594,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4240
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.007801,
-      "inputTokens": 51621,
-      "outputTokens": 96,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1243
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.008054,
-      "inputTokens": 51754,
-      "outputTokens": 485,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3447
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.007868,
-      "inputTokens": 52068,
-      "outputTokens": 96,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1007
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.007857,
-      "inputTokens": 52203,
-      "outputTokens": 44,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 939
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.007901,
-      "inputTokens": 52288,
-      "outputTokens": 97,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1214
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.008706,
-      "inputTokens": 53723,
-      "outputTokens": 1080,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6419
-    },
-    {
-      "participant": "spec-analyst",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.00841,
-      "inputTokens": 54803,
-      "outputTokens": 316,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2528
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000562,
-      "inputTokens": 3330,
-      "outputTokens": 125,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 916
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000727,
-      "inputTokens": 4435,
-      "outputTokens": 124,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 1725
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.000964,
-      "inputTokens": 6267,
-      "outputTokens": 47,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 849
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004544,
-      "inputTokens": 24432,
-      "outputTokens": 1758,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 6488
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004065,
-      "inputTokens": 25617,
-      "outputTokens": 445,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 1938
-    },
-    {
-      "participant": "spec-critic",
-      "taskId": null,
-      "stage": "spec",
-      "costUsd": 0.004076,
-      "inputTokens": 26115,
-      "outputTokens": 317,
-      "model": "z-ai/glm-5.3-flash:nitro",
-      "durationMs": 1568
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000517,
-      "inputTokens": 3135,
-      "outputTokens": 78,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 721
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000612,
-      "inputTokens": 3771,
-      "outputTokens": 77,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1271
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000504,
-      "inputTokens": 3193,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 811
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000599,
-      "inputTokens": 3829,
-      "outputTokens": 41,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1262
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004008,
-      "inputTokens": 26451,
-      "outputTokens": 67,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1784
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004094,
-      "inputTokens": 27087,
-      "outputTokens": 52,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1578
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004141,
-      "inputTokens": 27365,
-      "outputTokens": 60,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1991
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004465,
-      "inputTokens": 28553,
-      "outputTokens": 304,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3021
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.00436,
-      "inputTokens": 28640,
-      "outputTokens": 107,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1598
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004378,
-      "inputTokens": 28844,
-      "outputTokens": 85,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1832
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004389,
-      "inputTokens": 28913,
-      "outputTokens": 87,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1857
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.019127,
-      "inputTokens": 29064,
-      "outputTokens": 24612,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 127349
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.031807,
-      "inputTokens": 26729,
-      "outputTokens": 46330,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 144970
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010263,
-      "inputTokens": 53268,
-      "outputTokens": 3788,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 15610
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.008391,
-      "inputTokens": 53490,
-      "outputTokens": 613,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2363
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.008457,
-      "inputTokens": 53839,
-      "outputTokens": 635,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2525
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.009837,
-      "inputTokens": 54186,
-      "outputTokens": 2849,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 9901
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010453,
-      "inputTokens": 54438,
-      "outputTokens": 3812,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 10941
-    },
-    {
-      "participant": "verification-designer",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.009019,
-      "inputTokens": 57191,
-      "outputTokens": 734,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4673
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.01619,
-      "inputTokens": 29168,
-      "outputTokens": 19691,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 95171
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.006661,
-      "inputTokens": 37423,
-      "outputTokens": 1746,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 9131
-    },
-    {
-      "participant": "architect",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.005892,
-      "inputTokens": 39089,
-      "outputTokens": 48,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2082
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000655,
-      "inputTokens": 4052,
-      "outputTokens": 78,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 757
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000663,
-      "inputTokens": 4141,
-      "outputTokens": 70,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1053
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.000655,
-      "inputTokens": 4197,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 936
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.004143,
-      "inputTokens": 27455,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1036
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.005374,
-      "inputTokens": 35654,
-      "outputTokens": 43,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 925
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012838,
-      "inputTokens": 62078,
-      "outputTokens": 5878,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 13274
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010636,
-      "inputTokens": 63532,
-      "outputTokens": 1844,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5741
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.01025,
-      "inputTokens": 63708,
-      "outputTokens": 1157,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4079
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010165,
-      "inputTokens": 63862,
-      "outputTokens": 976,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3433
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010159,
-      "inputTokens": 64016,
-      "outputTokens": 927,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2950
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.0121,
-      "inputTokens": 64192,
-      "outputTokens": 4119,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 10601
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010365,
-      "inputTokens": 66549,
-      "outputTokens": 637,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2439
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010422,
-      "inputTokens": 66703,
-      "outputTokens": 695,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2202
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010599,
-      "inputTokens": 66857,
-      "outputTokens": 950,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3894
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010962,
-      "inputTokens": 68255,
-      "outputTokens": 1207,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3991
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.01188,
-      "inputTokens": 68431,
-      "outputTokens": 2693,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 7191
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011024,
-      "inputTokens": 69915,
-      "outputTokens": 894,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3480
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011486,
-      "inputTokens": 70069,
-      "outputTokens": 1626,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4267
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011652,
-      "inputTokens": 70223,
-      "outputTokens": 1865,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5291
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011243,
-      "inputTokens": 70609,
-      "outputTokens": 1086,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3657
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.010979,
-      "inputTokens": 70763,
-      "outputTokens": 607,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2742
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011429,
-      "inputTokens": 70927,
-      "outputTokens": 1317,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4011
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011745,
-      "inputTokens": 72355,
-      "outputTokens": 1487,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5051
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012121,
-      "inputTokens": 72551,
-      "outputTokens": 2064,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6173
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012242,
-      "inputTokens": 73018,
-      "outputTokens": 2149,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6203
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012385,
-      "inputTokens": 74472,
-      "outputTokens": 2023,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5893
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.011768,
-      "inputTokens": 75926,
-      "outputTokens": 631,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2678
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.013059,
-      "inputTokens": 76102,
-      "outputTokens": 2740,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 7758
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012892,
-      "inputTokens": 77586,
-      "outputTokens": 2090,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5183
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.014147,
-      "inputTokens": 79040,
-      "outputTokens": 3818,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 8872
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012629,
-      "inputTokens": 80494,
-      "outputTokens": 924,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3499
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.013525,
-      "inputTokens": 80670,
-      "outputTokens": 2374,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6504
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012938,
-      "inputTokens": 82124,
-      "outputTokens": 1032,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3927
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012751,
-      "inputTokens": 82300,
-      "outputTokens": 677,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2580
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012445,
-      "inputTokens": 82476,
-      "outputTokens": 122,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1274
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.012431,
-      "inputTokens": 82652,
-      "outputTokens": 55,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 937
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.013424,
-      "inputTokens": 84050,
-      "outputTokens": 1360,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4061
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.014771,
-      "inputTokens": 84226,
-      "outputTokens": 3562,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 10985
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.013425,
-      "inputTokens": 86635,
-      "outputTokens": 717,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2977
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.013398,
-      "inputTokens": 86831,
-      "outputTokens": 622,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2544
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.013832,
-      "inputTokens": 87027,
-      "outputTokens": 1296,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4890
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.014026,
-      "inputTokens": 88425,
-      "outputTokens": 1271,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4288
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.014972,
-      "inputTokens": 90778,
-      "outputTokens": 2259,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6103
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.014357,
-      "inputTokens": 92232,
-      "outputTokens": 871,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3293
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.015283,
-      "inputTokens": 92408,
-      "outputTokens": 2370,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6360
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.015093,
-      "inputTokens": 93862,
-      "outputTokens": 1689,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5389
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.014271,
-      "inputTokens": 94789,
-      "outputTokens": 87,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1425
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.015608,
-      "inputTokens": 96187,
-      "outputTokens": 1966,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5111
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017227,
-      "inputTokens": 97641,
-      "outputTokens": 4301,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 13408
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.015044,
-      "inputTokens": 100122,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1250
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.016475,
-      "inputTokens": 101520,
-      "outputTokens": 2079,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6334
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.016974,
-      "inputTokens": 102974,
-      "outputTokens": 2547,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 7360
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.016823,
-      "inputTokens": 104428,
-      "outputTokens": 1931,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5416
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017026,
-      "inputTokens": 105882,
-      "outputTokens": 1906,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5265
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017405,
-      "inputTokens": 107336,
-      "outputTokens": 2175,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6478
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017639,
-      "inputTokens": 108790,
-      "outputTokens": 2201,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6196
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017702,
-      "inputTokens": 110244,
-      "outputTokens": 1943,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5478
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017166,
-      "inputTokens": 111698,
-      "outputTokens": 686,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2666
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017924,
-      "inputTokens": 111874,
-      "outputTokens": 1905,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4795
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.018154,
-      "inputTokens": 113328,
-      "outputTokens": 1925,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 11482
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.017268,
-      "inputTokens": 114782,
-      "outputTokens": 84,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1331
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.019238,
-      "inputTokens": 116180,
-      "outputTokens": 3019,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 7832
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.01841,
-      "inputTokens": 118662,
-      "outputTokens": 1018,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3643
-    },
-    {
-      "participant": "planner",
-      "taskId": null,
-      "stage": "design",
-      "costUsd": 0.018302,
-      "inputTokens": 119637,
-      "outputTokens": 594,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2967
-    },
-    {
       "participant": "test-writer",
-      "taskId": "T-001",
+      "taskId": "T-006",
       "stage": "build",
-      "costUsd": 0.18036,
-      "inputTokens": 8,
-      "outputTokens": 6356,
+      "costUsd": 0.18875860000000003,
+      "inputTokens": 14,
+      "outputTokens": 7207,
       "model": null,
-      "durationMs": 43693
+      "durationMs": 240934
     },
     {
       "participant": "implementer",
-      "taskId": "T-001",
+      "taskId": "T-006",
       "stage": "build",
-      "costUsd": 0.1261438,
-      "inputTokens": 8,
-      "outputTokens": 2931,
+      "costUsd": 0.15506470000000003,
+      "inputTokens": 16,
+      "outputTokens": 3486,
       "model": null,
-      "durationMs": 21754
+      "durationMs": 30710
     },
     {
       "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.002292,
-      "inputTokens": 14799,
-      "outputTokens": 121,
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.004756,
+      "inputTokens": 21803,
+      "outputTokens": 2476,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1071
+      "durationMs": 17679
     },
     {
       "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.002318,
-      "inputTokens": 15287,
-      "outputTokens": 42,
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.00348,
+      "inputTokens": 22689,
+      "outputTokens": 128,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 842
+      "durationMs": 1307
     },
     {
       "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.00241,
-      "inputTokens": 15896,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 900
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.003721,
-      "inputTokens": 16305,
-      "outputTokens": 2125,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 5950
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.002661,
-      "inputTokens": 17560,
-      "outputTokens": 45,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 681
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.002758,
-      "inputTokens": 18213,
-      "outputTokens": 43,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 833
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.002906,
-      "inputTokens": 19104,
-      "outputTokens": 67,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 974
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.010635,
-      "inputTokens": 19193,
-      "outputTokens": 12926,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 33915
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.002952,
-      "inputTokens": 19471,
-      "outputTokens": 53,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 827
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.0165,
-      "inputTokens": 42729,
-      "outputTokens": 16817,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 42765
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.021503,
-      "inputTokens": 44127,
-      "outputTokens": 24807,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 72349
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.00754,
-      "inputTokens": 47182,
-      "outputTokens": 771,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2768
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-001",
-      "stage": "build",
-      "costUsd": 0.007487,
-      "inputTokens": 47978,
-      "outputTokens": 483,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2437
-    },
-    {
-      "participant": "test-writer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.1931269,
-      "inputTokens": 10,
-      "outputTokens": 6226,
-      "model": null,
-      "durationMs": 44575
-    },
-    {
-      "participant": "test-writer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.20525120000000002,
-      "inputTokens": 10,
-      "outputTokens": 7068,
-      "model": null,
-      "durationMs": 49853
-    },
-    {
-      "participant": "test-writer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.2173175,
-      "inputTokens": 10,
-      "outputTokens": 7140,
-      "model": null,
-      "durationMs": 49679
-    },
-    {
-      "participant": "implementer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.1009896,
-      "inputTokens": 10,
-      "outputTokens": 1932,
-      "model": null,
-      "durationMs": 20102
-    },
-    {
-      "participant": "implementer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.10269300000000002,
-      "inputTokens": 10,
-      "outputTokens": 1798,
-      "model": null,
-      "durationMs": 17279
-    },
-    {
-      "participant": "test-writer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.32268800000000003,
-      "inputTokens": 10,
-      "outputTokens": 10839,
-      "model": null,
-      "durationMs": 68866
-    },
-    {
-      "participant": "implementer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.1017773,
-      "inputTokens": 8,
-      "outputTokens": 1866,
-      "model": null,
-      "durationMs": 17281
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.0022,
-      "inputTokens": 14234,
-      "outputTokens": 108,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2243
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.002208,
-      "inputTokens": 14165,
-      "outputTokens": 139,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 926
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.002246,
-      "inputTokens": 14677,
-      "outputTokens": 74,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 658
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.0023,
-      "inputTokens": 15165,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 481
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.002327,
-      "inputTokens": 14751,
-      "outputTokens": 191,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1759
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.002361,
-      "inputTokens": 15574,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 484
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.002361,
-      "inputTokens": 15360,
-      "outputTokens": 95,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1408
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.002436,
-      "inputTokens": 15697,
-      "outputTokens": 135,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1155
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.002402,
-      "inputTokens": 15848,
-      "outputTokens": 42,
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.003635,
+      "inputTokens": 23730,
+      "outputTokens": 126,
       "model": "deepseek/deepseek-v4.1-flash-1017",
       "durationMs": 1039
     },
     {
       "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.002439,
-      "inputTokens": 15789,
-      "outputTokens": 117,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1086
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.00247,
-      "inputTokens": 16284,
-      "outputTokens": 45,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 674
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.002905,
-      "inputTokens": 19140,
-      "outputTokens": 56,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 787
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.003083,
-      "inputTokens": 16257,
-      "outputTokens": 1074,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 6014
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.005967,
-      "inputTokens": 39515,
-      "outputTokens": 66,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1997
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.004094,
-      "inputTokens": 16183,
-      "outputTokens": 2778,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 13243
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.002902,
-      "inputTokens": 18858,
-      "outputTokens": 122,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 838
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.002863,
-      "inputTokens": 18916,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 526
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.005169,
-      "inputTokens": 19749,
-      "outputTokens": 3678,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 14935
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.003078,
-      "inputTokens": 20237,
-      "outputTokens": 70,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 743
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.003069,
-      "inputTokens": 20295,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1137
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.009125,
-      "inputTokens": 42174,
-      "outputTokens": 4665,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 14278
-    },
-    {
-      "participant": "test-writer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.2488891,
-      "inputTokens": 10,
-      "outputTokens": 7019,
-      "model": null,
-      "durationMs": 49455
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.01204,
-      "inputTokens": 43553,
-      "outputTokens": 9178,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 32389
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.011614,
-      "inputTokens": 42452,
-      "outputTokens": 8744,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 40692
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.007034,
-      "inputTokens": 44998,
-      "outputTokens": 474,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1795
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-005",
-      "stage": "build",
-      "costUsd": 0.007073,
-      "inputTokens": 45497,
-      "outputTokens": 414,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1434
-    },
-    {
-      "participant": "implementer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.1269903,
-      "inputTokens": 10,
-      "outputTokens": 2557,
-      "model": null,
-      "durationMs": 21469
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.003001,
-      "inputTokens": 19429,
-      "outputTokens": 145,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1949
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.003112,
-      "inputTokens": 20328,
-      "outputTokens": 105,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1549
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.003684,
-      "inputTokens": 24138,
-      "outputTokens": 106,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1531
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.00374,
-      "inputTokens": 24747,
-      "outputTokens": 47,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1385
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.003822,
-      "inputTokens": 25156,
-      "outputTokens": 81,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1317
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.017947,
-      "inputTokens": 42052,
-      "outputTokens": 19398,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 81628
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.007336,
-      "inputTokens": 45708,
-      "outputTokens": 799,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4202
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.01374,
-      "inputTokens": 43831,
-      "outputTokens": 11943,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 44097
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-004",
-      "stage": "build",
-      "costUsd": 0.007262,
-      "inputTokens": 46532,
-      "outputTokens": 470,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3069
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.011904,
-      "inputTokens": 43885,
-      "outputTokens": 8868,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 33887
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.011014,
-      "inputTokens": 25644,
-      "outputTokens": 11945,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 58379
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.007558,
-      "inputTokens": 25736,
-      "outputTokens": 6163,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 26686
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.003894,
-      "inputTokens": 25794,
-      "outputTokens": 42,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1065
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.014496,
-      "inputTokens": 45283,
-      "outputTokens": 12839,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 51527
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.011719,
-      "inputTokens": 48126,
-      "outputTokens": 7500,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 24825
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.007935,
-      "inputTokens": 51052,
-      "outputTokens": 462,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3002
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-002",
-      "stage": "build",
-      "costUsd": 0.008055,
-      "inputTokens": 51539,
-      "outputTokens": 541,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 2989
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.013517,
-      "inputTokens": 49052,
-      "outputTokens": 10266,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 49982
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.018042,
-      "inputTokens": 49330,
-      "outputTokens": 17737,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 87235
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.008327,
-      "inputTokens": 53085,
-      "outputTokens": 607,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4688
-    },
-    {
-      "participant": "reviewer",
-      "taskId": "T-003",
-      "stage": "build",
-      "costUsd": 0.008345,
-      "inputTokens": 53634,
-      "outputTokens": 500,
-      "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 3847
-    },
-    {
-      "participant": "test-writer",
       "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.23536210000000002,
-      "inputTokens": 8,
-      "outputTokens": 9330,
-      "model": null,
-      "durationMs": 66965
-    },
-    {
-      "participant": "implementer",
-      "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.213013,
-      "inputTokens": 14,
-      "outputTokens": 4501,
-      "model": null,
-      "durationMs": 36973
+      "stage": "workspace",
+      "costUsd": 0.003663,
+      "inputTokens": 24245,
+      "outputTokens": 43,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 517
     },
     {
       "participant": "reviewer",
       "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.008513,
-      "inputTokens": 27063,
-      "outputTokens": 7422,
+      "stage": "workspace",
+      "costUsd": 0.005504,
+      "inputTokens": 25299,
+      "outputTokens": 2849,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 47020
+      "durationMs": 15598
     },
     {
       "participant": "reviewer",
       "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.004689,
-      "inputTokens": 30901,
-      "outputTokens": 90,
+      "stage": "workspace",
+      "costUsd": 0.005533,
+      "inputTokens": 27196,
+      "outputTokens": 2422,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 1034
+      "durationMs": 12780
     },
     {
       "participant": "reviewer",
       "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.014766,
-      "inputTokens": 32422,
-      "outputTokens": 16504,
+      "stage": "workspace",
+      "costUsd": 0.005426,
+      "inputTokens": 31126,
+      "outputTokens": 1262,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 99451
+      "durationMs": 7882
     },
     {
       "participant": "reviewer",
       "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.005736,
-      "inputTokens": 35603,
-      "outputTokens": 660,
+      "stage": "workspace",
+      "costUsd": 0.004745,
+      "inputTokens": 31184,
+      "outputTokens": 113,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4285
+      "durationMs": 864
     },
     {
       "participant": "reviewer",
       "taskId": "T-006",
-      "stage": "build",
-      "costUsd": 0.005758,
-      "inputTokens": 36288,
-      "outputTokens": 525,
+      "stage": "workspace",
+      "costUsd": 0.004769,
+      "inputTokens": 31462,
+      "outputTokens": 82,
       "model": "deepseek/deepseek-v4.1-flash-1017",
-      "durationMs": 4134
+      "durationMs": 697
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.010873,
+      "inputTokens": 58452,
+      "outputTokens": 3509,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 17442
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.008853,
+      "inputTokens": 58666,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 805
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.008843,
+      "inputTokens": 58791,
+      "outputTokens": 41,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 658
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.010948,
+      "inputTokens": 58857,
+      "outputTokens": 3533,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 16745
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.009747,
+      "inputTokens": 59330,
+      "outputTokens": 1412,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 6748
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.011387,
+      "inputTokens": 59490,
+      "outputTokens": 4106,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 21674
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.015434,
+      "inputTokens": 59564,
+      "outputTokens": 10832,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 47634
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.0098,
+      "inputTokens": 62455,
+      "outputTokens": 719,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 4723
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "workspace",
+      "costUsd": 0.009694,
+      "inputTokens": 63199,
+      "outputTokens": 357,
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "durationMs": 1541
     }
   ],
   "totals": {
-    "durationMs": 1805928,
-    "costUsd": 4.040384,
-    "inputTokens": 9158125,
-    "outputTokens": 560158,
+    "durationMs": 558217,
+    "costUsd": 0.480913,
+    "inputTokens": 777568,
+    "outputTokens": 44791,
     "unknownCostEntries": 0
   }
 }
