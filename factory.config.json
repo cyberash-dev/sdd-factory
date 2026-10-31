@@ -26,7 +26,7 @@
     "default": "deepseek/deepseek-v4.1-flash-1017:nitro",
     "critic": "openai/gpt-6.1-terra",
     "triage": "deepseek/deepseek-v4.1-flash-1017:nitro",
-    "reviewer": "openai/gpt-6.1-terra",
+    "reviewer": "z-ai/glm-5.3",
     "lane": null,
     "lanes": {
       "test-writer": "claude-opus-5-5",
@@ -46,6 +46,10 @@
     }
   },
   "pricing": {
+    "z-ai/glm-5.3": {
+      "inputPerMillion": 0.07,
+      "outputPerMillion": 1.4
+    },
     "deepseek/deepseek-v4.1-flash-1017": {
       "inputPerMillion": 0.15,
       "outputPerMillion": 0.6
