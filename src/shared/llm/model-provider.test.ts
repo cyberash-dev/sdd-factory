@@ -27,6 +27,12 @@ describe("factory model registry", () => {
     expect([providerOf("z-ai/glm-5.3-flash:nitro"), nitro?.specification.supportedReasoningEfforts, nitro?.specification.supportsFunctionCalling]).toEqual(["openrouter", ["max", "high", "low"], true]);
   });
 
+  it("registers the throughput-sorted DeepSeek variant as the same OpenRouter model", () => {
+    const nitro = FACTORY_MODELS.find((model) => model.specification.name === "deepseek/deepseek-v4.1-flash-1017:nitro");
+
+    expect([providerOf("deepseek/deepseek-v4.1-flash-1017:nitro"), nitro?.specification.supportedReasoningEfforts, nitro?.specification.supportsFunctionCalling]).toEqual(["openrouter", ["max", "high", "medium", "low", "none"], true]);
+  });
+
   it("keeps every bundled Mozaik model and answers null for an unknown id", () => {
     expect([providerOf("claude-opus-5-5"), providerOf("gpt-6-luna"), providerOf("deepseek-flash"), providerOf("gpt-99")]).toEqual(["anthropic", "openai", "deepseek", null]);
   });
