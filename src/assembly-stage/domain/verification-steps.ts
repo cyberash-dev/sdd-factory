@@ -13,30 +13,8 @@ export const NETWORK_FAILURE = /ENOTFOUND|ECONNRESET|ETIMEDOUT/;
 
 export const VITEST_REPORT_FILE = "vitest.json";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function definesBuildScript(packageJson: string | null): boolean {
-  if (packageJson === null) {
-    return false;
-  }
-  let manifest: unknown;
-  try {
-    manifest = JSON.parse(packageJson);
-  } catch (error) {
-    /* an unparseable package.json fails npm ci first; the sequence is chosen again after a fix */
-    if (error instanceof SyntaxError) {
-      return false;
-    }
-    throw error;
-  }
-  const scripts = isRecord(manifest) ? manifest["scripts"] : undefined;
-  return isRecord(scripts) && typeof scripts["build"] === "string";
-}
-
-export function verificationSequence(hasBuildScript: boolean): readonly AssemblyStep[] {
-  return hasBuildScript ? BUILD_VERIFICATION_SEQUENCE : VERIFICATION_SEQUENCE;
+export function verificationSequence(hasBuildStep: boolean): readonly AssemblyStep[] {
+  return hasBuildStep ? BUILD_VERIFICATION_SEQUENCE : VERIFICATION_SEQUENCE;
 }
 
 export function stepArgv(step: AssemblyStep, evidenceDir: string): Argv {

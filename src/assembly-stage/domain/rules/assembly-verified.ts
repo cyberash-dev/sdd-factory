@@ -42,6 +42,9 @@ export function assemblyVerifiedRule(deps: AssemblyRuleDeps): TransitionRule {
       if (step === "sdd_ready") {
         return { state: building, emits: [], effects: [{ kind: ASSEMBLY_EFFECT.routeSddReady, round, evidencePath }] };
       }
+      if (step === "build") {
+        return { state: building, emits: [], effects: [{ kind: ASSEMBLY_EFFECT.routeBuild, round, evidencePath }] };
+      }
       return { state: building, emits: [], effects: [{ kind: ASSEMBLY_EFFECT.triage, round, step, evidencePath }] };
     },
   };

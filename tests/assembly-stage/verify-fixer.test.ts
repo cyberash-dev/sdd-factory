@@ -25,6 +25,7 @@ interface ScenarioInput {
   readonly vitest: (productDir: string) => string;
   readonly install?: () => CommandResult;
   readonly build?: (productDir: string) => Promise<CommandResult>;
+  readonly sourceSpec?: string;
   readonly fixerWrites: Readonly<Record<string, string>>;
   readonly fixerOverrides?: Partial<CliRoleOutcome>;
 }
@@ -69,6 +70,7 @@ async function runFixerScenario(input: ScenarioInput): Promise<FixerScenario> {
     "spec/spec.md": baselineSpec(SLUG, "0".repeat(40), "0".repeat(64)),
     "src/answer.ts": BROKEN_SOURCE,
   });
+  await writeFiles(root, { "spec.md": input.sourceSpec ?? "# todo\n" });
   const runner = fakeCommandRunner(async (invocation) => {
     const line = commandLine(invocation);
     if (line.startsWith("npm ci")) {
@@ -255,5 +257,12 @@ describe("assembly.verify simple-fixer on a mechanical red step", () => {
     const scenario = await runFixerScenario({ ...repairedTypecheck(), tsc: async () => ok(), build: typecheckOf });
 
     expect(stepCommands(scenario.runner)).toEqual(["npm ci --prefer-offline", "npx tsc --noEmit", "npm run build", "npm run build", "npm ci --prefer-offline", "npx tsc --noEmit", "npm run build", "npx vitest run", "npx sdd token", "npx sdd ready"]);
+  });
+
+  // @covers assembly-stage:DLT-006
+  it("never invokes the fixer for a script the source spec names but package.json lacks", async () => {
+    const scenario = await runFixerScenario({ ...repairedTypecheck(), tsc: async () => ok(), build: async () => ok(), sourceSpec: "- Start it with `npm start` after `npm run build`.\n" });
+
+    expect([scenario.fixerRequests.length, eventsOf(scenario.context)]).toEqual([0, ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified build red"]]);
   });
 });

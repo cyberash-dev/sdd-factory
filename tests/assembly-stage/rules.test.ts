@@ -113,6 +113,13 @@ describe("assembly.verified rule", () => {
     expect(result.effects).toEqual([{ kind: "assembly.route-sdd-ready", round: 1, evidencePath: "/run/handoffs/assembly/round-1/sdd_ready.log" }]);
   });
 
+  // @covers assembly-stage:DLT-006
+  it("delegates a build failure to the build router", () => {
+    const result = assemblyVerifiedRule(DEPS).apply({ state: assembling(1), event: verified("red", "build") });
+
+    expect([result.state.status, result.emits, result.effects]).toEqual(["building", [], [{ kind: "assembly.route-build", round: 1, evidencePath: "/run/handoffs/assembly/round-1/build.log" }]]);
+  });
+
   // @covers assembly-stage:BEH-007
   // @covers assembly-stage:INV-004
   it("fails the run with cap_exhausted on a red result in the last allowed round and emits no rework", () => {

@@ -9,3 +9,7 @@ export function sddReadyReason(kind: string, reference: string): string {
 export function uncoveredWithoutOwnerReason(specIds: readonly string[]): string {
   return `uncovered without owner: ${specIds.join(", ")}`;
 }
+
+export function missingScriptsReason(names: readonly string[]): string {
+  return `missing npm scripts named by the spec: ${names.join(", ")}`;
+}

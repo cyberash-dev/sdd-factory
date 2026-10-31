@@ -408,8 +408,10 @@ describe("assembly.verify build step", () => {
   });
 
   // @covers assembly-stage:DLT-005
-  it("runs no build command for a product whose package.json defines no build script", async () => {
+  // @covers assembly-stage:DLT-006
+  it("runs no build step for a product without a build script whose source spec names no npm command", async () => {
     const fixture = await productRepo();
+    await writeTextAtomic(join(fixture.root, "spec.md"), "# todo\n\nA CLI that counts its arguments.\n");
     const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
 
     const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
@@ -417,6 +419,52 @@ describe("assembly.verify build step", () => {
     expect([stepCommands(runner).filter((command) => command.startsWith("npm ")), stepsOf(context)]).toEqual([
       ["npm ci --prefer-offline"],
       ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified test green", "assembly.verified sdd_ready green"],
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-006
+  // @covers assembly-stage:BEH-003
+  it("makes the build step red without running the build when the source spec names a script package.json lacks", async () => {
+    const fixture = await productRepo(BUILD_PRODUCT_FILES);
+    await writeTextAtomic(join(fixture.root, "spec.md"), "- Start it with `npm start` after `npm run build`.\n");
+    const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    const evidenceDir = join(fixture.root, "run/handoffs/assembly/round-1");
+    expect([context.published.at(-1)?.payload, stepCommands(runner).includes("npm run build"), await readTextOrNull(join(evidenceDir, "npm_scripts.json")), await readTextOrNull(join(evidenceDir, "build.log"))]).toEqual([
+      { result: "red", step: "build", evidencePath: join(evidenceDir, "npm_scripts.json"), failingCovers: [] },
+      false,
+      '{"named":["build","start"],"missing":["start"]}\n',
+      "--- stdout ---\nmissing npm scripts named by the spec: start\n--- stderr ---\n\n",
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-006
+  it("runs npm run build when package.json defines every script the source spec names", async () => {
+    const fixture = await productRepo({ ...PRODUCT_FILES, "package.json": '{"name":"todo-cli","private":true,"scripts":{"start":"node dist/index.js","build":"tsc"}}\n' });
+    await writeTextAtomic(join(fixture.root, "spec.md"), "- Start it with `npm start` after `npm run build`.\n");
+    const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([stepCommands(runner).includes("npm run build"), stepsOf(context)]).toEqual([
+      true,
+      ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified build green", "assembly.verified test green", "assembly.verified sdd_ready green"],
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-006
+  it("runs the scripts check as a green build step without a build command for a product without scripts.build", async () => {
+    const fixture = await productRepo({ ...PRODUCT_FILES, "package.json": '{"name":"todo-cli","private":true,"scripts":{"start":"node src/index.js"}}\n' });
+    await writeTextAtomic(join(fixture.root, "spec.md"), "- Start it with `npm start`.\n");
+    const runner = fakeCommandRunner(withBuild(ok(), allGreen(vitestReport({ passing: ["x"] }))));
+
+    const { context } = await runVerify(fixture, runner, { "T-001": taskState({ implSha: fixture.baseSha }) }, ["T-001"]);
+
+    expect([stepCommands(runner).filter((command) => command.startsWith("npm ")), stepsOf(context)]).toEqual([
+      ["npm ci --prefer-offline"],
+      ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified build green", "assembly.verified test green", "assembly.verified sdd_ready green"],
     ]);
   });
 });

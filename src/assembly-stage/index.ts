@@ -3,6 +3,7 @@ import type { SliceFactory } from "../shared/slice.js";
 import { createExecFileCommandRunner } from "./adapters/outbound/exec-file-command-runner.js";
 import { publishEffect } from "./application/publish.js";
 import { recordEffect } from "./application/record.js";
+import { routeBuildEffect } from "./application/route-build.js";
 import { routeSddReadyEffect } from "./application/route-sdd-ready.js";
 import { startEffect } from "./application/start.js";
 import { TRIAGE_HANDOFF, triageEffect } from "./application/triage.js";
@@ -31,6 +32,7 @@ export function createAssemblySlice(options: AssemblySliceOptions = {}): SliceFa
         [ASSEMBLY_EFFECT.verify]: verifyEffect(runner),
         [ASSEMBLY_EFFECT.triage]: triage,
         [ASSEMBLY_EFFECT.routeSddReady]: routeSddReadyEffect(triage),
+        [ASSEMBLY_EFFECT.routeBuild]: routeBuildEffect(triage),
         [ASSEMBLY_EFFECT.publish]: publishEffect(runner),
         [ASSEMBLY_EFFECT.record]: recordEffect(),
       },

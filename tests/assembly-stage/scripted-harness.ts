@@ -39,6 +39,7 @@ export interface ScriptedOptions {
   readonly vitest: (run: number, productDir: string) => string;
   readonly tsc?: (run: number) => CommandResult;
   readonly apiRoles?: ApiRoleRunner;
+  readonly sourceSpec?: string;
 }
 
 export interface ScriptedAssembly {
@@ -105,6 +106,7 @@ export async function scriptedAssembly(options: ScriptedOptions): Promise<Script
   }
   await initRepo(teamDir, "main", { "README.md": "team\n" });
   await writeFiles(join(root, "run", "trace"), { "trace.jsonl": "", "trace.md": "# trace\n", "interventions.md": "# interventions\n" });
+  await writeFiles(root, { "spec.md": options.sourceSpec ?? "# todo\n" });
   registerTracer(sliceContext({ root }));
   let vitestRuns = 0;
   let tscRuns = 0;

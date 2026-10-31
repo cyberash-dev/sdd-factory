@@ -3,6 +3,7 @@ export const ASSEMBLY_EFFECT = {
   verify: "assembly.verify",
   triage: "assembly.triage",
   routeSddReady: "assembly.route-sdd-ready",
+  routeBuild: "assembly.route-build",
   publish: "assembly.publish",
   record: "assembly.record",
 } as const;

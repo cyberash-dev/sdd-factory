@@ -9,13 +9,14 @@ import { coversMarkersIn } from "../domain/covers-markers.js";
 import type { AssemblyLedger, FixEntry, MergeEntry, MergeResult, RoundFailingTest, StepResult, VerificationEntry } from "../domain/ledger.js";
 import { integerField, stringArrayField } from "../domain/payload.js";
 import { redactSecrets, secretValuesOf } from "../domain/redaction.js";
-import { WRITE_SET_CONFLICT } from "../domain/rework-reasons.js";
+import { missingScriptsReason, WRITE_SET_CONFLICT } from "../domain/rework-reasons.js";
 import { parseReadyEnvelope, SddEnvelopeError, type ReadyEnvelope } from "../../shared/sdd/envelope.js";
 import { repairSurfaceMembers } from "../../shared/sdd/surface-members.js";
 import { refreshBaselineBlock } from "../domain/baseline-block.js";
 import { failingCoversOf } from "../domain/sdd-ready-routing.js";
 import { parseTokenEnvelope } from "../domain/sdd-token.js";
-import { definesBuildScript, INSTALL_ARGV, NETWORK_FAILURE, OFFLINE_INSTALL_ARGV, VITEST_REPORT_FILE, stepArgv, verificationSequence, type AssemblyStep } from "../domain/verification-steps.js";
+import { hasBuildStep, missingScripts, npmScriptsEvidence, npmScriptsNamedIn, scriptNamesOf, type NpmScripts } from "../domain/npm-scripts.js";
+import { INSTALL_ARGV, NETWORK_FAILURE, OFFLINE_INSTALL_ARGV, VITEST_REPORT_FILE, stepArgv, verificationSequence, type AssemblyStep } from "../domain/verification-steps.js";
 import { parseVitestReport } from "../domain/vitest-report.js";
 import type { Argv, CommandResult, CommandRunner } from "../ports/outbound/command-runner.js";
 import { captureCommand, commandLog, evidenceDirFor } from "./evidence.js";
@@ -24,6 +25,7 @@ import { REPORT_FILE, updateLedger, writeProductReport, type LedgerIdentity } fr
 
 const INTEGRATION_BRANCH = "integration";
 const SDD_READY_REPORT_FILE = "sdd_ready.json";
+const NPM_SCRIPTS_REPORT_FILE = "npm_scripts.json";
 const SPEC_FILE = join("spec", "spec.md");
 const PACKAGE_FILE = "package.json";
 const ROLE_WRITTEN_DIRS = ["design", "spec"] as const;
@@ -65,7 +67,7 @@ function execute(run: VerifyRun, argv: Argv): Promise<CommandResult> {
   return run.runner.run({ argv, cwd: run.slice.paths.productDir, timeoutMs: run.slice.config.timeouts.verifierMs });
 }
 
-function entryOf(run: VerifyRun, step: AssemblyStep, argv: Argv, result: CommandResult, verdict: StepResult, evidencePath: string): VerificationEntry {
+function entryOf(run: VerifyRun, step: AssemblyStep, argv: readonly string[], result: CommandResult, verdict: StepResult, evidencePath: string): VerificationEntry {
   return { round: run.round, step, argv: [...argv], exit_code: result.exitCode ?? -1, duration_ms: result.durationMs, result: verdict, evidence_path: evidencePath };
 }
 
@@ -132,6 +134,27 @@ async function runCompileStep(run: VerifyRun, step: "typecheck" | "build"): Prom
   const result = await execute(run, argv);
   const evidencePath = await captureCommand(run.evidenceDir, step, result, run.secrets);
   return plainOutcome(run, entryOf(run, step, argv, result, result.exitCode === 0 ? "green" : "red", evidencePath), result, "assembly_typecheck");
+}
+
+async function npmScriptsOf(run: VerifyRun): Promise<NpmScripts> {
+  return {
+    defined: scriptNamesOf(await readTextOrNull(join(run.slice.paths.productDir, PACKAGE_FILE))),
+    named: npmScriptsNamedIn((await readTextOrNull(run.slice.paths.specSourcePath)) ?? ""),
+  };
+}
+
+/* assembly-stage:DLT-006: a script the source spec names but package.json lacks is the implementer's to add, so the check never takes a fixer trigger. */
+async function runBuild(run: VerifyRun): Promise<StepOutcome> {
+  const scripts = await npmScriptsOf(run);
+  const missing = missingScripts(scripts);
+  if (missing.length === 0 && scripts.defined.includes("build")) {
+    return runCompileStep(run, "build");
+  }
+  const check: CommandResult = { exitCode: missing.length === 0 ? 0 : 1, stdout: missing.length === 0 ? "" : missingScriptsReason(missing), stderr: "", durationMs: 0, timedOut: false };
+  await captureCommand(run.evidenceDir, "build", check, run.secrets);
+  const evidencePath = join(run.evidenceDir, NPM_SCRIPTS_REPORT_FILE);
+  await writeTextAtomic(evidencePath, npmScriptsEvidence(scripts));
+  return plainOutcome(run, entryOf(run, "build", [], check, check.exitCode === 0 ? "green" : "red", evidencePath), check, null);
 }
 
 function productRelative(run: VerifyRun, file: string): string {
@@ -232,8 +255,9 @@ function runStep(run: VerifyRun, step: AssemblyStep): Promise<StepOutcome> {
     case "install":
       return runInstall(run);
     case "typecheck":
-    case "build":
       return runCompileStep(run, step);
+    case "build":
+      return runBuild(run);
     case "test":
       return runTest(run);
     case "sdd_ready":
@@ -320,8 +344,7 @@ async function repairStep(run: VerifyRun, step: AssemblyStep, outcome: StepOutco
 }
 
 async function runSequence(run: VerifyRun): Promise<"restart" | "terminated" | "done"> {
-  const hasBuildScript = definesBuildScript(await readTextOrNull(join(run.slice.paths.productDir, PACKAGE_FILE)));
-  for (const step of verificationSequence(hasBuildScript)) {
+  for (const step of verificationSequence(hasBuildStep(await npmScriptsOf(run)))) {
     let outcome = await runStep(run, step);
     if (outcome.fixTrigger !== null) {
       const unrepaired = await repairStep(run, step, outcome, outcome.fixTrigger);

@@ -75,6 +75,17 @@ describe("scripted assembly through the run engine", () => {
     ]);
   });
 
+  // @covers assembly-stage:DLT-006
+  it("routes a script the source spec names but no task's package.json defines through the build step to triage", async () => {
+    const apiRoles = scriptedApiRoles(async () => "---\nrole: triage\nattempt: 1\nstatus: complete\nroute:\n  task_id: T-001\n  target: implementer\n  reason: add the start script\n---\n");
+    const run = await scriptedAssembly({ vitest: (_, productDir) => ALL_PASS(productDir), apiRoles, sourceSpec: "- Start it with `npm start`.\n" });
+
+    expect([apiRoles.requests.length, run.trace.map(describeEvent).slice(2, 8)]).toEqual([
+      1,
+      ["assembly.verified install green", "assembly.verified typecheck green", "assembly.verified build red", "assembly.triaged T-001 implementer add the start script", "assembly.rework T-001 implementer 1", "task.rework T-001 implementer triage"],
+    ]);
+  });
+
   // @covers assembly-stage:INV-003
   it("publishes the tree of the head the final green round verified", async () => {
     const run = await scriptedAssembly({ vitest: (round, productDir) => (round === 1 ? CLI_FAILS(productDir) : ALL_PASS(productDir)) });
