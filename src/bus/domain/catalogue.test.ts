@@ -149,6 +149,14 @@ describe("event catalogue validation", () => {
     expect(codeOf(() => validateEvent(event))).toBe("no error");
   });
 
+  // @covers bus:DLT-009
+  // @covers bus:CTR-006
+  it("accepts assembly.verified with the build step", () => {
+    const event = eventOf("assembly.verified", { ...VALID_PAYLOADS["assembly.verified"], result: "red", step: "build" }, { producer: "assembler" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
   it("rejects an unknown event type before looking at the payload", () => {
     const event = eventOf("task.exploded", { taskId: "T-001" });
 

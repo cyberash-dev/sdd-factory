@@ -52,10 +52,18 @@ describe("bus surfaces after the member, state and roster deltas", () => {
   });
 
   // @covers bus:DLT-008
-  it("carries version 0.7.0 after design.rework gained the finding path and spec ids", async () => {
+  it("carries a version past 0.6 after design.rework gained the finding path and spec ids", async () => {
     const events = await surfaceRecord("bus:SUR-001");
 
-    expect(events.version).toBe("0.7.0");
+    const [major, minor] = events.version.split(".").map(Number);
+    expect([major, (minor ?? 0) >= 7]).toEqual([0, true]);
+  });
+
+  // @covers bus:DLT-009
+  it("carries version 0.8.0 after assembly.verified gained the build step", async () => {
+    const events = await surfaceRecord("bus:SUR-001");
+
+    expect(events.version).toBe("0.8.0");
   });
 
   // @covers bus:DLT-003
