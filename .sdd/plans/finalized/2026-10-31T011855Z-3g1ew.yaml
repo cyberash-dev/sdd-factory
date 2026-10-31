@@ -1,0 +1,17 @@
+plan_id: 2026-10-31T011855Z-3g1ew
+created_at: 2026-10-31T01:18:55.986Z
+pending_attestations:
+  - id: design-stage:DLT-009
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:18:55.985Z
+    change_request: "run 21 cross-task drift fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved
+  - id: build-stage:DLT-011
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:18:56.320Z
+    change_request: "run 21 cross-task drift fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved

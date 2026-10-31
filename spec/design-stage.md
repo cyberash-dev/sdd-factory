@@ -1316,6 +1316,52 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-009
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:18:55.985Z
+    change_request: run 21 cross-task drift fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: design-stage
+title: a repairing architect aligns tech.md with code another task already landed when no record fixes the detail
+target_ids:
+  - design-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  In run 21 T-003's implementer reported VD-INFEASIBLE twice: its frozen
+  tests expected the usage texts of tech.md, while src/cli/index.ts,
+  landed and approved by T-002, printed different texts, and no approved
+  record fixes those texts. Both architect repairs rewrote tech.md with
+  yet another text the architect chose (and edited module M-01, which
+  the finding did not name), so the restarted test-writer produced the
+  same conflict. Change to design-stage:BEH-004 for an architect repair:
+  when the finding quotes code of a file outside the reporting task's
+  writes that differs from tech.md on a detail no approved record fixes
+  (a message text, a field or flag spelling), the repair makes tech.md
+  describe that landed code as quoted, since the landed task is approved
+  and is not restarted by the repair; when an approved record fixes the
+  detail, tech.md follows the record. The repair still changes only the
+  modules covering the finding's spec ids. The rule lives in the
+  architect prompt's rework rule.
+tests_old_behavior:
+  - a first-pass architect run is unchanged
+tests_new_behavior:
+  - to:design-stage:BEH-004
+test_obligation:
+  not_applicable:
+    reason: the alignment is a judgement of the architect model applied from its prompt; no deterministic oracle observes it outside a live run, where the trace records the repair and the restarted lane's outcome
+---
+```
+
 ---
 
 ## 16. Implementation bindings

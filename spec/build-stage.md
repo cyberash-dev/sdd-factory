@@ -2773,6 +2773,64 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-011
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:18:56.320Z
+    change_request: run 21 cross-task drift fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: build-stage
+title: test-writer restarts caused by a design repair do not count toward the test-writer rework cap
+target_ids:
+  - build-stage:CST-002
+  - build-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  build-stage:CST-002 lets a task's tests be re-authored once. An
+  architect repair (design-stage:BEH-004) or a planner re-cut restarts
+  the affected lanes from the test-writer through task.rework{target:
+  test-writer, reason: "architect_repair: ..." | "planner_recut"}; in
+  run 21 the second architect repair would have exhausted T-003's
+  test-writer cap although no test author had failed, since the design
+  under the tests had changed. Change: a test-writer restart whose
+  reason is an architect repair or a planner re-cut re-authors the tests
+  without counting toward CST-002; such restarts are bounded by the
+  design repair caps (build-stage:CST-003, build-stage:CST-004). Only
+  rejections and routed reworks with other reasons count, and the second
+  counted one still fails the task. Attempt numbers stay monotonic.
+tests_old_behavior:
+  - a second counted test-writer rework of one task still ends in task.failed cap_exhausted
+tests_new_behavior:
+  - to:build-stage:CST-002
+  - to:build-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given a task whose tests were re-authored once after a review, a
+    task.rework{target: test-writer, reason: "architect_repair: X"}
+    restarts its lane at the next attempt number instead of failing it,
+    and a later task.rework{target: test-writer, reason:
+    "review_changes"} fails it with cap_exhausted; given a fresh task, two
+    design-repair restarts in a row both restart the lane.
+  test_template: unit
+  boundary_classes:
+    - design repair after a counted rework
+    - counted rework after design repairs
+    - consecutive design repairs
+  failure_scenarios:
+    - a design repair failing the task on the test-writer cap
+    - design repairs letting a third counted rework through
+---
+```
+
 ---
 
 ## 16. Implementation bindings
