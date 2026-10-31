@@ -103,7 +103,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: spec-stage
 name: product-spec-files
-version: "0.2.0"
+version: "0.3.0"
 boundary_type: public_storage
 members:
   - spec-stage:CTR-001
@@ -1278,6 +1278,241 @@ test_obligation:
   failure_scenarios:
     - an id added twice
     - a record without surface_ref added
+---
+```
+
+```yaml
+---
+id: spec-stage:DLT-008
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T09:44:53.616Z
+    change_request: "operator decision 2026-10-31: approval gate recovery ladder A, B, C"
+    scope: first-time-approval
+partition_id: spec-stage
+title: the approval repair never turns a record without boundary fields into a Surface member
+target_ids:
+  - spec-stage:DLT-007
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  spec-stage:DLT-007 appends to the Surface's members every record whose
+  surface_ref names it. A member is a boundary record, and `sdd lint`
+  requires policy_refs, applicability, concurrency_model and data_scope
+  on it. In run todo-cli-20261031-092105 the analyst gave the
+  ImplementationBinding todo-cli:IB-001 ("CLI entry bound to
+  dist/cli.js") a surface_ref and none of those fields; the critic
+  accepted, the repair made it a member, the lint after the repair
+  failed and the stage blocked with analyst_blocked, which ends the run.
+  Left out of members it would instead fail `sdd ready` with
+  surface_member_drift at assembly. Change: the repair appends a record
+  whose surface_ref names the Surface only when the record carries all
+  four boundary fields; a record whose surface_ref names the Surface but
+  lacks one of them loses its surface_ref line instead and stays out of
+  members, and the log line names it. Contracts are appended as before.
+tests_old_behavior:
+  - a Behavior with surface_ref and the four boundary fields is still appended to members
+tests_new_behavior:
+  - to:spec-stage:DLT-007
+test_obligation:
+  predicate: |
+    Given a spec whose Surface lacks a Behavior carrying surface_ref and
+    the four boundary fields, and an ImplementationBinding carrying
+    surface_ref and none of them, the repair appends the Behavior to
+    members, removes the binding's surface_ref line, leaves the binding
+    out of members, and the repaired spec passes `sdd lint`.
+  test_template: unit
+  boundary_classes:
+    - record with surface_ref and all four boundary fields
+    - record with surface_ref and no boundary fields
+    - record with surface_ref and some boundary fields
+  failure_scenarios:
+    - a record without boundary fields appended to members
+    - a record left with a surface_ref outside members
+---
+```
+
+```yaml
+---
+id: spec-stage:DLT-009
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T09:44:53.950Z
+    change_request: "operator decision 2026-10-31: approval gate recovery ladder A, B, C"
+    scope: first-time-approval
+partition_id: spec-stage
+title: a foreman repair at approval that raises the lint error count is reverted
+target_ids:
+  - spec-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Before the pre-authorised approval the foreman edits the product spec
+  mechanically: it decides undecided Open-Qs by their default
+  (spec-stage:DLT-003) and completes the Surface members
+  (spec-stage:DLT-004, DLT-007, DLT-008). In run
+  todo-cli-20261031-092105 such a repair turned a lint-clean spec into
+  one with four lint errors and the stage blocked. A mechanical repair
+  must never make the spec worse. Change: the foreman counts the
+  `sdd lint` errors of the spec before each repair and after it; when
+  the count after is higher, it writes the spec as it was before that
+  repair, logs "spec.approve: <repair> reverted: lint errors <before> ->
+  <after>", and continues the approval gate from the unrepaired text.
+tests_old_behavior:
+  - a repair that keeps the lint error count is still applied
+tests_new_behavior:
+  - to:spec-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given a spec on disk with 0 lint errors and a repair whose result has
+    4, the guarded repair leaves the pre-repair text on disk, returns it
+    and logs the revert with "0 -> 4"; given a repair whose result keeps
+    0 errors, the repaired text is on disk and returned.
+  test_template: unit
+  boundary_classes:
+    - repair raising the error count
+    - repair keeping the error count
+    - repair lowering the error count
+  failure_scenarios:
+    - a repair that adds lint errors kept
+    - a harmless repair reverted
+---
+```
+
+```yaml
+---
+id: spec-stage:DLT-010
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T09:44:54.291Z
+    change_request: "operator decision 2026-10-31: approval gate recovery ladder A, B, C"
+    scope: first-time-approval
+partition_id: spec-stage
+title: the approval gate probes the approval and sdd ready on a scratch copy before approving
+target_ids:
+  - spec-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  `sdd ready` checks some structural rules only on approved records
+  (surface_member_drift, surface_unapproved_ref, Surface semver), and an
+  approved record can no longer be edited by the analyst, so a structural
+  defect found at assembly can only reach triage. Change: after lint and
+  the integrity check pass and before the real approval, the foreman
+  copies the product directory without node_modules (linked instead) to
+  a scratch directory under the run directory, runs the same approve and
+  finalize there, then `sdd ready --format=json`, and keeps every
+  violation except uncovered, orphan_covers, unapproved, aggregated_check
+  and debt_budget_increased (those depend on tests and git state that do
+  not exist yet). A failed probe approve or finalize is a finding too.
+  Each kept violation becomes a gate finding (spec-stage:DLT-011) naming
+  the record id when the violation names one. The product directory is
+  untouched by the probe; the scratch directory is removed afterwards.
+tests_old_behavior:
+  - a spec whose probe yields no violation is approved as before
+tests_new_behavior:
+  - to:spec-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given a proposed product spec for which the probe's `sdd ready`
+    reports surface_member_drift for todo:BEH-003 and uncovered for every
+    record, the probe returns exactly one finding naming todo:BEH-003 and
+    surface_member_drift; every probe command runs in the scratch
+    directory, the product spec is byte-identical afterwards and the
+    scratch directory is gone; a probe finalize failure returns one
+    finding with the finalize output; a clean probe returns none.
+  test_template: integration
+  boundary_classes:
+    - structural violation reported
+    - only test-dependent violations reported
+    - probe finalize failure
+  failure_scenarios:
+    - the probe approves records in the product directory
+    - an uncovered violation treated as a finding
+---
+```
+
+```yaml
+---
+id: spec-stage:DLT-011
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T09:44:54.629Z
+    change_request: "operator decision 2026-10-31: approval gate recovery ladder A, B, C"
+    scope: first-time-approval
+partition_id: spec-stage
+title: product-spec-files 0.2.0 -> 0.3.0 - a failed approval gate goes back to the analyst before the stage blocks
+target_ids:
+  - spec-stage:BEH-004
+  - spec-stage:SUR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: spec-stage:SUR-001
+    intended_version: "0.3.0"
+description: |
+  The approval gate blocks the stage, and so ends the run, on the first
+  failure: lint after the repairs, spec_integrity, the probe of
+  spec-stage:DLT-010, approve or finalize. Three runs of 2026-10-30/31
+  ended this way on defects the analyst could have fixed in one edit.
+  Change: when the gate fails and stageAttempts.specGateReworks is below
+  caps.specGateReworks (instance configuration, factory:DLT-015;
+  built-in default 1), the foreman writes `spec/review/gate.md` in the
+  ga.md format of spec-stage:CTR-003 with decision rework and one
+  finding per failure (`GATE-NNN`, kind gap or conflict, target_ids the
+  record ids the failure names, source none, resolution decide,
+  required_change the failure text with the rule id and line), and
+  publishes spec.gate_failed{findingsPath, detail}. The transition counts
+  the gate rework, emits spec.rework{round, findingsPath} and starts the
+  analyst at attempt round + 1 with gate.md as its rework finding, where
+  round is the current critic round; the redraft then takes the usual
+  critic route. When the count has reached the cap, the stage blocks as
+  before with analyst_blocked and the failure text.
+  spec-stage:SUR-001 gains spec/review/gate.md: 0.2.0 -> 0.3.0.
+tests_old_behavior:
+  - a gate failure with the gate rework cap reached still blocks with analyst_blocked
+tests_new_behavior:
+  - to:spec-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given a lint failure at the gate naming todo:IB-001 and
+    specGateReworks 0 under a cap of 1, the gate writes gate.md with one
+    GATE-001 finding targeting todo:IB-001 and publishes spec.gate_failed;
+    the transition moves the run to spec_drafting with specGateReworks 1,
+    emits spec.rework with that findingsPath and starts a draft at
+    attempt round + 1 with gate.md as rework finding; a second gate
+    failure with specGateReworks 1 blocks with analyst_blocked.
+  test_template: integration
+  boundary_classes:
+    - gate failure under the cap
+    - gate failure at the cap
+    - integrity failure without a record id
+  failure_scenarios:
+    - a fixable gate failure ending the run
+    - gate reworks beyond the cap
 ---
 ```
 

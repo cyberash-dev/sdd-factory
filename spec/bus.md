@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.8.0"
+version: "0.9.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -2309,6 +2309,57 @@ test_obligation:
     - unknown step value
   failure_scenarios:
     - the enum widened to any string
+---
+```
+
+```yaml
+---
+id: bus:DLT-010
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T09:44:54.970Z
+    change_request: "operator decision 2026-10-31: approval gate recovery ladder A, B, C"
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.8.0 -> 0.9.0 - spec.gate_failed and the spec gate rework counter
+target_ids:
+  - bus:SUR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.9.0"
+description: |
+  spec-stage:DLT-011 routes a failed approval gate back to the analyst.
+  The catalogue gains the event spec.gate_failed, producer foreman,
+  payload {findingsPath: string, detail: string}, accepted while the run
+  is in spec_review. state.json gains stageAttempts.specGateReworks, an
+  integer starting at 0 and growing by one per gate rework
+  (bus:INV-002 holds); schemaVersion stays 1 because a key is added and
+  none is removed. factory-events 0.8.0 -> 0.9.0.
+tests_old_behavior:
+  - an event outside the catalogue is still rejected at publication
+tests_new_behavior:
+  - to:bus:SUR-001
+test_obligation:
+  predicate: |
+    A spec.gate_failed with findingsPath and detail strings from foreman
+    is accepted at publication and one without findingsPath is rejected;
+    a fresh run state carries stageAttempts.specGateReworks 0, and a state
+    file without the key loads with 0.
+  test_template: unit
+  boundary_classes:
+    - complete payload
+    - missing field
+    - state file without the counter
+  failure_scenarios:
+    - spec.gate_failed rejected by the catalogue
+    - an old state file failing to load
 ---
 ```
 
