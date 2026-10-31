@@ -1516,6 +1516,68 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-012
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T12:36:28.452Z
+    change_request: "operator direction 2026-10-31: runs must not die on recoverable blocks; lint_cap on a clean spec"
+    scope: first-time-approval
+partition_id: spec-stage
+title: a lint cap reached on a clean spec does not block the stage
+target_ids:
+  - spec-stage:BEH-001
+  - spec-stage:CST-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  spec-stage:CST-001 caps the analyst's lint runs per invocation; the
+  run_sdd tool refuses the run past the cap with a message telling the
+  analyst to write a blocked handoff with lint_cap. In run
+  room-booking-api-20261031-121807 the analyst ran lint eight times while
+  applying 19 critic findings, every run exited 0 with no diagnostic, the
+  ninth was refused, the analyst wrote status blocked with lint_cap and the
+  run ended with spec.blocked although the spec was clean. Change: (1) the
+  refusal text names the outcome of the last lint run: when it exited 0
+  the analyst is told to write its handoff with status complete, otherwise
+  to block with lint_cap and the outstanding rule ids; (2) when an analyst
+  handoff reports status blocked with a lint_cap reason, the foreman runs
+  `sdd lint` on the product spec itself, and when it exits 0 the draft is
+  accepted exactly as a complete handoff (spec.drafted with lintExit 0 and
+  the handoff's record counts) instead of spec.blocked; a lint that still
+  fails blocks as before.
+tests_old_behavior:
+  - a lint_cap block whose spec still fails lint ends the stage with spec.blocked lint_cap
+tests_new_behavior:
+  - to:spec-stage:BEH-001
+  - to:spec-stage:CST-001
+test_obligation:
+  predicate: |
+    Given an analyst handoff with status blocked and blocked_reason
+    "lint_cap none" whose spec lints with exit 0, the draft effect publishes
+    spec.drafted with lintExit 0 and no spec.blocked; given the same
+    handoff whose spec lint exits 1, it publishes spec.blocked lint_cap;
+    the run_sdd refusal after a clean last lint run tells the analyst to
+    write status complete, and after a failing one to block with lint_cap.
+  test_template: integration
+  boundary_classes:
+    - lint cap with a clean spec
+    - lint cap with a failing spec
+    - refusal after a clean last run
+    - refusal after a failing last run
+  failure_scenarios:
+    - a clean spec ending the run at lint_cap
+    - a failing spec accepted as drafted
+---
+```
+
 ---
 
 ## 16. Implementation bindings
