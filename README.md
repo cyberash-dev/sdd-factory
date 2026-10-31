@@ -60,7 +60,7 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 | any | simple-fixer | `claude-opus-5-5`, effort medium | lane: Mozaik participant around `claude --print --safe-mode` | per failing unit, capped |
 | any | tracer | none | deterministic Mozaik participant | every event |
 
-1. **Spec.** The spec-analyst rewrites the Markdown input into a typed agent-sdd spec (`spec/spec.md` inside the product): one record per command, endpoint, behaviour, invariant or constraint, each with a test obligation. The spec-critic finds gaps and contradictions and decides every open question; the foreman then executes the approval the operator pre-authorised at launch.
+1. **Spec.** The spec-analyst rewrites the Markdown input into a typed agent-sdd spec (`spec/spec.md` inside the product): one record per command, endpoint, behaviour, invariant or constraint, each with a test obligation. The spec-critic finds gaps and contradictions and decides every open question; the foreman then executes the approval the operator pre-authorised at launch. Both roles follow fidelity rules, because acceptance tests are written from the source: reject only what the source names as an error, never weaken a stated sentence through an assumption or an out-of-scope note, keep every name the source spells.
 2. **Design.** The architect maps records to modules and a toolchain (`design/tech.md`); the verification-designer turns every test obligation into input classes and negative oracles (`design/verification.md`). The planner reconciles both into `design/tasks.json`: disjoint write-sets, an acyclic dependency graph at most 3 tasks deep, every approved record covered exactly once. The graph is validated mechanically and the foreman installs the declared tooling before any lane starts.
 3. **Build.** Each task runs in its own git worktree on branch `task/<id>`. The test-writer writes failing tests with `@covers` markers; the Verifier proves they fail for the right reason and freezes them; the implementer makes them green without touching tests; the Verifier runs typecheck and the full suite and checks the write-set; the reviewer checks the diff against the spec records and arbitrates test-versus-code disputes. Approved branches merge into `integration`.
 4. **Assembly.** The assembler runs `npm ci`, `tsc`, `vitest` and `sdd ready` on `integration` and routes an attributed failure back to the owning lane, an unattributed one to triage.
@@ -139,6 +139,19 @@ Rehearsal runs on 2026-10-31, all on the shipped cheap profile, each a fresh `np
 | `specs/expense-ledger-cli.md` | CLI, 6 commands, options, reports, CSV | 30 min | 4.30 | 7 | 3 | 0 (1 logged prompt note) | [`hidden/expense-ledger-cli/`](hidden/expense-ledger-cli/) |
 
 Every published product was checked from a clean checkout (`npm ci && npm run build && npm test`) and black-box against its source spec (curl for the APIs, `node dist/cli.js` for the CLI). The room booking run needed one resume: the root task's tests asserted on Node's internal `net.Socket.prototype.connect` arguments, the reviewer correctly sent them back twice, and the test-writer cap ended the run; after a prompt fix the resumed run (`--note` in `interventions.md`) re-authored the tests and published. An earlier room booking run had published a product whose `npm run build` failed and that lacked the `start` script its spec names; the assembly now runs the build (`assembly-stage:DLT-005`), checks every npm script the spec names (`assembly-stage:DLT-006`) and the tooling step pins Node types for the build config (`design-stage:DLT-011`).
+
+### Conformance against the source specs
+
+After the rehearsals, four independent auditor agents checked the published products black-box against the source Markdown only, the way hidden acceptance tests would, without reading the products' code, tests or formal specs; they read those afterwards only to attribute each deviation to the stage that introduced it.
+
+| product | stated requirements | inferred edge cases | deviations |
+|---|---|---|---|
+| url-shortener-api | 40/40 | 78/81 | `PORT=0` rejected; a non-ASCII URL breaks the redirect response |
+| todo-cli | 47/49 | 51/51 | an id comes back after `rm` although the source says ids are never reused |
+| room-booking-api | 84/84 | 82/88 | valid JSON that is not an object reported as `invalid_json`; seconds accepted in query times |
+| expense-ledger-cli | 80/80 | 70/72 | the stored field is `amount_cents`, the source says `amount` |
+
+Output formats, orderings, exit codes and error bodies match byte for byte; 251 of 253 stated checks pass. Four of the six deviations entered at the spec-analyst, one in design and one in code on top of an analyst gap: every later stage followed the formal spec faithfully, including its mistakes, and the products' own tests pinned them. The analyst also chose the strictest reading where the source was silent (an unquoted multi-word `todo add` was a usage error, `.000Z` times were rejected). The fidelity rules above came out of this audit; the products in `hidden/` predate them and still carry the deviations listed. Re-running only the spec stage with the new rules fixed the id reuse, the unquoted `todo add` and the rejected `PORT=0` in the new formal specs; it also exposed a concurrency defect, an architect simple-fix that reverted the verification design written meanwhile, fixed by `design-stage:DLT-012`.
 
 First end-to-end publication in detail: `specs/url-shortener-api.md`, run `url-shortener-api-20261031-004751` on the shipped cheap profile, published to [`hidden/url-shortener-api/`](hidden/url-shortener-api/) with its full trace in [`hidden/url-shortener-api/trace/`](hidden/url-shortener-api/trace/trace.md). Zero human interventions after launch.
 
