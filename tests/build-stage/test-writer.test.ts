@@ -54,7 +54,7 @@ describe("test-writer invocation", () => {
     await runLaneEffect(harness, "build.test-writer", { taskId: "T-001", attempt: 2, reworkFinding: { reason: "review_changes", findingPath: join(harness.context.paths.runDir, "finding.md") } }, laneState(lane, { attempts: { implementer: 0, testWriter: 2 } }));
 
     const prompt = cliRoles.requests[0]?.prompt ?? "";
-    expect([prompt.includes("## Rework finding\n\nreview_changes\nsource: "), prompt.includes("RV-001: test contradicts greeter:BEH-001.then"), prompt.includes("This is attempt 2 of at most 2")]).toEqual([true, true, true]);
+    expect([prompt.includes("## Rework finding\n\nreview_changes\nsource: "), prompt.includes("RV-001: test contradicts greeter:BEH-001.then"), prompt.includes("This is attempt 2 for this role on this task.")]).toEqual([true, true, true]);
   });
 
   it("publishes task.failed with reason blocked when the handoff declares blocked", async () => {

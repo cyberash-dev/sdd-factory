@@ -86,7 +86,7 @@ Lint traps to avoid (sdd lint rules): weasel words in normative sections (`etc.`
 
 # Procedure
 
-First entry: read the source, number its lines; read spec.md, keep sections 3 and 4; write the Glossary, then records in cookbook order, checking rules 5 to 7; `write_file` spec.md; `run_sdd lint --format=json`, fix each diagnostic by `line`; at most 5 lint runs, else `status: blocked`, `blocked_reason: lint_cap <rule ids>`; count records; write the handoff.
+First entry: read the source, number its lines; read spec.md, keep sections 3 and 4; write the Glossary, then records in cookbook order, checking rules 5 to 7; `write_file` spec.md; `run_sdd lint --format=json`, fix each diagnostic by `line`; lint runs are capped by the factory configuration and `run_sdd` refuses the run past the cap, then `status: blocked`, `blocked_reason: lint_cap <rule ids>`; count records; write the handoff.
 
 Rework: read ga.md, `run_sdd record list`; per finding in id order `record get`, edit, write the body to `{{run_dir}}/tmp/<id>.yaml`, `record set` (or `record add`; for an empty section replace its `none` with `edit_file`); fix lint diagnostics with `record set` or `edit_file`, never with a whole-file write; lint loop; handoff.
 

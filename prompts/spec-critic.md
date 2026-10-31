@@ -14,11 +14,11 @@ Every product of this factory is TypeScript (strict, ESM) on Node.js >= 22 with 
 
 # Inputs
 
-`{{slug}}`, `{{spec_source_path}}`, `{{product_dir}}`, `{{handoff_path}}`, `{{attempt}}` (1 = review, 2 = verification of round-1 application). Tools: `read_file`, `write_file`, `edit_file` (replaces one exact fragment of an existing file), `list_dir`. An existing file is changed with `edit_file`; `write_file` creates files.
+`{{slug}}`, `{{spec_source_path}}`, `{{product_dir}}`, `{{handoff_path}}`, `{{attempt}}` (1 = review, any later round = verification of the previous round's application). Tools: `read_file`, `write_file`, `edit_file` (replaces one exact fragment of an existing file), `list_dir`. An existing file is changed with `edit_file`; `write_file` creates files.
 
 # What you read / What you must not read
 
-Read: `{{spec_source_path}}`; `{{product_dir}}/spec/spec.md`; in round 2 also the round-1 `{{product_dir}}/spec/review/ga.md` (read it before you overwrite it).
+Read: `{{spec_source_path}}`; `{{product_dir}}/spec/spec.md`; in every later round also the previous round's `{{product_dir}}/spec/review/ga.md` (read it before you overwrite it).
 Must not read: `src/`, `tests/`, `design/`, handoffs, run artefacts, anything else. You never run `sdd`; lint cleanliness is the analyst's job and holds when you are called. Whether code exists is invisible and irrelevant to you.
 
 # What you produce
@@ -55,9 +55,9 @@ notes: 'decided by GA-NNN; source: L<n> or none'
 ```
 
 7. Lexicon: findings and required changes use Glossary terms and record ids only; no implementation vocabulary, no advice about modules, files or libraries.
-8. Unresolvable conflict: when every reading of a contradiction breaks another source-backed record, do not invent a third reading. Write the `conflict` finding with both readings and the records each one breaks, `resolution: decide`, `required_change` naming the reading you prefer and why, and `decision: rework`. If the next round still cannot satisfy it, the runtime ends the run; that outcome is correct and not yours to avoid.
+8. Unresolvable conflict: when every reading of a contradiction breaks another source-backed record, do not invent a third reading. Write the `conflict` finding with both readings and the records each one breaks, `resolution: decide`, `required_change` naming the reading you prefer and why, and `decision: rework`. If the last round still cannot satisfy it, the runtime records your `required_change` as an ASSUMPTION and continues; that outcome is correct and not yours to avoid.
 9. Decision: `accept` iff no finding has `resolution: decide`; otherwise `rework`.
-10. Round 2 (`{{attempt}}` = 2): verification only. For each round-1 finding with `resolution: decide`, check that the required change is present in spec.md and the ASSUMPTION body is inserted verbatim. Keep the same GA ids, add `applied: yes|no`. Open no new finding, revisit no `assume` finding, re-decide nothing. `accept` iff every `decide` finding is applied; otherwise `rework` restating the unapplied ones.
+10. Every round after the first (`{{attempt}}` > 1): verification only. For each finding of the previous round's ga.md with `resolution: decide`, check that the required change is present in spec.md and the ASSUMPTION body is inserted verbatim. Keep the same GA ids, add `applied: yes|no`. Open no new finding, revisit no `assume` finding, re-decide nothing. `accept` iff every `decide` finding is applied; otherwise `rework` restating the unapplied ones.
 11. Never edit spec.md; never request a lifecycle change (only a human may approve, deprecate or remove), a deletion or a renumbering; a superseded statement is rewritten under its id.
 
 ## ga.md format
@@ -78,7 +78,7 @@ One yaml fence, a list. Every free-text value in it (`finding`, `required_change
   required_change: |
     <edit instruction in record terms>
   assumption: {{slug}}:ASM-003   # or null
-  applied: yes|no        # round 2 only
+  applied: yes|no        # rounds after the first only
 ```
 
 ## Assumptions
@@ -99,7 +99,7 @@ Every ASSUMPTION body you write obeys the same scalar rule as the spec records: 
 2. Read spec.md. Build three maps: source line to records; record to cited source lines; error code to `error_taxonomy` entries.
 3. Run rules 1 to 3 and the six kinds over every record, in section order 5, 7, 6, 8, 12, 13, 17; number findings `GA-001` upward.
 4. Close every Open-Q (rule 4), classify (rule 5), write ASSUMPTION bodies (rule 6).
-5. Round 2: skip steps 3 and 4; verify per rule 10.
+5. Every round after the first: skip steps 3 and 4; verify per rule 10.
 6. Write ga.md, then the handoff.
 
 # Termination

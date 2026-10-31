@@ -89,7 +89,7 @@ describe("implementer invocation", () => {
     await runLaneEffect(harness, "build.implementer", { taskId: "T-001", attempt: 2, reworkFinding: { reason: "verification_red", findingPath: evidencePath } }, laneState(lane, { status: "impl_pending", attempts: { implementer: 2, testWriter: 1 }, testsSha: state.tasks["T-001"]?.testsSha ?? null }));
 
     const prompt = cliRoles.requests[0]?.prompt ?? "";
-    expect([prompt.includes(`verification_red\nsource: ${evidencePath}`), prompt.includes('"reasons":["tests_failed"]'), prompt.includes("This is attempt 2 of at most 3")]).toEqual([true, true, true]);
+    expect([prompt.includes(`verification_red\nsource: ${evidencePath}`), prompt.includes('"reasons":["tests_failed"]'), prompt.includes("This is attempt 2. Implementer attempts per task are capped")]).toEqual([true, true, true]);
   });
 
   // @covers build-stage:BEH-005
