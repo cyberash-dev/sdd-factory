@@ -1481,6 +1481,65 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-012
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T08:58:02.309Z
+    change_request: concurrent design fixer revert, url run 20261031-083721; approved on the operator's instruction
+    scope: first-time-approval
+partition_id: design-stage
+title: a design simple-fix never sees or reverts the concurrent design role's file
+target_ids:
+  - design-stage:DLT-005
+kind: replace
+compatibility_action: ignore
+baseline_version: design-stage:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The architect and the verification-designer run at the same time in one
+  product directory (bus:INV-003). design-stage:DLT-005 runs the
+  simple-fixer on the whole product directory: it snapshots it, diffs it
+  after the run and reverts every change when one lies outside the
+  allowed path. In run url-shortener-api-20261031-083721 the architect's
+  fixer ran from 08:48:15 to 08:48:49 while the verification-designer
+  wrote design/verification.md at 08:48:37; the diff listed that file as
+  the fixer's change outside design/tech.md, the run was discarded, the
+  revert deleted the verification design, and the stage blocked with
+  "design/verification.md was not written" although the role had written
+  it. Change: a design_file_invalid fix for the architect leaves
+  design/verification.md out of its changed files and out of its revert,
+  and one for the verification-designer leaves design/tech.md out of
+  both; the other role's file is neither a scope violation nor reverted.
+  Every other path outside the allowed file still discards the run.
+tests_old_behavior:
+  - a fixer change outside the allowed file other than the concurrent role's file still discards the run and reverts it
+tests_new_behavior:
+  - to:design-stage:DLT-005
+test_obligation:
+  predicate: |
+    During an architect design_file_invalid fix that repairs design/tech.md,
+    a write of design/verification.md by another writer leaves the fix
+    outcome fixed and design/verification.md on disk with its written
+    content; the same for a verification-designer fix with design/tech.md
+    written meanwhile; a fixer write to any other path outside the
+    allowed file still yields discarded and is reverted.
+  test_template: integration
+  boundary_classes:
+    - architect fix with a concurrent verification design write
+    - verification-designer fix with a concurrent technical design write
+    - fixer write outside both files
+  failure_scenarios:
+    - the concurrent role's file deleted by a revert
+    - a write outside the allowed file accepted
+---
+```
+
 ---
 
 ## 16. Implementation bindings
