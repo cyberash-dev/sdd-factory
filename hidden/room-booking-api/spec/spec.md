@@ -6,39 +6,32 @@
 
 ## 1. Context
 
-`roomy` is a small HTTP API that manages meeting rooms and the bookings made for them. A caller
-creates rooms with a name and a capacity, books rooms for a titled interval with a number of
-attendees, lists and filters rooms and bookings, deletes bookings, and asks which rooms are free
-for a given interval. All state lives in memory and is lost when the process stops. The API is the
-whole product: there is no user interface, no persistence and no authentication.
+roomy is a small HTTP API that manages meeting rooms and the bookings of those rooms. All state is held in process memory and is lost when the process stops. The API is consumed by HTTP clients over plain HTTP on a single port taken from the `PORT` environment variable.
 
 ---
 
 ## 2. Glossary
 
-- **room** — a bookable meeting room described by an id, a name and a capacity.
-- **room id** — the server-assigned identifier of a room; `r1`, `r2`, ... in creation order.
-- **booking** — a reservation of one room for one interval, described by an id, the room id, a
-  title, a start, an end and an attendee count.
-- **booking id** — the server-assigned identifier of a booking; `b1`, `b2`, ... in creation order
-  across all rooms.
-- **name** — the human label of a room; unique across all rooms, compared case-insensitively.
-- **title** — the human label of a booking; not unique.
-- **capacity** — the maximum number of attendees a room accepts; an integer.
-- **attendees** — the number of people a booking is made for; an integer of at least 1.
-- **time** — an ISO-8601 string in UTC with a `Z` suffix and minute precision, for example
-  `2026-11-02T09:30:00Z`.
-- **start** and **end** — the two times bounding a booking or an availability query.
-- **interval** — the ordered pair of a start and an end; intervals are half-open, so a booking
-  ending at `10:00` and one starting at `10:00` do not overlap.
-- **overlap** — two intervals overlap when they share at least one instant under the half-open
-  reading.
-- **conflicting booking** — an existing booking of the same room whose interval overlaps the
-  requested interval.
-- **availability** — the set of rooms with sufficient capacity and no conflicting booking for a
-  requested interval.
-- **error code** — the stable snake_case value of the `error` field of an error response.
-- **state** — the in-memory collection of rooms and bookings held by one running process.
+- **Room** — a bookable meeting room described by an id, a name and a capacity.
+- **Room id** — the identifier the server assigns to a room: `r1`, `r2`, ... in creation order.
+- **Booking** — a reservation of one room for one time interval, described by an id, a room id, a title, a start, an end and an attendee count.
+- **Booking id** — the identifier the server assigns to a booking: `b1`, `b2`, ... in creation order across all rooms.
+- **Capacity** — the maximum number of attendees a room accepts; an integer in the range 1 to 100.
+- **Attendees** — the number of people a booking reserves the room for; an integer of at least 1.
+- **Name** — the label of a room; a non-empty string of at most 40 characters, unique among rooms ignoring letter case.
+- **Title** — the label of a booking; a non-empty string of at most 80 characters.
+- **Time** — an ISO-8601 UTC timestamp string with a `Z` suffix and minute precision, for example `2026-11-02T09:30:00Z`.
+- **Interval** — the half-open span `[start, end)` of a booking or of a query.
+- **Overlap** — the relation between two intervals that contain at least one common instant; intervals that touch at one endpoint do not overlap.
+- **Availability** — the set of rooms that satisfy a capacity and a free-interval request.
+- **Query parameter** — a value carried in the request target after `?`, such as `minCapacity`, `from`, `to`, `start`, `end` or `attendees`.
+- **Error code** — the stable snake_case identifier carried in the `error` field of an error response.
+- **Path** — the part of a request target that selects a route, for example `/rooms` or `/bookings/b1`.
+- **Route** — the method and path pair that a Contract of the surface declares, for example `POST /rooms` or `DELETE /bookings/:bookingId`.
+- **Endpoint** — the set of routes one Contract of the surface declares for one operation; a request whose path belongs to no endpoint's path is an unknown route.
+- **Client** — any HTTP caller of the API.
+- **Ephemeral port** — a port chosen by the operating system, used by tests instead of a fixed port.
+- **In-memory state** — the rooms and bookings a running process holds; it exists only for the lifetime of that process.
 
 ---
 
@@ -78,8 +71,8 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:37.017Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.937Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
 discovery_scope:
@@ -89,12 +82,12 @@ discovery_scope:
   - tsconfig.json
 coverage_evidence:
   - kind: git_tree_hash_v1
-    reference: a93f8578ed10193a767f7fa9b1df82eb7c0f2ddc
+    reference: 6d8357ad5b52c7f100e30db1642c1cc9b0e3414f
     note: |
       Greenfield product generated by sdd-factory; the token covers the
       scaffold commit before any product code exists.
-freshness_token: 337fb13842ecfd8919c0ccc752e0970794f0cb5fe5089a83620fdcab62a56e52
-baseline_commit_sha: a93f8578ed10193a767f7fa9b1df82eb7c0f2ddc
+freshness_token: bffb02d9b10347e431ae569a1c6f6389c6ab30d7f746c9f4df7421db0179c4f7
+baseline_commit_sha: 6d8357ad5b52c7f100e30db1642c1cc9b0e3414f
 mechanism: git_tree_hash_v1
 ---
 ```
@@ -112,12 +105,12 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
 title: roomy HTTP API
-name: roomy-http-api
+name: roomy
 boundary_type: api
 members:
   - room-booking-api:CTR-001
@@ -127,10 +120,6 @@ members:
   - room-booking-api:CTR-005
   - room-booking-api:CTR-006
   - room-booking-api:CTR-007
-  - room-booking-api:CTR-008
-  - room-booking-api:CTR-009
-  - room-booking-api:CTR-010
-  - room-booking-api:CTR-011
   - room-booking-api:BEH-001
   - room-booking-api:BEH-002
   - room-booking-api:BEH-003
@@ -153,11 +142,12 @@ members:
   - room-booking-api:BEH-020
   - room-booking-api:BEH-021
   - room-booking-api:BEH-022
-  - room-booking-api:BEH-023
-  - room-booking-api:BEH-024
+  - room-booking-api:SCN-001
+  - room-booking-api:SCN-002
+  - room-booking-api:SCN-003
 version: "0.1.0"
 consumer_compat_policy: semver_per_surface
-notes: 'source: L16-L64'
+notes: "source: L1, L7-L8, L16-L57"
 ---
 ```
 
@@ -174,19 +164,24 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create room returns 201 with the created room
-given: the state contains no room with the requested name
-when: "a client sends `POST /rooms` with `{ \"name\": \"Focus\", \"capacity\": 6 }`"
-then: "the response is 201, `Content-Type: application/json`, the body is the room with `name` `Focus`, `capacity` 6 and a server-assigned room id, and the room is part of the state"
+title: "POST /rooms creates a room with a server-assigned id"
 surface_ref: room-booking-api:SUR-001
+given: "the server holds N rooms, N >= 0"
+when: "the client sends POST /rooms with body {\"name\":\"Aurora\",\"capacity\":4}"
+then: "the response is 201 with Content-Type application/json and body {\"id\":\"r<N+1>\",\"name\":\"Aurora\",\"capacity\":4}, and a later GET /rooms lists that room"
+negative_cases:
+  - "the same name in different case again => 409 room_name_taken instead of a second 201"
+  - "capacity 101 => 400 invalid_room, and GET /rooms still lists N rooms"
+out_of_scope:
+  - room creation with a client-supplied id
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -194,20 +189,17 @@ data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'POST /rooms with a duplicate name => 409 room_name_taken, no new room'
-  - 'POST /rooms with capacity 0 => 400 invalid_room, no new room'
-out_of_scope:
-  - room updates and deletion
 test_obligation:
-  predicate: a valid room body yields 201 and the room is retrievable through GET /rooms
+  predicate: "a valid room body on an empty server returns 201 and one room with id r1 is listed afterwards"
   test_template: integration
   boundary_classes:
-    - name of 1 character with capacity 1
-    - name of 40 characters with capacity 100
+    - "first room on an empty server"
+    - "name of length 1 and of length 40"
+    - "capacity 1 and capacity 100"
   failure_scenarios:
-    - the created room is absent from GET /rooms
-notes: 'source: L18-L22'
+    - "the created room is missing from GET /rooms"
+    - "the assigned id differs from r<N+1>"
+notes: "source: L12, L18-L22"
 ---
 ```
 
@@ -220,19 +212,26 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create room rejects an invalid name
-given: any state
-when: "a client sends `POST /rooms` whose `name` is missing, empty, whitespace only, longer than 40 characters or not a string"
-then: "the response is 400 with `{ \"error\": \"invalid_room\" }` and the state is unchanged"
+title: "POST /rooms rejects an invalid name or capacity"
 surface_ref: room-booking-api:SUR-001
+given: "the server holds N rooms"
+when: "the client sends POST /rooms with a name that is not a non-empty string of at most 40 characters, or a capacity that is not an integer in 1..100"
+then: "the response is 400 with body {\"error\":\"invalid_room\"} and no room is created"
+negative_cases:
+  - "{\"name\":\"Aurora\",\"capacity\":4} => 201, not 400"
+  - "{\"name\":\"\",\"capacity\":1} => 400 invalid_room"
+  - "{\"name\":\"Aurora\",\"capacity\":0} => 400 invalid_room"
+  - "{\"name\":\"Aurora\",\"capacity\":101} => 400 invalid_room"
+  - "a 41-character name => 400 invalid_room"
+  - "{\"name\":\"Aurora\",\"capacity\":2.5} => 400 invalid_room"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -240,22 +239,16 @@ data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'POST /rooms with a 40-character name => 201'
-  - 'POST /rooms with `name` 41 characters => 400 invalid_room'
-out_of_scope:
-  - trimming or normalising the stored name
 test_obligation:
-  predicate: an invalid name yields 400 invalid_room and no room is created
+  predicate: "every invalid name or capacity value returns 400 invalid_room and leaves the room count unchanged"
   test_template: integration
   boundary_classes:
-    - empty string
-    - 40 characters
-    - 41 characters
+    - "empty name and 41-character name"
+    - "capacity 0, 1, 100, 101"
+    - "non-integer capacity and non-string name"
   failure_scenarios:
-    - a 41-character name yields 201
-    - an empty name yields 500
-notes: 'source: L20-L23'
+    - "an invalid room is created anyway"
+notes: "source: L20, L23"
 ---
 ```
 
@@ -268,45 +261,40 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create room rejects an invalid capacity
-given: any state
-when: "a client sends `POST /rooms` whose `capacity` is missing, not an integer, below 1 or above 100"
-then: "the response is 400 with `{ \"error\": \"invalid_room\" }` and the state is unchanged"
+title: "POST /rooms rejects a name already used in another case"
 surface_ref: room-booking-api:SUR-001
+given: "a room named Aurora exists"
+when: "the client sends POST /rooms with name Aurora, aurora or AURORA"
+then: "the response is 409 with body {\"error\":\"room_name_taken\"} and no room is created"
+negative_cases:
+  - "name Aurora after Aurora => 409 room_name_taken"
+  - "name aurora after Aurora => 409 room_name_taken"
+  - "name Borealis after Aurora => 201, not 409"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
-data_scope: new_writes_only
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'POST /rooms with capacity 1 => 201'
-  - 'POST /rooms with capacity 100 => 201'
-  - 'POST /rooms with capacity 1.5 => 400 invalid_room'
-out_of_scope:
-  - room capacity changes
 test_obligation:
-  predicate: a capacity outside 1..100 or of non-integer type yields 400 invalid_room
+  predicate: "a name equal to an existing name ignoring case returns 409 room_name_taken"
   test_template: integration
   boundary_classes:
-    - capacity 0
-    - capacity 1
-    - capacity 100
-    - capacity 101
-    - capacity as a string
+    - "identical case"
+    - "upper case and lower case variants"
+    - "different name"
   failure_scenarios:
-    - capacity 0 yields 201
-    - capacity 101 yields 201
-notes: 'source: L20-L23'
+    - "a second room with the same name ignoring case is created"
+notes: "source: L24"
 ---
 ```
 
@@ -319,40 +307,39 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create room rejects a name already taken
-given: "the state contains a room named `Focus`"
-when: "a client sends `POST /rooms` with `name` `focus`, `FOCUS` or `Focus`"
-then: "the response is 409 with `{ \"error\": \"room_name_taken\" }` and the state is unchanged"
+title: "GET /rooms lists every room ordered by id"
 surface_ref: room-booking-api:SUR-001
+given: "rooms r1 to r12 exist, created in that order"
+when: "the client sends GET /rooms without a query"
+then: "the response is 200 with body {\"rooms\":[<room>, ...]} holding all 12 rooms ordered r1, r2, ..., r12"
+negative_cases:
+  - "minCapacity=abc => 400 invalid_query, not a room list"
+  - "an empty server => 200 with {\"rooms\":[]}"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
-data_scope: new_writes_only
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'POST /rooms with `name` `Field` while `Focus` exists => 201'
-out_of_scope:
-  - renaming an existing room
 test_obligation:
-  predicate: a case-insensitive duplicate name yields 409 room_name_taken
+  predicate: "GET /rooms returns every room ordered by id using numeric id order"
   test_template: integration
   boundary_classes:
-    - identical name
-    - name differing in case only
-    - name differing by one character
+    - "empty server"
+    - "9 and 10 rooms, so r10 follows r9"
   failure_scenarios:
-    - a name differing only in case yields 201
-notes: 'source: L24'
+    - "r10 is ordered before r9"
+    - "a room is missing from the list"
+notes: "source: L12, L26-L28"
 ---
 ```
 
@@ -365,15 +352,22 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list rooms ordered by id
-given: the state contains rooms created in some order
-when: "a client sends `GET /rooms`"
-then: "the response is 200 with `{ \"rooms\": [<room>, ...] }` listing every room in ascending room-id order"
+title: "GET /rooms filters by minCapacity"
 surface_ref: room-booking-api:SUR-001
+given: "rooms r1 capacity 4, r2 capacity 10, r3 capacity 40 exist"
+when: "the client sends GET /rooms with the query minCapacity=<integer>"
+then: "the response is 200 with only the rooms whose capacity is at least the value, ordered by id"
+negative_cases:
+  - "minCapacity=5 => rooms r2 and r3, not r1"
+  - "minCapacity=41 => 200 with {\"rooms\":[]}, not 400"
+  - "minCapacity=0 => 400 invalid_query"
+  - "minCapacity=-1 => 400 invalid_query"
+  - "minCapacity=2.5 => 400 invalid_query"
+  - "minCapacity=ten => 400 invalid_query"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
@@ -385,23 +379,17 @@ data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'GET /rooms on an empty state => 200 with `{ \"rooms\": [] }`'
-  - 'GET /rooms?minCapacity=abc => 400 invalid_query'
-out_of_scope:
-  - pagination
 test_obligation:
-  predicate: rooms are returned in ascending room-id order including after the ninth room
+  predicate: "minCapacity keeps exactly the rooms with capacity at least the value and rejects values that are not positive integers with 400 invalid_query"
   test_template: integration
   boundary_classes:
-    - zero rooms
-    - one room
-    - ten rooms crossing the two-digit id boundary
-    - minCapacity that is not a positive integer
+    - "value equal to an existing capacity"
+    - "value above every capacity"
+    - "zero, negative, fractional and non-numeric value"
   failure_scenarios:
-    - rooms are returned in lexicographic id order
-    - a created room is missing from the list
-notes: 'source: L26-L29'
+    - "a room below the bound is returned"
+    - "a non-positive value returns a room list instead of 400 invalid_query"
+notes: "source: L29"
 ---
 ```
 
@@ -414,42 +402,39 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list rooms filtered by minCapacity
-given: "the state contains rooms with capacities 4, 8 and 12"
-when: "a client sends `GET /rooms?minCapacity=8`"
-then: "the response is 200 with the rooms of capacity 8 and 12, in ascending room-id order"
+title: "POST /rooms/:roomId/bookings creates a booking with a server-assigned id"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 with capacity 10 exists and the server holds M bookings across all rooms"
+when: "the client sends POST /rooms/r1/bookings with {\"title\":\"Standup\",\"start\":\"2026-11-02T09:00:00Z\",\"end\":\"2026-11-02T09:30:00Z\",\"attendees\":6}"
+then: "the response is 201 with Content-Type application/json and body {\"id\":\"b<M+1>\",\"roomId\":\"r1\",\"title\":\"Standup\",\"start\":\"2026-11-02T09:00:00Z\",\"end\":\"2026-11-02T09:30:00Z\",\"attendees\":6}"
+negative_cases:
+  - "attendees 11 with room capacity 10 => 422 over_capacity, not 201"
+  - "POST /rooms/r99/bookings => 404 room_not_found, not 201"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: all_data
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'GET /rooms?minCapacity=20 => 200 with an empty `rooms` array'
-  - 'GET /rooms?minCapacity=0 => 400 invalid_query'
-out_of_scope:
-  - upper capacity bounds other than by filtering client side
 test_obligation:
-  predicate: minCapacity keeps rooms whose capacity is at least the value while preserving id order
+  predicate: "a valid booking body returns 201 and the booking is listed by GET /rooms/r1/bookings"
   test_template: integration
   boundary_classes:
-    - minCapacity equal to an existing capacity
-    - minCapacity above every capacity
-    - minCapacity 1
+    - "first booking and a later booking"
+    - "attendees 1 and attendees equal to capacity"
   failure_scenarios:
-    - rooms below minCapacity are returned
-    - the response is unordered
-notes: 'source: L29'
+    - "the created booking is not listed afterwards"
+    - "the id is not the next booking id"
+notes: "source: L13, L31-L35"
 ---
 ```
 
@@ -462,42 +447,37 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list rooms rejects an invalid minCapacity
-given: any state
-when: "a client sends `GET /rooms` with `minCapacity` that is not a positive integer, for example `0`, `-1`, `abc` or `1.5`"
-then: "the response is 400 with `{ \"error\": \"invalid_query\" }`"
+title: "POST /rooms/:roomId/bookings on an unknown room"
 surface_ref: room-booking-api:SUR-001
+given: "no room has the id r99"
+when: "the client sends POST /rooms/r99/bookings with a valid booking body"
+then: "the response is 404 with body {\"error\":\"room_not_found\"} and no booking is created"
+negative_cases:
+  - "the same body against the existing room r1 => 201, not 404 room_not_found"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'GET /rooms?minCapacity=1 => 200'
-  - 'GET /rooms with no minCapacity => 200 with every room'
-out_of_scope:
-  - rejecting unknown query parameters
 test_obligation:
-  predicate: a non-positive or non-integer minCapacity yields 400 invalid_query
+  predicate: "a booking request for an unknown room returns 404 room_not_found and creates nothing"
   test_template: integration
   boundary_classes:
-    - minCapacity 0
-    - minCapacity with a decimal part
-    - minCapacity with letters
+    - "unknown room id"
+    - "existing room id"
   failure_scenarios:
-    - minCapacity=0 yields 200
-    - minCapacity=abc yields 500
-notes: 'source: L29'
+    - "a booking is created for a room that does not exist"
+notes: "source: L36"
 ---
 ```
 
@@ -510,19 +490,31 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create booking returns 201 with the created booking
-given: "the state contains the room `r1` with capacity 6 and no booking conflicting with `2026-11-02T09:30:00Z` to `2026-11-02T10:00:00Z`"
-when: "a client sends `POST /rooms/r1/bookings` with `{ \"title\": \"Standup\", \"start\": \"2026-11-02T09:30:00Z\", \"end\": \"2026-11-02T10:00:00Z\", \"attendees\": 4 }`"
-then: "the response is 201 with the booking carrying a server-assigned booking id, `roomId` `r1`, that title, start, end and attendee count"
+title: "POST /rooms/:roomId/bookings rejects invalid booking fields"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 with capacity 10 exists and holds no booking for 2026-11-02"
+when: "the client sends POST /rooms/r1/bookings with an invalid field set"
+then: "the response is 400 with body {\"error\":\"invalid_booking\"} and no booking is created"
+negative_cases:
+  - "empty title => 400 invalid_booking"
+  - "an 81-character title => 400 invalid_booking"
+  - "start 2026-11-02T09:30:00 without the Z suffix => 400 invalid_booking"
+  - "start 2026-11-02T09:30:30Z => 400 invalid_booking"
+  - "start 2026-11-02T09:30:00.500Z => 400 invalid_booking"
+  - "not-a-time => 400 invalid_booking"
+  - "end equal to start => 400 invalid_booking"
+  - "end before start => 400 invalid_booking"
+  - "start 2026-11-02T09:00:00Z with end 2026-11-02T17:01:00Z => 400 invalid_booking"
+  - "attendees 0 => 400 invalid_booking"
+  - "start 2026-11-02T09:00:00Z with end 2026-11-02T17:00:00Z => 201, the 8-hour bound is inclusive"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -530,21 +522,19 @@ data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'the same request again => 409 room_busy'
-  - 'a booking for an unknown room => 404 room_not_found'
-out_of_scope:
-  - recurring bookings
 test_obligation:
-  predicate: a valid booking body yields 201 with a server-assigned booking id and appears in the room booking list
+  predicate: "each invalid title, time, ordering and duration value returns 400 invalid_booking and creates no booking"
   test_template: integration
   boundary_classes:
-    - attendees equal to the room capacity
-    - start and end on the same whole minute plus one minute
+    - "title of length 0, 80 and 81"
+    - "whole-minute time and time with seconds or milliseconds"
+    - "end equal to start and end one minute before start"
+    - "duration of exactly 8 hours and of 8 hours plus one minute"
   failure_scenarios:
-    - the response lacks the booking id
-    - the booking does not appear in GET /rooms/r1/bookings
-notes: 'source: L31-L35'
+    - "a booking with a non-whole-minute time is stored"
+    - "a booking longer than 8 hours is stored"
+    - "an invalid booking changes the booking count"
+notes: "source: L14, L33, L37"
 ---
 ```
 
@@ -557,40 +547,40 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create booking rejects an unknown room
-given: the state contains no room with id `r99`
-when: "a client sends `POST /rooms/r99/bookings` with an otherwise valid body"
-then: "the response is 404 with `{ \"error\": \"room_not_found\" }` and the state is unchanged"
+title: "POST /rooms/:roomId/bookings rejects more attendees than the room capacity"
 surface_ref: room-booking-api:SUR-001
+given: "room r2 with capacity 4 exists"
+when: "the client sends POST /rooms/r2/bookings with attendees greater than 4"
+then: "the response is 422 with body {\"error\":\"over_capacity\"} and no booking is created"
+negative_cases:
+  - "attendees 5 with capacity 4 => 422 over_capacity"
+  - "attendees 4 with capacity 4 => 201, not 422"
+  - "attendees 0 => 400 invalid_booking, not 422"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
-data_scope: all_data
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'POST /rooms/r1/bookings on an existing room => 201'
-out_of_scope:
-  - creating a room implicitly through a booking
 test_obligation:
-  predicate: an unknown room id yields 404 room_not_found and no booking is created
+  predicate: "attendees above the room capacity return 422 over_capacity while attendees equal to the capacity return 201"
   test_template: integration
   boundary_classes:
-    - room id never created
-    - room id shape that is not used by the server
+    - "attendees equal to capacity"
+    - "attendees of capacity plus one"
   failure_scenarios:
-    - an unknown room id yields 400 invalid_booking
-    - a booking is stored under an unknown room
-notes: 'source: L36'
+    - "an over-capacity booking is stored"
+    - "a booking at exactly the capacity is refused"
+notes: "source: L38"
 ---
 ```
 
@@ -603,19 +593,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create booking rejects an invalid booking body
-given: "the state contains the room `r1` with capacity 10"
-when: "a client sends `POST /rooms/r1/bookings` where the title is missing, empty, whitespace only, longer than 80 characters or not a string, or where start or end is unparseable, not UTC with a `Z` suffix, not on a whole minute, not after the other bound, or the end is more than 8 hours after the start"
-then: "the response is 400 with `{ \"error\": \"invalid_booking\" }` and the state is unchanged"
+title: "POST /rooms/:roomId/bookings rejects an overlapping interval"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 holds booking b1 from 2026-11-02T10:00:00Z to 2026-11-02T11:00:00Z and booking b2 from 2026-11-02T11:00:00Z to 2026-11-02T12:00:00Z"
+when: "the client sends POST /rooms/r1/bookings for 2026-11-02T10:30:00Z to 2026-11-02T11:30:00Z"
+then: "the response is 409 with body {\"error\":\"room_busy\",\"conflictingBookingId\":\"b1\"} and no booking is created"
+negative_cases:
+  - "the same request against another room with free capacity => 201"
+  - "an interval containing both b1 and b2 => 409 room_busy naming the earliest-starting conflict b1"
+  - "an interval starting at 2026-11-02T12:00:00Z => 201, not 409"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -623,26 +617,18 @@ data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'a title of 80 characters with a duration of exactly 8 hours => 201'
-  - 'start equal to end => 400 invalid_booking'
-  - 'a start with 30 seconds => 400 invalid_booking'
-out_of_scope:
-  - times with a non-UTC offset
 test_obligation:
-  predicate: each invalid title, time or duration class yields 400 invalid_booking with no state change
+  predicate: "an interval overlapping an existing booking of the same room returns 409 room_busy whose conflictingBookingId is the earliest-starting overlapping booking"
   test_template: integration
   boundary_classes:
-    - title of 80 characters
-    - title of 81 characters
-    - duration of exactly 8 hours
-    - duration of 8 hours and 1 minute
-    - end equal to start
-    - time with a non-zero seconds part
+    - "overlap at the start and overlap at the end of an existing booking"
+    - "interval spanning two conflicting bookings"
+    - "conflict in another room"
   failure_scenarios:
-    - an 8 hour 1 minute booking yields 201
-    - a start equal to the end yields 201
-notes: 'source: L33-L37'
+    - "an overlapping booking is stored"
+    - "conflictingBookingId names a non-conflicting booking"
+    - "conflictingBookingId is missing from the body"
+notes: "source: L14, L39"
 ---
 ```
 
@@ -655,19 +641,22 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create booking rejects attendees above room capacity
-given: "the state contains the room `r1` with capacity 6"
-when: "a client sends `POST /rooms/r1/bookings` with an otherwise valid body and `attendees` 7"
-then: "the response is 422 with `{ \"error\": \"over_capacity\" }` and the state is unchanged"
+title: "Bookings that merely touch an existing interval do not conflict"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 holds booking b1 from 2026-11-02T10:00:00Z to 2026-11-02T11:00:00Z"
+when: "the client books 2026-11-02T11:00:00Z to 2026-11-02T11:30:00Z and then 2026-11-02T09:30:00Z to 2026-11-02T10:00:00Z"
+then: "both requests respond 201 and both bookings are listed"
+negative_cases:
+  - "2026-11-02T10:59:00Z to 2026-11-02T11:30:00Z => 409 room_busy"
+  - "2026-11-02T09:30:00Z to 2026-11-02T10:01:00Z => 409 room_busy"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -675,22 +664,16 @@ data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'attendees equal to capacity 6 => 201'
-  - 'attendees 0 => 400 invalid_booking'
-out_of_scope:
-  - booking a room above its capacity with an override
 test_obligation:
-  predicate: attendees above the room capacity yields 422 over_capacity
+  predicate: "an interval sharing only an endpoint with an existing booking is accepted while an interval sharing one minute is rejected with 409 room_busy"
   test_template: integration
   boundary_classes:
-    - attendees equal to capacity
-    - attendees one above capacity
-    - attendees 0
+    - "new interval ending exactly at the existing start"
+    - "new interval starting exactly at the existing end"
+    - "new interval sharing one minute"
   failure_scenarios:
-    - attendees one above capacity yields 201
-    - attendees above capacity yields 400 invalid_booking
-notes: 'source: L38'
+    - "a booking that only touches is rejected as conflicting"
+notes: "source: L14"
 ---
 ```
 
@@ -703,44 +686,40 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: create booking rejects an overlapping interval
-given: "the room `r1` has a booking from `2026-11-02T09:00:00Z` to `2026-11-02T10:00:00Z` and a second booking from `2026-11-02T09:30:00Z` to `2026-11-02T11:00:00Z`"
-when: "a client sends `POST /rooms/r1/bookings` with start `2026-11-02T09:45:00Z` and end `2026-11-02T10:15:00Z`"
-then: "the response is 409 with `{ \"error\": \"room_busy\", \"conflictingBookingId\": \"<id>\" }` where the id is the earliest-starting conflicting booking, that is the one starting at `09:00`, and the state is unchanged"
+title: "GET /rooms/:roomId/bookings lists bookings ordered by start then id"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 holds bookings b1 from 10:00 to 11:00, b2 from 09:00 to 09:30 and b3 from 10:00 to 10:30"
+when: "the client sends GET /rooms/r1/bookings without a query"
+then: "the response is 200 with body {\"bookings\":[<booking>, ...]} ordered b2, b1, b3, that is by start and then by id"
+negative_cases:
+  - "a room without bookings => 200 with {\"bookings\":[]}"
+  - "an unknown room => 404 room_not_found, not an empty list"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
-data_scope: new_writes_only
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'a booking from 10:00 to 11:00 next to a booking ending at 10:00 => 201'
-  - 'a booking for the same interval in a different room => 201'
-out_of_scope:
-  - merging or splitting conflicting bookings
 test_obligation:
-  predicate: an overlapping interval yields 409 room_busy naming the earliest-starting conflicting booking
+  predicate: "the booking list is ordered by start and, for equal starts, by ascending booking id"
   test_template: integration
   boundary_classes:
-    - requested interval fully inside an existing booking
-    - requested interval containing two existing bookings
-    - requested interval touching an existing booking at its end
-    - requested interval touching an existing booking at its start
+    - "empty room"
+    - "equal start times"
+    - "bookings in a different creation order than the time order"
   failure_scenarios:
-    - the response lacks conflictingBookingId
-    - conflictingBookingId names a non-conflicting booking
-    - an adjacent interval yields 409
-notes: 'source: L14, L39'
+    - "bookings with equal start are ordered by creation instead of id"
+    - "bookings of another room appear in the list"
+notes: "source: L41-L43"
 ---
 ```
 
@@ -753,15 +732,22 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list bookings of a room ordered by start then id
-given: "the room `r1` has bookings with different starts and two bookings with the same start"
-when: "a client sends `GET /rooms/r1/bookings`"
-then: "the response is 200 with `{ \"bookings\": [<booking>, ...] }` ordered by `start` ascending and, for equal starts, by ascending booking id"
+title: "GET /rooms/:roomId/bookings filters by a from/to window"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 holds booking b1 from 2026-11-02T10:00:00Z to 2026-11-02T11:00:00Z"
+when: "the client sends GET /rooms/r1/bookings with both from and to"
+then: "the response is 200 with exactly the bookings overlapping the half-open window [from, to)"
+negative_cases:
+  - "from=2026-11-02T10:00:00Z&to=2026-11-02T10:30:00Z => b1 is listed"
+  - "from=2026-11-02T10:30:00Z&to=2026-11-02T11:30:00Z => b1 is listed"
+  - "from=2026-11-02T09:00:00Z&to=2026-11-02T10:00:00Z => empty list, no overlap"
+  - "from=2026-11-02T11:00:00Z&to=2026-11-02T12:00:00Z => empty list, no overlap"
+  - "from=2026-11-02T10:00:00Z without to => 400 invalid_query, not a filtered list"
+  - "GET /rooms/r99/bookings with from=2026-11-02T10:00:00Z&to=2026-11-02T12:00:00Z => 404 room_not_found, not 200"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
@@ -773,22 +759,21 @@ data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'GET /rooms/r1/bookings on a room without bookings => 200 with an empty array'
-  - 'GET /rooms/r99/bookings => 404 room_not_found'
-out_of_scope:
-  - pagination
 test_obligation:
-  predicate: bookings are ordered by start and then by ascending booking id
+  predicate: "a from/to window returns exactly the bookings whose half-open interval intersects the window, an incomplete window returns 400 invalid_query and an unknown room returns 404 room_not_found"
   test_template: integration
   boundary_classes:
-    - no bookings
-    - two bookings sharing a start time
-    - ten bookings across the two-digit id boundary
+    - "window ending exactly at a booking start"
+    - "window starting exactly at a booking end"
+    - "window fully inside a booking"
+    - "only one of from and to given"
+    - "unknown room id"
   failure_scenarios:
-    - equal-start bookings are ordered by id descending
-    - bookings of another room are included
-notes: 'source: L41-L43'
+    - "a booking that only touches the window is returned"
+    - "a booking inside the window is omitted"
+    - "a window without to returns an unfiltered list"
+    - "an unknown room returns 200 with an empty list"
+notes: "source: L44"
 ---
 ```
 
@@ -801,15 +786,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list bookings filtered by from and to
-given: "the room `r1` has bookings ending at `2026-11-02T10:00:00Z` and starting at `2026-11-02T10:00:00Z`"
-when: "a client sends `GET /rooms/r1/bookings?from=2026-11-02T09:00:00Z&to=2026-11-02T10:00:00Z`"
-then: "the response is 200 with only the bookings overlapping the half-open interval from `09:00` to `10:00`, so the booking ending at `10:00` is included and the booking starting at `10:00` is not"
+title: "GET /rooms/:roomId/bookings rejects an invalid window or unknown room"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 exists and no room has the id r99"
+when: "the client sends GET /rooms/:roomId/bookings with an incomplete or invalid window, or against an unknown room"
+then: "the response is 400 with {\"error\":\"invalid_query\"} for a bad window and 404 with {\"error\":\"room_not_found\"} for an unknown room"
+negative_cases:
+  - "only from given => 400 invalid_query"
+  - "only to given => 400 invalid_query"
+  - "from=2026-11-02T11:00:00Z&to=2026-11-02T10:00:00Z => 400 invalid_query"
+  - "from=2026-11-02T11:00:00Z&to=2026-11-02T11:00:00Z => 400 invalid_query"
+  - "from=yesterday&to=today => 400 invalid_query"
+  - "GET /rooms/r99/bookings => 404 room_not_found"
+  - "from=2026-11-02T10:00:00Z&to=2026-11-02T12:00:00Z => 200"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
@@ -821,22 +814,17 @@ data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'from without to => 400 invalid_query'
-  - 'to earlier than from => 400 invalid_query'
-out_of_scope:
-  - filtering by title or attendees
 test_obligation:
-  predicate: the from and to window keeps exactly the overlapping bookings under the half-open reading
+  predicate: "an incomplete or invalid booking window returns 400 invalid_query and an unknown room returns 404 room_not_found"
   test_template: integration
   boundary_classes:
-    - booking ending exactly at from
-    - booking starting exactly at to
-    - booking spanning the whole window
+    - "only one of from and to"
+    - "to equal to from and to before from"
+    - "unparsable time value"
   failure_scenarios:
-    - a booking starting at to is included
-    - a booking ending at from is excluded
-notes: 'source: L14, L44'
+    - "an unfiltered list is returned for an invalid window"
+    - "an unknown room returns 200 with an empty list"
+notes: "source: L44-L45"
 ---
 ```
 
@@ -849,44 +837,41 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list bookings rejects an invalid time window
-given: "the state contains the room `r1`"
-when: "a client sends `GET /rooms/r1/bookings` with only `from`, with only `to`, with an unparseable time, with a time whose seconds part is not `00`, or with `to` not after `from`"
-then: "the response is 400 with `{ \"error\": \"invalid_query\" }`"
+title: "DELETE /bookings/:bookingId removes a booking and frees the interval"
 surface_ref: room-booking-api:SUR-001
+given: "room r1 holds booking b1 from 2026-11-02T10:00:00Z to 2026-11-02T11:00:00Z"
+when: "the client sends DELETE /bookings/b1"
+then: "the response is 204 with an empty body, GET /rooms/r1/bookings no longer lists b1, and a new booking for the same interval and room succeeds with 201"
+negative_cases:
+  - "deleting b1 a second time => 404 booking_not_found"
+  - "booking the same interval again after the delete => 201, not 409 room_busy"
+  - "GET /bookings/b1 => 405 method_not_allowed, because only DELETE is defined on that route"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: all_data
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'both from and to valid with to after from => 200'
-  - 'from=2026-11-02T09:00:30Z => 400 invalid_query'
-out_of_scope:
-  - rejecting unknown query parameters
 test_obligation:
-  predicate: an incomplete or invalid time window yields 400 invalid_query
+  predicate: "a delete of a known booking returns 204, removes the booking and frees its interval for a later booking"
   test_template: integration
   boundary_classes:
-    - only from
-    - only to
-    - to equal to from
-    - unparseable time
-    - "query time whose seconds part is not 00"
+    - "delete of the only booking of a room"
+    - "delete followed by a booking of the same interval"
   failure_scenarios:
-    - only from yields 200
-    - to equal to from yields 200
-notes: 'source: L14, L44'
+    - "the deleted booking is still listed"
+    - "the freed interval still returns 409 room_busy"
+    - "the 204 response carries a body"
+notes: "source: L47-L49"
 ---
 ```
 
@@ -899,39 +884,38 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: list bookings rejects an unknown room
-given: the state contains no room with id `r99`
-when: "a client sends `GET /rooms/r99/bookings` with or without a time window"
-then: "the response is 404 with `{ \"error\": \"room_not_found\" }`"
+title: "DELETE /bookings/:bookingId on an unknown booking"
 surface_ref: room-booking-api:SUR-001
+given: "no booking has the id b99"
+when: "the client sends DELETE /bookings/b99"
+then: "the response is 404 with body {\"error\":\"booking_not_found\"}"
+negative_cases:
+  - "delete of an existing booking id => 204, not 404 booking_not_found"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'GET /rooms/r1/bookings on an existing room => 200'
-out_of_scope:
-  - exposing rooms that were never created
 test_obligation:
-  predicate: an unknown room id yields 404 room_not_found
+  predicate: "deleting an unknown booking id returns 404 booking_not_found and changes no state"
   test_template: integration
   boundary_classes:
-    - room id never created
-    - unknown room id combined with an invalid time window
+    - "unknown booking id"
+    - "existing booking id"
   failure_scenarios:
-    - an unknown room id yields 200 with an empty array
-notes: 'source: L45'
+    - "an unknown delete returns 204"
+    - "an unknown delete removes another booking"
+notes: "source: L50"
 ---
 ```
 
@@ -944,40 +928,42 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: delete booking frees its interval
-given: "the room `r1` has the booking `b1` from `2026-11-02T09:00:00Z` to `2026-11-02T10:00:00Z`"
-when: "a client sends `DELETE /bookings/b1` and then books `r1` from `2026-11-02T09:30:00Z` to `2026-11-02T09:45:00Z`"
-then: "the delete responds 204 with no body, and the following booking request responds 201 because the interval is free"
+title: "GET /availability lists the free rooms that fit the attendee count"
 surface_ref: room-booking-api:SUR-001
+given: "rooms r1 capacity 4, r2 capacity 10, r3 capacity 10 and r4 capacity 8 exist and r2 holds a booking from 2026-11-02T10:00:00Z to 2026-11-02T11:00:00Z"
+when: "the client sends GET /availability with start=2026-11-02T10:30:00Z, end=2026-11-02T11:30:00Z and attendees=6"
+then: "the response is 200 with body {\"rooms\":[r4, r3]}: rooms with capacity at least 6 and no overlapping booking, ordered by capacity ascending and then by id"
+negative_cases:
+  - "start=2026-11-02T12:00:00Z&end=2026-11-02T13:00:00Z with attendees=6 => r4, r2, r3, so r2 is available again"
+  - "attendees=11 => 200 with {\"rooms\":[]}, not 400"
+  - "attendees=0 => 400 invalid_query"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'DELETE /bookings/b1 twice => the second responds 404 booking_not_found'
-out_of_scope:
-  - deleting rooms
 test_obligation:
-  predicate: a deleted booking disappears from the room booking list and its interval becomes bookable
+  predicate: "availability returns the rooms with capacity at least attendees and no overlapping booking, ordered by capacity then id"
   test_template: integration
   boundary_classes:
-    - deleting the only booking of a room
-    - deleting one of several bookings
+    - "capacity equal to attendees"
+    - "room busy for the queried window and room free for it"
+    - "equal capacities ordered by id"
   failure_scenarios:
-    - the deleted booking is still returned by GET /rooms/r1/bookings
-    - the freed interval still yields 409 room_busy
-notes: 'source: L47-L49'
+    - "a busy room is returned"
+    - "a room below the attendee count is returned"
+    - "the order is by id instead of capacity"
+notes: "source: L52-L56"
 ---
 ```
 
@@ -990,40 +976,46 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: delete booking rejects an unknown booking
-given: the state contains no booking with id `b404`
-when: "a client sends `DELETE /bookings/b404`"
-then: "the response is 404 with `{ \"error\": \"booking_not_found\" }`"
+title: "GET /availability rejects missing or invalid parameters"
 surface_ref: room-booking-api:SUR-001
+given: "rooms exist"
+when: "the client sends GET /availability with a missing parameter, an invalid time, end not after start, or a non-positive attendees value"
+then: "the response is 400 with body {\"error\":\"invalid_query\"}"
+negative_cases:
+  - "start and end only, attendees missing => 400 invalid_query"
+  - "start=2026-11-02T10:00:00Z and end and attendees present, start missing => 400 invalid_query"
+  - "end equal to start => 400 invalid_query"
+  - "end before start => 400 invalid_query"
+  - "end=2026-11-02T10:00:00 not a UTC time with Z => 400 invalid_query"
+  - "attendees=0 => 400 invalid_query"
+  - "attendees=2.5 => 400 invalid_query"
+  - "all three valid => 200"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'DELETE /bookings/b1 on an existing booking => 204'
-out_of_scope:
-  - deleting bookings in bulk
 test_obligation:
-  predicate: an unknown booking id yields 404 booking_not_found
+  predicate: "any missing or invalid availability parameter returns 400 invalid_query while a complete valid query returns 200"
   test_template: integration
   boundary_classes:
-    - booking id never assigned
-    - booking id already deleted
+    - "each of the three parameters missing in turn"
+    - "end equal to start and end before start"
+    - "attendees zero and fractional"
   failure_scenarios:
-    - an unknown booking id yields 204
-    - an unknown booking id yields 500
-notes: 'source: L50'
+    - "a missing parameter is treated as a default"
+    - "an invalid query returns a room list instead of 400 invalid_query"
+notes: "source: L54, L57"
 ---
 ```
 
@@ -1036,42 +1028,42 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: availability lists free rooms ordered by capacity then id
-given: "the state contains `r1` with capacity 4, `r2` with capacity 8 free for `2026-11-02T09:00:00Z` to `2026-11-02T10:00:00Z`, `r3` with capacity 8 booked across that interval, and `r4` with capacity 2"
-when: "a client sends `GET /availability?start=2026-11-02T09:00:00Z&end=2026-11-02T10:00:00Z&attendees=4`"
-then: "the response is 200 with `{ \"rooms\": [<room>, ...] }` containing the rooms with capacity at least 4 and no overlapping booking, ordered by capacity ascending and then by ascending room id"
+title: "A request body that is not valid JSON is rejected"
 surface_ref: room-booking-api:SUR-001
+given: "the server is running"
+when: "the client sends POST /rooms with a body that cannot be parsed as JSON"
+then: "the response is 400 with body {\"error\":\"invalid_json\"} and no state changes"
+negative_cases:
+  - "body {\"name\": => 400 invalid_json"
+  - "empty body => 400 invalid_json"
+  - "body [1,2,3] => 400 invalid_json"
+  - "body {\"name\":\"Aurora\",\"capacity\":4} => 201, not 400 invalid_json"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'every room booked for the interval => 200 with an empty `rooms` array'
-  - 'attendees missing => 400 invalid_query'
-out_of_scope:
-  - suggesting alternative intervals
 test_obligation:
-  predicate: availability returns exactly the rooms with sufficient capacity and no overlapping booking, ordered by capacity then id
+  predicate: "an unparsable, empty or non-object body returns 400 invalid_json and the process keeps serving later requests"
   test_template: integration
   boundary_classes:
-    - attendees equal to a capacity
-    - a booking touching the query interval at its end
-    - no room matching
+    - "truncated JSON"
+    - "empty body"
+    - "valid JSON of the wrong shape"
   failure_scenarios:
-    - a room with an overlapping booking is returned
-    - rooms are ordered by id only
-notes: 'source: L52-L56'
+    - "the process crashes on an unparsable body"
+    - "a non-object JSON body creates a room"
+notes: "source: L63"
 ---
 ```
 
@@ -1084,15 +1076,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: availability rejects missing or invalid parameters
-given: any state
-when: "a client sends `GET /availability` where `start`, `end` or `attendees` is missing, where a time is unparseable, where a time has a seconds part other than `00`, where `attendees` is not an integer of at least 1, or where `end` is not after `start`"
-then: "the response is 400 with `{ \"error\": \"invalid_query\" }`"
+title: "A request to an unknown route responds 404"
 surface_ref: room-booking-api:SUR-001
+given: "the server is running"
+when: "the client requests a path that no endpoint defines"
+then: "the response is 404 with body {\"error\":\"not_found\"}"
+negative_cases:
+  - "GET /rooms/r1 => 404 not_found"
+  - "GET /booking => 404 not_found"
+  - "DELETE /rooms/r1 => 404 not_found"
+  - "GET /rooms => 200, not 404 not_found"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
@@ -1104,25 +1101,16 @@ data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'all three parameters valid with end after start => 200'
-  - 'attendees 0 => 400 invalid_query'
-  - 'start=2026-11-02T09:00:30Z => 400 invalid_query'
-out_of_scope:
-  - rejecting unknown query parameters
 test_obligation:
-  predicate: each missing or invalid availability parameter yields 400 invalid_query
+  predicate: "every path outside the defined endpoint set returns 404 not_found"
   test_template: integration
   boundary_classes:
-    - missing start
-    - missing attendees
-    - attendees 0
-    - end equal to start
-    - "query time whose seconds part is not 00"
+    - "unknown literal path"
+    - "defined path with an extra segment"
   failure_scenarios:
-    - a missing parameter yields 200
-    - an invalid time yields 500
-notes: 'source: L54-L57; records room-booking-api:ASM-008 and room-booking-api:ASM-009'
+    - "an unknown path returns 405 or 500"
+    - "an unknown path returns an empty 404 without a code"
+notes: "source: L64"
 ---
 ```
 
@@ -1135,42 +1123,42 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: malformed JSON body responds invalid_json
-given: any state
-when: "a client sends `POST /rooms` or `POST /rooms/:roomId/bookings` with a body that is not valid JSON"
-then: "the response is 400 with `{ \"error\": \"invalid_json\" }` and the state is unchanged"
+title: "A defined route with an unsupported method responds 405"
 surface_ref: room-booking-api:SUR-001
+given: "the server is running"
+when: "the client uses a method the matching route does not define"
+then: "the response is 405 with body {\"error\":\"method_not_allowed\"}"
+negative_cases:
+  - "DELETE /rooms => 405 method_not_allowed"
+  - "PATCH /rooms/r1/bookings => 405 method_not_allowed"
+  - "GET /bookings/b1 => 405 method_not_allowed"
+  - "POST /availability => 405 method_not_allowed"
+  - "GET /nope => 404 not_found, not 405"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
-data_scope: new_writes_only
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'a valid JSON body that fails validation => 400 invalid_room or 400 invalid_booking'
-  - 'an empty body => 400 invalid_json'
-out_of_scope:
-  - non-JSON content types
 test_obligation:
-  predicate: an unparseable body yields 400 invalid_json on every route that accepts a body
+  predicate: "an unsupported method on a defined route path returns 405 method_not_allowed while an undefined path returns 404 not_found"
   test_template: integration
   boundary_classes:
-    - empty body
-    - truncated JSON
-    - JSON array instead of object
+    - "each defined route with one unsupported method"
+    - "undefined path"
   failure_scenarios:
-    - a malformed body yields 500
-    - a malformed body yields 400 invalid_room
-notes: 'source: L63'
+    - "an unsupported method returns 404 not_found"
+    - "an unsupported method is executed as if it were supported"
+notes: "source: L64"
 ---
 ```
 
@@ -1183,15 +1171,18 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: unknown route responds not_found
-given: any state
-when: "a client sends a request to a path that no documented route matches, for example `GET /rooms/r1` or `GET /bookings`"
-then: "the response is 404 with `{ \"error\": \"not_found\" }`"
+title: "Responses carry a JSON content type except the 204"
 surface_ref: room-booking-api:SUR-001
+given: "the server is running"
+when: "the client sends any request"
+then: "every response other than 204 carries Content-Type application/json, and the 204 response carries no body and no content type"
+negative_cases:
+  - "an error response such as 400 invalid_room carries Content-Type application/json, not text/plain"
+  - "the 204 of DELETE /bookings/b1 carries no body"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
@@ -1199,124 +1190,204 @@ concurrency_model:
   read_consistency: strong
   idempotency: read_only
   time_source: none
-data_scope: not_applicable
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'GET /rooms => 200'
-  - 'POST /rooms/r1/bookings/x => 404 not_found'
-out_of_scope:
-  - an OpenAPI document
 test_obligation:
-  predicate: an unmatched path yields 404 not_found for every method
-  test_template: contract
+  predicate: "the content type is application/json on 200, 201, 400, 404, 405, 409 and 422 responses and the 204 response has no body"
+  test_template: integration
   boundary_classes:
-    - path one segment too long
-    - path one segment too short
-    - path outside the documented prefixes
+    - "success response"
+    - "error response"
+    - "204 response"
   failure_scenarios:
-    - an unknown path yields 400
-    - an unknown path yields 405
-notes: 'source: L64'
+    - "an error response is sent as text/plain"
+    - "the 204 response carries a JSON body"
+notes: "source: L62"
 ---
 ```
 
 ```yaml
 ---
-id: room-booking-api:BEH-023
-type: Behavior
+id: room-booking-api:SCN-001
+type: Scenario
 lifecycle:
   status: approved
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: unsupported method responds method_not_allowed
-given: any state
-when: "a client sends a method that a documented route does not support, for example `DELETE /rooms` or `PUT /rooms/r1/bookings`"
-then: "the response is 405 with `{ \"error\": \"method_not_allowed\" }`"
+title: "Book, conflict, release and rebook one room interval"
 surface_ref: room-booking-api:SUR-001
+initial_state: "the server holds no rooms"
+trigger: "the client creates room Aurora and books 2026-11-02T10:00:00Z to 2026-11-02T11:00:00Z, then a second overlapping booking, then deletes the first booking and books the same interval again"
+observable_sequence:
+  - "POST /rooms responds 201 with id r1"
+  - "POST /rooms/r1/bookings responds 201 with id b1"
+  - "the overlapping POST /rooms/r1/bookings for 10:30 to 11:30 responds 409 room_busy with conflictingBookingId b1"
+  - "DELETE /bookings/b1 responds 204"
+  - "GET /rooms/r1/bookings responds 200 with an empty list"
+  - "the same interval posted again responds 201 with a new booking id"
+ordering: strict
+idempotency: none
+retry_policy: "a rejected booking is retried only after the conflicting booking is deleted"
+timeout: none
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: not_applicable
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'DELETE /bookings/b1 on an existing booking => 204'
-  - 'PATCH /rooms/r1 => 404 not_found because no documented route matches that path'
-out_of_scope:
-  - advertising allowed methods in a header
 test_obligation:
-  predicate: an unsupported method on a documented route yields 405 method_not_allowed
-  test_template: contract
+  predicate: "the ordered sequence ends with a successful booking of an interval that was refused before the delete"
+  test_template: integration
   boundary_classes:
-    - unsupported method on POST /rooms
-    - unsupported method on GET /availability
-    - unsupported method on a path that no route matches
+    - "conflicting interval"
+    - "freed interval"
   failure_scenarios:
-    - an unsupported method yields 404 not_found
-    - an unsupported method yields 500
-notes: 'source: L64'
+    - "the rebooking fails after the delete"
+notes: "source: L31-L50"
 ---
 ```
 
 ```yaml
 ---
-id: room-booking-api:BEH-024
-type: Behavior
+id: room-booking-api:SCN-002
+type: Scenario
 lifecycle:
   status: approved
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: responses carry the JSON content type except 204
-given: any state
-when: "a client sends any request that produces a response body"
-then: "the response carries `Content-Type: application/json`, while the 204 response of `DELETE /bookings/:bookingId` carries no body"
+title: "Identifiers follow creation order and are never reused"
 surface_ref: room-booking-api:SUR-001
+initial_state: "two rooms exist with ids r1 and r2"
+trigger: "the client books r1, then r2, then deletes the first booking, then books r1 again"
+observable_sequence:
+  - "the first booking has id b1 and roomId r1"
+  - "the second booking has id b2 and roomId r2, so the counter is shared across rooms"
+  - "the booking created after the delete has id b3"
+  - "the next created room has id r3"
+ordering: strict
+idempotency: none
+retry_policy: "not applicable, booking creation is never retried automatically"
+timeout: none
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: not_applicable
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
-negative_cases:
-  - 'DELETE /bookings/b1 => 204 with an empty body'
-  - 'GET /rooms => 200 with Content-Type: application/json'
-  - 'GET /rooms?minCapacity=abc => 400 with Content-Type: application/json and `{ "error": "invalid_query" }`'
-out_of_scope:
-  - content negotiation
 test_obligation:
-  predicate: every response with a body sets Content-Type application/json and the 204 carries no body
-  test_template: contract
+  predicate: "booking and room ids increase monotonically in creation order and are not reused after a delete"
+  test_template: integration
   boundary_classes:
-    - 200 response
-    - 400 response
-    - 204 response
-    - error response carrying a code from room-booking-api:CTR-010
+    - "bookings in two different rooms"
+    - "creation after a delete"
   failure_scenarios:
-    - an error response is sent as text/plain
-    - the 204 response has a JSON body
-notes: 'source: L61-L62'
+    - "the booking counter restarts per room"
+    - "a deleted id is assigned again"
+notes: "source: L12-L13, L49"
+---
+```
+
+```yaml
+---
+id: room-booking-api:SCN-003
+type: Scenario
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "A process restart discards all state"
+surface_ref: room-booking-api:SUR-001
+initial_state: "a running server holds room r1 with booking b1"
+trigger: "the process is stopped and started again on the same port"
+observable_sequence:
+  - "GET /rooms responds 200 with {\"rooms\":[]}"
+  - "GET /rooms/r1/bookings responds 404 room_not_found"
+  - "a newly created room receives id r1"
+ordering: strict
+idempotency: none
+retry_policy: "not applicable, the restart is performed by the operator"
+timeout: none
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: single_per_process
+  read_consistency: strong
+  idempotency: none
+  time_source: none
+data_scope: all_data
+policy_refs:
+  - room-booking-api:POL-001
+  - room-booking-api:POL-002
+test_obligation:
+  predicate: "after a restart no room or booking from the previous process is visible and ids start at r1 again"
+  test_template: integration
+  boundary_classes:
+    - "restart after rooms only"
+    - "restart after rooms and bookings"
+  failure_scenarios:
+    - "state survives a restart"
+notes: "source: L3"
+---
+```
+
+```yaml
+---
+id: room-booking-api:NFR-001
+type: NFR
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "Build compiles and the test suite passes"
+metric: "exit status of npm run build followed by npm test"
+target: "0 failures and exit code 0 for both commands"
+verification_obligation:
+  verification_stage: ci_unit
+  artefact: "build and test transcript of the CI job"
+applicability:
+  invariant_to_all_axes: true
+test_obligation:
+  predicate: "npm run build emits the compiled output and npm test exits 0"
+  test_template: unit
+  boundary_classes:
+    - "clean checkout"
+    - "compiled output present"
+  failure_scenarios:
+    - "a type error stops the build"
+    - "a test fails"
+notes: "source: L72"
 ---
 ```
 
@@ -1333,53 +1404,55 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: POST /rooms
+title: "Server start and port configuration"
 surface_ref: room-booking-api:SUR-001
 schema:
-  method: POST
-  path: /rooms
-  request_body: "`{ \"name\": <non-empty string, at most 40 characters>, \"capacity\": <integer 1..100> }`"
-  response_201: "the created room, shaped as room-booking-api:CTR-007"
-error_taxonomy:
-  - "201 - room created, body is the created room"
-  - "400 invalid_room - the name or the capacity fails validation"
-  - "400 invalid_json - the request body is not valid JSON"
-  - "404 not_found - the path matches no documented route"
-  - "405 method_not_allowed - the path is documented but the method is not"
-  - "409 room_name_taken - the name is already used by another room, compared case-insensitively"
+  command: "npm start"
+  precondition: "npm run build has succeeded"
+  environment:
+    - name: PORT
+      type: integer
+      required: false
+      default: 3000
+  transport: "HTTP over TCP"
 preconditions:
-  - the process is listening for HTTP requests
-external_identifiers: []
+  - "the compiled output exists"
+  - "the chosen port is free"
+external_identifiers:
+  - "environment variable PORT"
+  - "TCP port"
 compatibility_rules:
-  - adding a response field is compatible
-  - removing, renaming or retyping a response field or an error code is breaking
+  - "the default port 3000 is part of the contract"
+  - "a PORT value overrides the default port"
+error_taxonomy:
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
-data_scope: new_writes_only
+data_scope: not_applicable
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: POST /rooms answers 201, 400 invalid_room, 400 invalid_json, 409 room_name_taken, 404 not_found or 405 method_not_allowed and never any other status
-  test_template: contract
+  predicate: "the server listens on the PORT value when set and on 3000 otherwise"
+  test_template: integration
   boundary_classes:
-    - valid body
-    - invalid name
-    - duplicate name in another case
-    - malformed JSON
+    - "PORT unset"
+    - "PORT set to an ephemeral port"
   failure_scenarios:
-    - a valid body answers 400
-    - an invalid name answers 500
-notes: 'source: L18-L24, L61'
+    - "the server ignores PORT"
+    - "the server binds another default port"
+notes: "source: L7-L8, L72"
 ---
 ```
 
@@ -1392,50 +1465,56 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: GET /rooms
+title: "POST /rooms"
 surface_ref: room-booking-api:SUR-001
 schema:
-  method: GET
+  method: POST
   path: /rooms
-  query: "`minCapacity=<integer>` optional"
-  response_200: "`{ \"rooms\": [<room>, ...] }` ordered by ascending room id, each room shaped as room-booking-api:CTR-007"
-error_taxonomy:
-  - "200 - the room list, possibly empty"
-  - "400 invalid_query - minCapacity is present but not a positive integer"
-  - "404 not_found - the path matches no documented route"
-  - "405 method_not_allowed - the path is documented but the method is not"
+  request_body:
+    name: "non-empty string, at most 40 characters"
+    capacity: "integer 1..100"
+  success:
+    status: 201
+    body: "{id, name, capacity}"
 preconditions:
-  - the process is listening for HTTP requests
-external_identifiers: []
+  - "the request body is valid JSON"
+external_identifiers:
+  - "HTTP POST /rooms"
 compatibility_rules:
-  - adding a room field is compatible
-  - changing the order rule or the query parameter name is breaking
+  - "the room body shape {id, name, capacity} is contractual"
+  - "additional response fields may only be added, never removed or renamed"
+error_taxonomy:
+  - "E_INVALID_ROOM - HTTP 400 - code invalid_room"
+  - "E_ROOM_NAME_TAKEN - HTTP 409 - code room_name_taken"
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: all_data
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: GET /rooms answers 200, 400 invalid_query, 404 not_found or 405 method_not_allowed and lists every room in ascending id order
+  predicate: "POST /rooms returns 201 with the created room and the documented 400 and 409 codes for the invalid inputs"
   test_template: contract
   boundary_classes:
-    - no rooms
-    - minCapacity absent
-    - minCapacity invalid
+    - "valid body"
+    - "invalid name or capacity"
+    - "duplicate name ignoring case"
   failure_scenarios:
-    - minCapacity=0 answers 200
-    - a room is missing from the list
-notes: 'source: L26-L29'
+    - "an invalid body returns 201"
+    - "the response body lacks the id field"
+notes: "source: L18-L24"
 ---
 ```
 
@@ -1448,56 +1527,54 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: POST /rooms/:roomId/bookings
+title: "GET /rooms"
 surface_ref: room-booking-api:SUR-001
 schema:
-  method: POST
-  path: /rooms/:roomId/bookings
-  request_body: "`{ \"title\": <non-empty string, at most 80 characters>, \"start\": <time>, \"end\": <time>, \"attendees\": <integer >= 1> }`"
-  response_201: "the created booking, shaped as room-booking-api:CTR-008"
-  response_409: "`{ \"error\": \"room_busy\", \"conflictingBookingId\": \"<booking id>\" }`"
-error_taxonomy:
-  - "201 - booking created, body is the created booking"
-  - "400 invalid_booking - the title, a time or the interval length fails validation"
-  - "400 invalid_json - the request body is not valid JSON"
-  - "404 room_not_found - the room id is unknown"
-  - "404 not_found - the path matches no documented route"
-  - "405 method_not_allowed - the path is documented but the method is not"
-  - "409 room_busy - the interval overlaps an existing booking of the same room"
-  - "422 over_capacity - attendees exceeds the room capacity"
-preconditions:
-  - the room identified by the path exists in the state
-external_identifiers: []
+  method: GET
+  path: /rooms
+  query_parameters:
+    - name: minCapacity
+      required: false
+      type: "positive integer"
+  success:
+    status: 200
+    body: "{rooms: [room, ...]} ordered by id"
+preconditions: []
+external_identifiers:
+  - "HTTP GET /rooms"
 compatibility_rules:
-  - adding a booking field is compatible
-  - removing conflictingBookingId from the room_busy body is breaking
+  - "the envelope {rooms: [...]} is contractual"
+error_taxonomy:
+  - "E_INVALID_QUERY - HTTP 400 - code invalid_query"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
-data_scope: new_writes_only
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: POST /rooms/:roomId/bookings answers 201, 400 invalid_booking, 400 invalid_json, 404 room_not_found, 404 not_found, 405 method_not_allowed, 409 room_busy or 422 over_capacity and never any other status
+  predicate: "GET /rooms returns 200 with all rooms ordered by id, filters by minCapacity and returns 400 invalid_query for a value that is not a positive integer"
   test_template: contract
   boundary_classes:
-    - valid body
-    - unknown room
-    - overlapping interval
-    - attendees above capacity
+    - "no query"
+    - "valid minCapacity"
+    - "minCapacity that is not a positive integer"
   failure_scenarios:
-    - an overlapping interval answers 201
-    - attendees above capacity answers 400
-notes: 'source: L31-L39, L61'
+    - "the room list is unordered"
+    - "minCapacity is ignored"
+notes: "source: L26-L29"
 ---
 ```
 
@@ -1510,51 +1587,66 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: GET /rooms/:roomId/bookings
+title: "POST /rooms/:roomId/bookings"
 surface_ref: room-booking-api:SUR-001
 schema:
-  method: GET
+  method: POST
   path: /rooms/:roomId/bookings
-  query: "`from=<time>&to=<time>` optional, both or neither; selects bookings overlapping the half-open interval `[from, to)`"
-  response_200: "`{ \"bookings\": [<booking>, ...] }` ordered by ascending start, then by ascending booking id, each booking shaped as room-booking-api:CTR-008"
-error_taxonomy:
-  - "200 - the booking list of the room, possibly empty"
-  - "400 invalid_query - from and to are not given together, are unparseable, or to is not after from"
-  - "404 room_not_found - the room id is unknown"
-  - "404 not_found - the path matches no documented route"
-  - "405 method_not_allowed - the path is documented but the method is not"
+  path_parameters:
+    - name: roomId
+      type: string
+  request_body:
+    title: "non-empty string, at most 80 characters"
+    start: "time"
+    end: "time"
+    attendees: "integer >= 1"
+  success:
+    status: 201
+    body: "{id, roomId, title, start, end, attendees}"
 preconditions:
-  - the room identified by the path exists in the state
-external_identifiers: []
+  - "the request body is valid JSON"
+external_identifiers:
+  - "HTTP POST /rooms/:roomId/bookings"
 compatibility_rules:
-  - adding a booking field is compatible
-  - changing the half-open overlap rule or the order rule is breaking
+  - "the booking body shape {id, roomId, title, start, end, attendees} is contractual"
+  - "start and end are echoed in the ISO-8601 UTC minute-precision form"
+error_taxonomy:
+  - "E_ROOM_NOT_FOUND - HTTP 404 - code room_not_found"
+  - "E_INVALID_BOOKING - HTTP 400 - code invalid_booking"
+  - "E_OVER_CAPACITY - HTTP 422 - code over_capacity"
+  - "E_ROOM_BUSY - HTTP 409 - code room_busy with conflictingBookingId"
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: all_data
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: GET /rooms/:roomId/bookings answers 200, 400 invalid_query, 404 room_not_found, 404 not_found or 405 method_not_allowed and applies the half-open window
+  predicate: "POST /rooms/:roomId/bookings returns 201 for a valid body and exactly one of 404 room_not_found, 400 invalid_booking, 422 over_capacity or 409 room_busy for each invalid input class"
   test_template: contract
   boundary_classes:
-    - no window
-    - window covering every booking
-    - window touching a booking at its boundary
+    - "valid body"
+    - "unknown room id"
+    - "invalid title, time or duration"
+    - "attendees above capacity"
+    - "overlapping interval"
   failure_scenarios:
-    - only from is given and answers 200
-    - a booking starting exactly at to is included
-notes: 'source: L41-L45'
+    - "an over-capacity booking returns 409 instead of 422"
+    - "an overlapping booking returns 400 instead of 409"
+    - "room_busy omits conflictingBookingId"
+notes: "source: L31-L39"
 ---
 ```
 
@@ -1567,48 +1659,63 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: DELETE /bookings/:bookingId
+title: "GET /rooms/:roomId/bookings"
 surface_ref: room-booking-api:SUR-001
 schema:
-  method: DELETE
-  path: /bookings/:bookingId
-  response_204: "no body; the booking is removed from the state and its interval becomes free"
-error_taxonomy:
-  - "204 - booking deleted, no body"
-  - "404 booking_not_found - the booking id is unknown"
-  - "404 not_found - the path matches no documented route"
-  - "405 method_not_allowed - the path is documented but the method is not"
-preconditions:
-  - the booking identified by the path exists in the state
-external_identifiers: []
+  method: GET
+  path: /rooms/:roomId/bookings
+  path_parameters:
+    - name: roomId
+      type: string
+  query_parameters:
+    - name: from
+      required: false
+      type: "time, only together with to"
+    - name: to
+      required: false
+      type: "time, only together with from"
+  success:
+    status: 200
+    body: "{bookings: [booking, ...]} ordered by start then id"
+preconditions: []
+external_identifiers:
+  - "HTTP GET /rooms/:roomId/bookings"
 compatibility_rules:
-  - changing 204 to a body-carrying status is breaking
+  - "the envelope {bookings: [...]} is contractual"
+  - "the window is half-open: [from, to)"
+error_taxonomy:
+  - "E_ROOM_NOT_FOUND - HTTP 404 - code room_not_found"
+  - "E_INVALID_QUERY - HTTP 400 - code invalid_query"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
   actor_concurrency: multi_per_resource
   read_consistency: strong
-  idempotency: none
+  idempotency: read_only
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: DELETE /bookings/:bookingId answers 204, 404 booking_not_found, 404 not_found or 405 method_not_allowed and leaves no body on 204
+  predicate: "GET /rooms/:roomId/bookings returns the ordered booking list, filters by an overlap window and returns 400 invalid_query or 404 room_not_found for the invalid input classes"
   test_template: contract
   boundary_classes:
-    - existing booking
-    - unknown booking id
-    - already deleted booking
+    - "no query"
+    - "valid from and to"
+    - "only one of from and to"
+    - "unknown room id"
   failure_scenarios:
-    - a deleted booking still appears in its room list
-    - 204 carries a body
-notes: 'source: L47-L50'
+    - "the list is unordered"
+    - "a window without from or to is accepted"
+notes: "source: L41-L45"
 ---
 ```
 
@@ -1621,51 +1728,52 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: GET /availability
+title: "DELETE /bookings/:bookingId"
 surface_ref: room-booking-api:SUR-001
 schema:
-  method: GET
-  path: /availability
-  query: "`start=<time>&end=<time>&attendees=<integer of at least 1>`, all three required"
-  response_200: "`{ \"rooms\": [<room>, ...] }` with every room of capacity at least attendees that has no booking overlapping `[start, end)`, ordered by capacity ascending then by ascending room id, each room shaped as room-booking-api:CTR-007"
-error_taxonomy:
-  - "200 - the list of free rooms, possibly empty"
-  - "400 invalid_query - a parameter is missing or invalid, or end is not after start"
-  - "404 not_found - the path matches no documented route"
-  - "405 method_not_allowed - the path is documented but the method is not"
-preconditions:
-  - the process is listening for HTTP requests
-external_identifiers: []
+  method: DELETE
+  path: /bookings/:bookingId
+  path_parameters:
+    - name: bookingId
+      type: string
+  success:
+    status: 204
+    body: none
+preconditions: []
+external_identifiers:
+  - "HTTP DELETE /bookings/:bookingId"
 compatibility_rules:
-  - adding a room field is compatible
-  - changing the order rule or making a parameter optional is breaking
+  - "the success response carries no body and no content type"
+error_taxonomy:
+  - "E_BOOKING_NOT_FOUND - HTTP 404 - code booking_not_found"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: all_data
+data_scope: new_writes_only
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: GET /availability answers 200, 400 invalid_query, 404 not_found or 405 method_not_allowed and returns exactly the free rooms with sufficient capacity
+  predicate: "DELETE /bookings/:bookingId returns 204 for a known booking and 404 booking_not_found for an unknown one"
   test_template: contract
   boundary_classes:
-    - every room free
-    - every room booked
-    - attendees equal to a room capacity
-    - attendees not a positive integer
+    - "known booking id"
+    - "unknown booking id"
   failure_scenarios:
-    - a booked room is returned
-    - a missing parameter answers 200
-notes: 'source: L52-L57; decided by GA-003; records room-booking-api:ASM-009'
+    - "an unknown id returns 204"
+    - "the 204 response carries a body"
+notes: "source: L47-L50"
 ---
 ```
 
@@ -1678,246 +1786,39 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: room representation
+title: "GET /availability"
 surface_ref: room-booking-api:SUR-001
 schema:
-  object: "`{ \"id\": \"<room id>\", \"name\": \"<string>\", \"capacity\": <integer> }`"
-  id: "server-assigned, `r1`, `r2`, ... in creation order"
-  name: "non-empty string of at most 40 characters, unique across rooms compared case-insensitively"
-  capacity: "integer in 1..100"
-error_taxonomy:
-  - "400 invalid_room - a room object in a request body does not satisfy this shape"
+  method: GET
+  path: /availability
+  query_parameters:
+    - name: start
+      required: true
+      type: "time"
+    - name: end
+      required: true
+      type: "time"
+    - name: attendees
+      required: true
+      type: "positive integer"
+  success:
+    status: 200
+    body: "{rooms: [room, ...]} ordered by capacity then id"
 preconditions: []
-external_identifiers: []
-compatibility_rules:
-  - adding a field to the room object is compatible
-  - removing or renaming id, name or capacity is breaking
-applicability:
-  invariant_to_all_axes: true
-concurrency_model:
-  actor_concurrency: multi_per_resource
-  read_consistency: strong
-  idempotency: read_only
-  time_source: none
-data_scope: all_data
-policy_refs:
-  - room-booking-api:POL-001
-  - room-booking-api:POL-002
-test_obligation:
-  predicate: every room object in a response has exactly the id, name and capacity fields with the documented types
-  test_template: contract
-  boundary_classes:
-    - name of 40 characters
-    - capacity 1
-    - capacity 100
-  failure_scenarios:
-    - a room object lacks id
-    - capacity is serialised as a string
-notes: 'source: L12'
----
-```
-
-```yaml
----
-id: room-booking-api:CTR-008
-type: Contract
-lifecycle:
-  status: approved
-  approval_record:
-    owner_role: product-owner
-    approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
-    scope: first-time-approval
-partition_id: room-booking-api
-title: booking representation
-surface_ref: room-booking-api:SUR-001
-schema:
-  object: "`{ \"id\": \"<booking id>\", \"roomId\": \"<room id>\", \"title\": \"<string>\", \"start\": \"<time>\", \"end\": \"<time>\", \"attendees\": <integer> }`"
-  id: "server-assigned, `b1`, `b2`, ... in creation order across all rooms"
-  roomId: "the id of the room the booking belongs to"
-  title: "non-empty string of at most 80 characters"
-  attendees: "integer of at least 1"
-error_taxonomy:
-  - "400 invalid_booking - a booking body does not satisfy this shape"
-  - "422 over_capacity - attendees exceeds the capacity of the booked room"
-preconditions: []
-external_identifiers: []
-compatibility_rules:
-  - adding a field to the booking object is compatible
-  - removing or renaming any documented field is breaking
-applicability:
-  invariant_to_all_axes: true
-concurrency_model:
-  actor_concurrency: multi_per_resource
-  read_consistency: strong
-  idempotency: read_only
-  time_source: none
-data_scope: all_data
-policy_refs:
-  - room-booking-api:POL-001
-  - room-booking-api:POL-002
-test_obligation:
-  predicate: every booking object in a response carries exactly the six documented fields with the documented types
-  test_template: contract
-  boundary_classes:
-    - title of 80 characters
-    - attendees 1
-    - start and end on whole minutes
-  failure_scenarios:
-    - the booking object lacks roomId
-    - start is serialised in a non-UTC form
-notes: 'source: L13'
----
-```
-
-```yaml
----
-id: room-booking-api:CTR-009
-type: Contract
-lifecycle:
-  status: approved
-  approval_record:
-    owner_role: product-owner
-    approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
-    scope: first-time-approval
-partition_id: room-booking-api
-title: time format
-surface_ref: room-booking-api:SUR-001
-schema:
-  format: "ISO-8601 in UTC with a `Z` suffix and minute precision, for example `2026-11-02T09:30:00Z`"
-  accepted: "a string whose calendar fields are valid, whose UTC designator is `Z`, and whose seconds part is `00`"
-  rejected: "a string with a non-UTC offset, an unparseable calendar value, a seconds part other than `00`, a fractional seconds part, or a value that is not a string"
-  interval_semantics: "booking intervals are half-open, so a booking ending at 10:00 and one starting at 10:00 do not overlap"
-error_taxonomy:
-  - "400 invalid_booking - a booking start or end is not an accepted time or violates the interval rules"
-  - "400 invalid_query - a query time parameter is not an accepted time or violates the interval rules"
-preconditions: []
-external_identifiers: []
-compatibility_rules:
-  - narrowing the accepted time format is breaking
-applicability:
-  invariant_to_all_axes: true
-concurrency_model:
-  actor_concurrency: multi_per_resource
-  read_consistency: strong
-  idempotency: read_only
-  time_source: none
-data_scope: not_applicable
-policy_refs:
-  - room-booking-api:POL-001
-  - room-booking-api:POL-002
-test_obligation:
-  predicate: a time with a `Z` suffix and `00` seconds is accepted while every rejected class is refused by the route that consumes it
-  test_template: unit
-  boundary_classes:
-    - whole-minute UTC time
-    - time with 30 seconds
-    - time with a `+02:00` offset
-    - unparseable calendar date
-  failure_scenarios:
-    - a `+02:00` time is accepted
-    - a time with 30 seconds is accepted on a write route
-notes: 'source: L14'
----
-```
-
-```yaml
----
-id: room-booking-api:CTR-010
-type: Contract
-lifecycle:
-  status: approved
-  approval_record:
-    owner_role: product-owner
-    approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
-    scope: first-time-approval
-partition_id: room-booking-api
-title: error response envelope and routing errors
-surface_ref: room-booking-api:SUR-001
-schema:
-  envelope: "`{ \"error\": \"<stable snake_case code>\" }`, plus `conflictingBookingId` only for `room_busy`"
-  content_type: "every response with a body carries `Content-Type: application/json`; the 204 carries no body"
-  unknown_route: "404 with `{ \"error\": \"not_found\" }`"
-  unsupported_method: "405 with `{ \"error\": \"method_not_allowed\" }` on a documented path"
-  malformed_body: "400 with `{ \"error\": \"invalid_json\" }` when a request body is not valid JSON"
-error_taxonomy:
-  - "400 invalid_json - a request body is not valid JSON"
-  - "400 invalid_query - a query parameter is missing or invalid"
-  - "400 invalid_room - a room body fails validation"
-  - "400 invalid_booking - a booking body fails validation"
-  - "404 not_found - no documented route matches the path"
-  - "404 room_not_found - the room id is unknown"
-  - "404 booking_not_found - the booking id is unknown"
-  - "405 method_not_allowed - the path is documented but the method is not"
-  - "409 room_name_taken - the room name is already in use"
-  - "409 room_busy - the interval overlaps an existing booking of the same room"
-  - "422 over_capacity - attendees exceeds the room capacity"
-preconditions: []
-external_identifiers: []
-compatibility_rules:
-  - adding a new error code is compatible for clients that ignore unknown codes
-  - changing an existing error code string is breaking
-applicability:
-  invariant_to_all_axes: true
-concurrency_model:
-  actor_concurrency: multi_per_resource
-  read_consistency: strong
-  idempotency: read_only
-  time_source: none
-data_scope: not_applicable
-policy_refs:
-  - room-booking-api:POL-001
-  - room-booking-api:POL-002
-test_obligation:
-  predicate: every non-2xx response carries a JSON body whose error field is a snake_case code from this taxonomy and the documented content type
-  test_template: contract
-  boundary_classes:
-    - unknown route
-    - unsupported method
-    - malformed body
-    - validation failure
-  failure_scenarios:
-    - an error response carries free text instead of a code
-    - an error response has no Content-Type
-notes: 'source: L61-L64'
----
-```
-
-```yaml
----
-id: room-booking-api:CTR-011
-type: Contract
-lifecycle:
-  status: approved
-  approval_record:
-    owner_role: product-owner
-    approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
-    scope: first-time-approval
-partition_id: room-booking-api
-title: server process configuration
-surface_ref: room-booking-api:SUR-001
-schema:
-  listen_port: "the port given by the environment variable `PORT`; default `3000` when the variable is unset"
-  reachability: "the HTTP routes of this surface are served on that port for the lifetime of the process"
-error_taxonomy:
-  - "none - startup configuration produces no HTTP error response"
-preconditions:
-  - the built process is started by the operator
 external_identifiers:
-  - "environment variable PORT"
+  - "HTTP GET /availability"
 compatibility_rules:
-  - changing the variable name or the default port is breaking for operators
+  - "the envelope {rooms: [...]} is contractual"
+  - "the queried window is half-open: [start, end)"
+error_taxonomy:
+  - "E_INVALID_QUERY - HTTP 400 - code invalid_query"
+  - "E_NOT_FOUND_ROUTE - HTTP 404 - code not_found"
+  - "E_METHOD_NOT_ALLOWED - HTTP 405 - code method_not_allowed"
+  - "E_INVALID_JSON - HTTP 400 - code invalid_json"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
@@ -1925,20 +1826,22 @@ concurrency_model:
   read_consistency: strong
   idempotency: read_only
   time_source: none
-data_scope: not_applicable
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: with PORT set the routes answer on that port and with PORT unset they answer on 3000
-  test_template: integration
+  predicate: "GET /availability returns the free rooms with capacity at least attendees ordered by capacity then id, and 400 invalid_query for a missing or invalid parameter"
+  test_template: contract
   boundary_classes:
-    - PORT set to an ephemeral port
-    - PORT unset
+    - "all parameters valid"
+    - "one parameter missing"
+    - "end not after start"
+    - "attendees that is not a positive integer"
   failure_scenarios:
-    - the process ignores PORT and binds 3000 anyway
-    - the process refuses to start with PORT set
-notes: 'source: L5-L8'
+    - "a busy room is returned"
+    - "a missing parameter is treated as a default"
+notes: "source: L52-L57"
 ---
 ```
 
@@ -1955,44 +1858,40 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: identifiers are server-assigned and sequential
-statement: "every room carries an id of the form `r<n>` and every booking an id of the form `b<n>`, `n` starting at 1 and increasing by one in creation order, shared across all rooms for bookings; a client-supplied id is never honoured"
-scope: all rooms and bookings in the state
-evidence:
-  public_api: GET /rooms, GET /rooms/:roomId/bookings and the creation responses expose the assigned ids
-  test_probe: create rooms and bookings and compare the assigned ids with the creation order
+title: "Room ids are unique and follow creation order"
+statement: "every room has an id of the form r<n> with a positive integer n, ids are unique, and room creation assigns the next n in creation order"
+scope: "all rooms in the running process"
+evidence: public_api
 stability: contractual
 negative_cases:
-  - "three created rooms carry the ids r1, r2, r3"
-  - "two bookings in different rooms carry b1 and b2"
+  - "a second POST /rooms with a different valid name => 201 with r2, never a reused r1"
+  - "GET /rooms after a restart never lists a room created before the restart, so ids restart at r1"
 out_of_scope:
-  - client-chosen identifiers
+  - "ids supplied by the client"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
 data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: assigned ids follow the creation order with the documented prefixes
+  predicate: "the room ids observed through GET /rooms are r1..rN without gaps or duplicates"
   test_template: integration
   boundary_classes:
-    - first room
-    - tenth room crossing the two-digit boundary
-    - bookings in two rooms
+    - "one room"
+    - "more than nine rooms"
   failure_scenarios:
-    - a booking id restarts at b1 for the second room
-    - a gap appears in the room id sequence
-notes: 'source: L12-L13'
+    - "two rooms share an id"
+notes: "source: L12"
 ---
 ```
 
@@ -2005,26 +1904,24 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: bookings of one room never overlap
-statement: "two bookings of the same room never overlap under the half-open reading, so a booking ending at 10:00 and one starting at 10:00 coexist while any pair sharing an instant does not"
-scope: all bookings of one room
-evidence:
-  public_api: POST /rooms/:roomId/bookings answers 409 room_busy for an overlapping interval, and GET /rooms/:roomId/bookings never lists overlapping bookings
-  test_probe: attempt to create an overlapping booking and assert 409 room_busy
+title: "Booking ids are unique across all rooms and follow creation order"
+statement: "every booking has an id of the form b<n> with a positive integer n, ids are unique across all rooms, one counter serves all rooms, and a deleted id is never reused"
+scope: "all bookings in the running process"
+evidence: public_api
 stability: contractual
 negative_cases:
-  - "a booking 09:00-10:00 followed by a booking 10:00-11:00 is accepted"
-  - "a booking 09:30-10:30 on top of 09:00-10:00 answers 409 room_busy"
+  - "a booking in r2 after one booking in r1 => 201 with b2, not b1"
+  - "a booking created after deleting b1 => 201 with a fresh id, not b1"
 out_of_scope:
-  - overlapping bookings in different rooms
+  - "ids supplied by the client"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -2033,16 +1930,14 @@ policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: no stored pair of bookings of one room overlaps
+  predicate: "booking ids observed through the API are unique across rooms and increase in creation order"
   test_template: integration
   boundary_classes:
-    - adjacent intervals
-    - identical intervals
-    - zero-length requested interval
+    - "bookings in two rooms"
+    - "creation after a delete"
   failure_scenarios:
-    - an overlapping booking is stored
-    - an adjacent booking is rejected
-notes: 'source: L14, L39'
+    - "the counter restarts per room"
+notes: "source: L13"
 ---
 ```
 
@@ -2055,45 +1950,40 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: every error response carries a stable code
-statement: "every response with a status of 400 or above carries a JSON body with an `error` field holding a stable snake_case code from error list of room-booking-api:CTR-010 and never free-text prose"
-scope: every response of the surface
-evidence:
-  public_api: all error responses
-  test_probe: assert the shape and the code of each documented error path
+title: "No two bookings of one room overlap"
+statement: "at every observable point in time no two bookings of the same room have overlapping half-open intervals"
+scope: "every room"
+evidence: public_api
 stability: contractual
 negative_cases:
-  - "GET /rooms?minCapacity=abc answers 400 with `{ \"error\": \"invalid_query\" }`"
-  - "DELETE /bookings/b404 answers 404 with `{ \"error\": \"booking_not_found\" }`"
+  - "a second booking of 10:30 to 11:30 in a room booked 10:00 to 11:00 => 409 room_busy, the store is unchanged"
+  - "bookings in different rooms may overlap => both respond 201"
 out_of_scope:
-  - diagnostic logs outside the response body
+  - "conflicts across rooms"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
-  idempotency: read_only
+  idempotency: none
   time_source: none
-data_scope: not_applicable
+data_scope: all_data
 policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: each error status is paired with the documented code and no other body shape
-  test_template: contract
+  predicate: "no read of the booking list ever shows two overlapping intervals in one room"
+  test_template: integration
   boundary_classes:
-    - 400 response
-    - 404 response
-    - 409 response
-    - 422 response
+    - "adjacent intervals"
+    - "overlapping intervals"
   failure_scenarios:
-    - an error body is a bare string
-    - an error code is a sentence
-notes: 'source: L61'
+    - "two overlapping bookings are accepted for one room"
+notes: "source: L14, L39"
 ---
 ```
 
@@ -2106,25 +1996,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: state is in memory only
-statement: "rooms and bookings live in the memory of the running process; nothing is written outside the process and a restarted process starts with an empty state"
-scope: the whole state
-evidence:
-  public_api: GET /rooms after a restart returns no rooms
-  test_probe: create a room, restart the process, list rooms
+title: "A booking never exceeds the capacity of its room"
+statement: "every stored booking has an attendee count no greater than the capacity of its room, and a room capacity never changes because rooms are never updated"
+scope: "every booking"
+evidence: public_api
 stability: contractual
 negative_cases:
-  - "a room created before a restart is absent from GET /rooms after the restart"
+  - "attendees 5 in a room of capacity 4 => 422 over_capacity, nothing stored"
 out_of_scope:
-  - backup and restore
+  - "occupancy changes after creation"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -2133,15 +2021,14 @@ policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: a restarted process exposes an empty state
+  predicate: "every listed booking satisfies attendees <= capacity of its room"
   test_template: integration
   boundary_classes:
-    - restart with no data
-    - restart after creating rooms and bookings
+    - "attendees equal to capacity"
+    - "attendees above capacity"
   failure_scenarios:
-    - state survives a restart
-    - the process writes a data file
-notes: 'source: L3'
+    - "an over-capacity booking is listed"
+notes: "source: L38, L68"
 ---
 ```
 
@@ -2154,26 +2041,24 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: room names are unique case-insensitively
-statement: "at most one room exists per name when names are compared case-insensitively; the stored name keeps the spelling the client sent"
-scope: all rooms
-evidence:
-  public_api: POST /rooms answers 409 room_name_taken for a duplicate and GET /rooms shows the stored spelling
-  test_probe: create `Focus`, then `focus`, then list rooms
+title: "All state is lost when the process stops"
+statement: "rooms and bookings exist only in the memory of the running process and never survive a restart"
+scope: "the whole API"
+evidence: public_api
 stability: contractual
 negative_cases:
-  - "creating `Focus` and then `focus` answers 409 room_name_taken"
-  - "creating `Focus` then `Field` answers 201 and both names keep their spelling"
+  - "GET /rooms after a restart => 200 with an empty list, never rooms from the previous process"
+  - "a file or database on disk never restores state"
 out_of_scope:
-  - name normalisation or trimming
+  - "persistence of any kind"
 applicability:
   invariant_to_all_axes: true
 concurrency_model:
-  actor_concurrency: multi_per_resource
+  actor_concurrency: single_per_process
   read_consistency: strong
   idempotency: none
   time_source: none
@@ -2182,16 +2067,14 @@ policy_refs:
   - room-booking-api:POL-001
   - room-booking-api:POL-002
 test_obligation:
-  predicate: no two rooms share a name under case-insensitive comparison
+  predicate: "a restarted process exposes no room or booking created before the restart"
   test_template: integration
   boundary_classes:
-    - identical name
-    - name differing only in case
-    - name differing by one character
+    - "restart with rooms only"
+    - "restart with rooms and bookings"
   failure_scenarios:
-    - two rooms with names differing only in case exist
-    - the stored name is lower-cased
-notes: 'source: L24'
+    - "state is restored from disk after a restart"
+notes: "source: L3, L68"
 ---
 ```
 
@@ -2226,40 +2109,28 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: error reporting uses stable codes
+title: "Error reporting"
 policy_kind: error_reporting
 applicability:
-  applies_to: every error response of room-booking-api:SUR-001
-predicate: "every error response body is JSON, carries an `error` field whose value is a snake_case code from room-booking-api:CTR-010, and carries `conflictingBookingId` only for `room_busy`"
+  applies_to: "every unsuccessful response of every endpoint"
+predicate: "an unsuccessful response has a JSON object body with an error field holding a stable snake_case code from the contract taxonomy, and the room_busy body additionally holds conflictingBookingId; no free text stands in for a code"
 negative_test_obligations:
-  - "an error response whose error field is a prose sentence fails the check"
-  - "a room_busy body without conflictingBookingId fails the check"
-  - "a 500 status on a documented validation failure fails the check"
-applicability_note: none
-applicability_axes:
-  invariant_to_all_axes: true
-concurrency_model:
-  actor_concurrency: multi_per_resource
-  read_consistency: strong
-  idempotency: read_only
-  time_source: none
-data_scope: not_applicable
-policy_refs:
-  - room-booking-api:POL-001
+  - "an error body without the error field"
+  - "an error code spelled in another case or with another separator"
+  - "room_busy without conflictingBookingId"
 test_obligation:
-  predicate: every error path answers the documented status and code
+  predicate: "every error response body parses as a JSON object with a stable snake_case error code"
   test_template: contract
   boundary_classes:
-    - validation error
-    - routing error
-    - conflict error
+    - "client error"
+    - "conflict error with extra field"
   failure_scenarios:
-    - an error code is not snake_case
-notes: 'source: L61'
+    - "an error is reported as plain text"
+notes: "source: L61"
 ---
 ```
 
@@ -2272,41 +2143,30 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: boundary validation never crashes the process
+title: "Boundary validation"
 policy_kind: input_validation
 applicability:
-  applies_to: every request body and query string of room-booking-api:SUR-001
-predicate: "a missing, mistyped, malformed or out-of-range input is answered with the documented 400 or 422 status and the process keeps serving subsequent requests"
+  applies_to: "request bodies, path parameters and query parameters of every endpoint"
+predicate: "an input outside its documented class is rejected with the documented 4xx code before any state changes, and no invalid input terminates the process or produces a 5xx response"
 negative_test_obligations:
-  - "a malformed JSON body that terminates the process fails the check"
-  - "a non-integer capacity that reaches the state fails the check"
-  - "a request after a rejected one that receives no answer fails the check"
-applicability_axes:
-  invariant_to_all_axes: true
-concurrency_model:
-  actor_concurrency: multi_per_resource
-  read_consistency: strong
-  idempotency: none
-  time_source: none
-data_scope: not_applicable
-policy_refs:
-  - room-booking-api:POL-002
+  - "an unparsable body crashes the process"
+  - "an invalid query is processed with a default value"
+  - "a rejected request still changes state"
 test_obligation:
-  predicate: every invalid input class is rejected with a documented status while the process stays alive
+  predicate: "for each documented invalid input class the server answers with the documented 4xx code and keeps serving the next request"
   test_template: integration
   boundary_classes:
-    - malformed JSON body
-    - wrong field types
-    - out-of-range numbers
-    - invalid query parameters
+    - "invalid body"
+    - "invalid query parameter"
+    - "invalid path parameter"
   failure_scenarios:
-    - an invalid input yields 500
-    - the process exits after a rejected request
-notes: 'source: L23, L37, L44, L57, L63'
+    - "a 5xx response for an invalid input"
+    - "the process exits on an invalid request"
+notes: "source: L61, L63"
 ---
 ```
 
@@ -2323,22 +2183,21 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: no outbound network access
-constraint: "the product makes no outbound network call; rooms, bookings and availability are computed from the in-memory state alone"
-rationale: "the source describes no external service and state is in memory"
+title: "TypeScript with strict type checking"
+constraint: "the product is written in TypeScript with strict type checking and ESM modules, and the typecheck is tsc --noEmit"
+rationale: "factory toolchain shared by every product"
 test_obligation:
-  predicate: no outbound connection is opened while serving the documented routes
-  test_template: integration
+  predicate: "tsc --noEmit exits 0 on the whole source tree"
+  test_template: unit
   boundary_classes:
-    - request to a room route
-    - request to the availability route
+    - "source tree"
   failure_scenarios:
-    - a route performs an HTTP call to a remote host
-notes: 'source: L3'
+    - "a type error is present"
+notes: "source: L3"
 ---
 ```
 
@@ -2351,22 +2210,21 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: no runtime dependencies beyond the source
-constraint: "the product ships no runtime dependency; the source names none, so the server and the tests use only what the factory toolchain provides"
-rationale: "the source lists no third-party library, framework or database"
+title: "Node.js 22 or newer"
+constraint: "the product runs on Node.js 22 or newer"
+rationale: "factory toolchain runtime"
 test_obligation:
-  predicate: the runtime dependency list of the product is empty
+  predicate: "the code runs on Node.js 22 without experimental flags"
   test_template: unit
   boundary_classes:
-    - production dependency list
-    - import graph of the server entry point
+    - "Node 22"
   failure_scenarios:
-    - a third-party package is required at runtime
-notes: 'source: L1-L3'
+    - "the code needs an older or unreleased runtime"
+notes: "source: L3"
 ---
 ```
 
@@ -2379,23 +2237,106 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: implementation language and build commands named by the source
-constraint: "the product is written in TypeScript and is built and started with the npm scripts the source names, `npm run build` before `npm start`"
-rationale: "the source fixes the language and the start sequence of the server"
+title: "vitest through npm test, tsc for the build"
+constraint: "tests run with vitest through npm test and the build is tsc run as npm run build"
+rationale: "factory toolchain and the acceptance criteria of the source"
 test_obligation:
-  predicate: the sources are TypeScript files and a built process starts with npm start after npm run build
+  predicate: "npm test runs the whole suite and npm run build emits the compiled output"
+  test_template: unit
+  boundary_classes:
+    - "test run"
+    - "build run"
+  failure_scenarios:
+    - "the suite needs another runner"
+notes: "source: L8, L72"
+---
+```
+
+```yaml
+---
+id: room-booking-api:CON-004
+type: Constraint
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "No outbound network or external service"
+constraint: "the server opens no outbound network connection and depends on no external service or database; all state is in process memory"
+rationale: "in-memory product without persistence"
+test_obligation:
+  predicate: "rooms and bookings created through the API are answered from process memory alone: after the process is stopped and started again GET /rooms returns 200 with {\"rooms\":[]} and the first created room has id r1, while the restarted process answers the next request with a documented status instead of a 5xx"
   test_template: integration
   boundary_classes:
-    - fresh checkout without build output
-    - checkout after a successful build
+    - "restart after rooms and bookings were created"
+    - "request served after the restart"
   failure_scenarios:
-    - npm start runs without a prior build and serves nothing
-    - the product is shipped as plain JavaScript without a build step
-notes: 'source: L1-L8, L72'
+    - "a room created before the restart is listed after it, which shows state outside process memory"
+    - "a request after the restart answers 5xx because a service outside the process is unreachable"
+notes: "source: L3, L68"
+---
+```
+
+```yaml
+---
+id: room-booking-api:CON-005
+type: Constraint
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "No runtime dependencies beyond those the source lists"
+constraint: "the product adds no runtime dependency; the source lists none"
+rationale: "the source names no library or framework"
+test_obligation:
+  predicate: "package.json declares no runtime dependency"
+  test_template: unit
+  boundary_classes:
+    - "dependency list"
+  failure_scenarios:
+    - "a runtime dependency is added"
+notes: "source: L3"
+---
+```
+
+```yaml
+---
+id: room-booking-api:CON-006
+type: Constraint
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "Port from PORT and npm start"
+constraint: "the server listens on the port in the PORT environment variable with default 3000, and it is started with npm start after npm run build"
+rationale: "the source fixes the start command and the port source"
+test_obligation:
+  predicate: "npm start serves the API on the PORT value or on 3000 when unset"
+  test_template: integration
+  boundary_classes:
+    - "PORT set"
+    - "PORT unset"
+  failure_scenarios:
+    - "the server ignores PORT"
+notes: "source: L7-L8"
 ---
 ```
 
@@ -2430,23 +2371,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: how is the case-insensitive room name comparison defined
-question: "the source says a name already used by another room is rejected case-insensitively; it does not say whether the stored name keeps the client spelling or is normalised, nor which case folding applies"
+title: "Does a whitespace-only name or title count as non-empty?"
+question: "the source requires a non-empty room name and a non-empty booking title; is a string made only of spaces valid?"
 options:
-  - id: OPT-001
-    label: "store the name as sent and compare with locale-independent lower-casing"
-    consequence: "GET /rooms echoes the client spelling and only names equal after lower-casing collide"
-  - id: OPT-002
-    label: "store the name lower-cased and compare the stored value"
-    consequence: "GET /rooms returns a name the client did not send"
+  - id: reject_whitespace_only
+    label: "trim before validation, so a whitespace-only value is invalid"
+    consequence: "such requests answer 400 invalid_room or 400 invalid_booking"
+  - id: accept_whitespace_only
+    label: "any string with at least one character is valid"
+    consequence: "a name of three spaces creates a room and blocks that name only by exact characters"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L24'
+default_if_unresolved: reject_whitespace_only
+notes: "source: L20, L23, L33, L37"
 ---
 ```
 
@@ -2459,23 +2400,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: which error wins when a request violates several rules
-question: "the source lists one error per rule without saying which applies when a request breaks several, for example an unknown room combined with an invalid title, or attendees above capacity combined with an overlapping interval"
+title: "How is the 40 and 80 character bound counted?"
+question: "the length bound of a name and of a title does not say which unit counts as a character for non-ASCII text"
 options:
-  - id: OPT-001
-    label: "evaluate in the order: body parse, route and room existence, body validation, capacity, conflict"
-    consequence: "400 invalid_json precedes 404 room_not_found which precedes 400 invalid_booking which precedes 422 over_capacity which precedes 409 room_busy"
-  - id: OPT-002
-    label: "evaluate the whole body first and the state rules afterwards"
-    consequence: "400 invalid_booking precedes 404 room_not_found"
+  - id: utf16_code_units
+    label: "count UTF-16 code units, the length of a JavaScript string"
+    consequence: "an emoji outside the basic plane counts as two characters"
+  - id: code_points
+    label: "count Unicode code points"
+    consequence: "an emoji counts as one character and a 40-emoji name is accepted"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L36-L39, L63'
+default_if_unresolved: utf16_code_units
+notes: "source: L20, L23, L33"
 ---
 ```
 
@@ -2488,23 +2429,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: what counts as one character for the length limits
-question: "the source limits a room name to 40 characters and a booking title to 80 characters without saying whether the unit is a Unicode code point, a UTF-16 code unit or a grapheme cluster"
+title: "What happens to unknown fields in a request body?"
+question: "the source fixes the required fields but does not say whether extra fields are rejected"
 options:
-  - id: OPT-001
-    label: "count Unicode code points"
-    consequence: "a name of 40 emoji is accepted"
-  - id: OPT-002
-    label: "count UTF-16 code units of the JavaScript string length"
-    consequence: "a name of 40 emoji is rejected as 80 units"
+  - id: ignore_extra
+    label: "extra fields are ignored"
+    consequence: "a body with an unknown field is accepted when the known fields are valid"
+  - id: reject_extra
+    label: "extra fields make the body invalid"
+    consequence: "a body with an unknown field answers 400 invalid_room or 400 invalid_booking"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L20, L33'
+default_if_unresolved: ignore_extra
+notes: "source: L20, L33"
 ---
 ```
 
@@ -2517,23 +2458,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: how are ids ordered
-question: "the source orders rooms by id and bookings by start then id, without saying whether the id order is numeric or lexicographic, which matters from the tenth record on"
+title: "Which error wins when one request violates several rules?"
+question: "the source lists several error classes per endpoint without an order between them"
 options:
-  - id: OPT-001
-    label: "numeric ascending order of the numeric part, equal to creation order"
-    consequence: "r10 comes after r9 and b10 after b9"
-  - id: OPT-002
-    label: "lexicographic order of the whole id string"
-    consequence: "r10 comes before r9"
+  - id: route_then_resource_then_body
+    label: "route, then resource existence, then body parse, then query, then field, then capacity, then conflict"
+    consequence: "an unknown room wins over an invalid body, which wins over an overlapping interval"
+  - id: body_first
+    label: "body validation wins over resource existence"
+    consequence: "POST /rooms/r99/bookings with a bad title answers 400 invalid_booking instead of 404 room_not_found"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L28, L43, L56'
+default_if_unresolved: route_then_resource_then_body
+notes: "source: L36-L39, L44-L45"
 ---
 ```
 
@@ -2546,23 +2487,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: how is the conflicting booking chosen among ties
-question: "the source names the earliest-starting conflicting booking, which does not decide the case where two conflicting bookings share that earliest start"
+title: "Which timestamp spellings are accepted?"
+question: "the source requires an ISO-8601 UTC time with a Z suffix and minute precision but does not say whether other ISO-8601 UTC spellings are accepted or rejected"
 options:
-  - id: OPT-001
-    label: "break the tie by ascending booking id"
-    consequence: "room_busy is deterministic and names the lower id"
-  - id: OPT-002
-    label: "leave the choice to the implementation"
-    consequence: "clients cannot rely on a specific id in that case"
+  - id: strict_minute_z
+    label: "accept only the form YYYY-MM-DDTHH:MM:SSZ"
+    consequence: "2026-11-02T09:30:00+00:00 and 2026-11-02T09:30:00.000Z answer 400 invalid_booking or 400 invalid_query"
+  - id: any_iso_utc_minute
+    label: "accept any ISO-8601 spelling that denotes a whole UTC minute"
+    consequence: "an explicit zero offset and a zero millisecond part are accepted and normalised"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L39'
+default_if_unresolved: strict_minute_z
+notes: "source: L14, L37"
 ---
 ```
 
@@ -2575,23 +2516,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: are unknown properties and query parameters rejected
-question: "the source documents the allowed fields of each body and the allowed query parameters without saying whether an extra property or an extra query parameter is an error"
+title: "Do the booking-window and availability times follow the booking time rules?"
+question: "the time rules of the source are written for booking bodies; the query parameters from, to, start and end are only called a time"
 options:
-  - id: OPT-001
-    label: "ignore unknown properties and unknown query parameters"
-    consequence: "a body with an extra field is accepted and the extra field is discarded"
-  - id: OPT-002
-    label: "reject unknown properties and unknown query parameters"
-    consequence: "a typo in a field name yields 400 invalid_room or 400 invalid_booking"
+  - id: same_strict_rules
+    label: "query times use the same strict form as booking times"
+    consequence: "a query time outside that form answers 400 invalid_query"
+  - id: looser_query_rules
+    label: "any parseable ISO-8601 instant is accepted in a query"
+    consequence: "offset and millisecond spellings are accepted in queries while booking bodies stay strict"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L20, L29, L33, L54'
+default_if_unresolved: same_strict_rules
+notes: "source: L14, L44, L54"
 ---
 ```
 
@@ -2604,23 +2545,23 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: is a whitespace-only string empty
-question: "the source requires a non-empty room name and a non-empty booking title without saying whether a value made only of whitespace counts as empty"
+title: "Is attendees of zero acceptable on GET /availability?"
+question: "the availability query is documented as an integer, while a booking attendee count must be at least 1"
 options:
-  - id: OPT-001
-    label: "treat a whitespace-only string as empty and reject it"
-    consequence: "a name of three spaces answers 400 invalid_room"
-  - id: OPT-002
-    label: "treat any string of length at least one as non-empty"
-    consequence: "a name of three spaces is stored"
+  - id: positive_integer_only
+    label: "treat the value as a positive integer and reject zero with invalid_query"
+    consequence: "attendees=0 answers 400 invalid_query"
+  - id: any_non_negative
+    label: "accept zero and return every room free in the window"
+    consequence: "attendees=0 answers 200 with the free rooms"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L20, L33'
+default_if_unresolved: positive_integer_only
+notes: "source: L54, L57"
 ---
 ```
 
@@ -2633,23 +2574,139 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: does the whole-minute rule apply to query times
-question: "the source requires whole minutes for booking times and says a time not on a whole minute is an invalid booking; for the query times of GET /availability and of the from and to window it only says an invalid parameter is rejected"
+title: "Is ordering by id numeric or lexicographic?"
+question: "the id is a letter and a number; ordering by id can follow the creation order or the character order"
 options:
-  - id: OPT-001
-    label: "accept any parseable UTC `Z` time in queries, including seconds other than 00"
-    consequence: "a query with `09:30:30Z` is answered from the state"
-  - id: OPT-002
-    label: "apply the whole-minute rule to query times as well"
-    consequence: "a query with `09:30:30Z` answers 400 invalid_query"
+  - id: numeric_suffix
+    label: "compare the numeric suffix, so r10 follows r9"
+    consequence: "the room list follows creation order"
+  - id: lexicographic
+    label: "compare the id string, so r10 precedes r9"
+    consequence: "the room list stops following creation order at ten rooms"
 blocking: no
 owner: spec-critic
-default_if_unresolved: OPT-001
-notes: 'source: L37, L44, L57'
+default_if_unresolved: numeric_suffix
+notes: "source: L12, L28, L43"
+---
+```
+
+```yaml
+---
+id: room-booking-api:OQ-009
+type: Open-Q
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "Which paths count as known routes for the 405 answer?"
+question: "the source distinguishes an unknown route from a known route with an unsupported method but does not enumerate the known routes"
+options:
+  - id: declared_paths_only
+    label: "known routes are /rooms, /rooms/:roomId/bookings, /bookings/:bookingId and /availability"
+    consequence: "GET /bookings/b1 answers 405 method_not_allowed and GET /rooms/r1 answers 404 not_found"
+  - id: any_matching_prefix
+    label: "a path sharing a prefix with an endpoint counts as known"
+    consequence: "GET /rooms/r1 answers 405 method_not_allowed"
+blocking: no
+owner: spec-critic
+default_if_unresolved: declared_paths_only
+notes: "source: L64"
+---
+```
+
+```yaml
+---
+id: room-booking-api:OQ-010
+type: Open-Q
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "How is a body that is valid JSON but not an object treated?"
+question: "the source fixes the answer for a body that is not valid JSON but not for an empty body or a JSON array"
+options:
+  - id: invalid_json
+    label: "treat an empty body and any non-object JSON as invalid_json"
+    consequence: "an array body answers 400 invalid_json"
+  - id: invalid_payload_code
+    label: "treat a non-object body as invalid_room or invalid_booking"
+    consequence: "an array body on POST /rooms answers 400 invalid_room"
+blocking: no
+owner: spec-critic
+default_if_unresolved: invalid_json
+notes: "source: L63"
+---
+```
+
+```yaml
+---
+id: room-booking-api:OQ-011
+type: Open-Q
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "Which conflicting booking is named when two conflicts start together?"
+question: "the source names the earliest-starting conflicting booking but two conflicts can share the earliest start"
+options:
+  - id: lowest_id
+    label: "name the conflicting booking with the lowest id among the earliest starts"
+    consequence: "conflictingBookingId is deterministic"
+  - id: any_conflict
+    label: "name any conflicting booking"
+    consequence: "conflictingBookingId is not reproducible from the request"
+blocking: no
+owner: spec-critic
+default_if_unresolved: lowest_id
+notes: "source: L39"
+---
+```
+
+```yaml
+---
+id: room-booking-api:OQ-012
+type: Open-Q
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "Is a booking of exactly eight hours accepted?"
+question: "the source rejects a booking longer than 8 hours without saying whether the 8 hour bound is inclusive"
+options:
+  - id: inclusive_bound
+    label: "accept a duration of exactly 8 hours"
+    consequence: "09:00 to 17:00 answers 201"
+  - id: exclusive_bound
+    label: "accept only durations strictly shorter than 8 hours"
+    consequence: "09:00 to 17:00 answers 400 invalid_booking"
+blocking: no
+owner: spec-critic
+default_if_unresolved: inclusive_bound
+notes: "source: L37"
 ---
 ```
 
@@ -2666,20 +2723,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: room names are stored as sent and compared lower-cased
-assumption: "a room name is stored exactly as the client sent it, and two names are duplicates when they are equal after locale-independent lower-casing"
+title: "Whitespace-only names and titles are invalid"
+assumption: "a room name or booking title that is empty or consists only of whitespace is invalid and answers 400 invalid_room or 400 invalid_booking respectively"
 source_open_q: room-booking-api:OQ-001
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-004
-  - room-booking-api:INV-005
-notes: 'source: L24'
+  - "BEH-002: a whitespace-only name => 400 invalid_room and no room created"
+  - "BEH-008: a whitespace-only title => 400 invalid_booking and no booking created"
+notes: "source: L20, L23, L33, L37"
 ---
 ```
 
@@ -2692,22 +2749,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: error precedence follows the evaluation order of the source
-assumption: "when a request breaks several rules the reported code follows the order: a body that is not valid JSON answers 400 invalid_json, then an unknown room answers 404 room_not_found, then body validation answers 400 invalid_booking, then a capacity excess answers 422 over_capacity, then a conflict answers 409 room_busy"
+title: "Length is counted in UTF-16 code units"
+assumption: "the 40 character name bound and the 80 character title bound are counted in UTF-16 code units, as the length of a JavaScript string"
 source_open_q: room-booking-api:OQ-002
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-009
-  - room-booking-api:BEH-010
-  - room-booking-api:BEH-011
-  - room-booking-api:BEH-021
-notes: 'source: L36-L39, L63'
+  - "BEH-002: a name of exactly 40 characters => 201 and of 41 characters => 400 invalid_room"
+  - "BEH-008: a title of exactly 80 characters => 201 and of 81 characters => 400 invalid_booking"
+notes: "source: L20, L23, L33"
 ---
 ```
 
@@ -2720,20 +2775,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: length limits count Unicode code points
-assumption: "the 40-character room name limit and the 80-character booking title limit are measured in Unicode code points"
+title: "Unknown body fields are ignored"
+assumption: "unknown fields in a request body are ignored; a missing field or a field of the wrong type answers 400 invalid_room or 400 invalid_booking"
 source_open_q: room-booking-api:OQ-003
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-002
-  - room-booking-api:BEH-010
-notes: 'source: L20, L33'
+  - "BEH-002: a body with an extra field and a valid name and capacity => 201 invalid_room is not returned"
+  - "BEH-006: a body with an extra field and valid booking fields => 201"
+notes: "source: L20, L23, L33"
 ---
 ```
 
@@ -2746,21 +2801,21 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: id order is numeric ascending
-assumption: "an order by id means ascending numeric order of the numbers embedded in `r<n>` and `b<n>`, which equals creation order"
+title: "Error precedence"
+assumption: "when one request breaks several rules the answer is chosen in this order: 404 not_found for an undefined path, 405 method_not_allowed, 404 room_not_found or booking_not_found, 400 invalid_json, 400 invalid_query, 400 invalid_room or invalid_booking, 422 over_capacity, 409 room_name_taken or room_busy"
 source_open_q: room-booking-api:OQ-004
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-005
-  - room-booking-api:BEH-013
-  - room-booking-api:INV-001
-notes: 'source: L28, L43'
+  - "BEH-007: a valid body against an unknown room => 404 room_not_found"
+  - "BEH-014: GET /rooms/r99/bookings => 404 room_not_found"
+  - "BEH-009: attendees above capacity with a valid interval => 422 over_capacity"
+notes: "source: L36-L39, L44-L45"
 ---
 ```
 
@@ -2773,19 +2828,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: conflicting bookings are tie-broken by id
-assumption: "when several conflicting bookings share the earliest start, room_busy names the one with the lowest booking id"
+title: "Only the strict UTC timestamp form is accepted"
+assumption: "a booking start or end must match exactly YYYY-MM-DDTHH:MM:SSZ; any other spelling, including an explicit zero offset or a millisecond part, answers 400 invalid_booking"
 source_open_q: room-booking-api:OQ-005
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-012
-notes: 'source: L39'
+  - "BEH-008: start 2026-11-02T09:30:00+00:00 => 400 invalid_booking"
+  - "BEH-008: start 2026-11-02T09:30:00Z => 201"
+notes: "source: L14, L37"
 ---
 ```
 
@@ -2798,21 +2854,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: unknown properties and query parameters are ignored
-assumption: "an unknown property in a request body is discarded and an unknown query parameter is ignored; neither is an error"
+title: "Query times follow the booking time form"
+assumption: "the query parameters from, to, start and end follow the same strict UTC minute form as booking times and answer 400 invalid_query otherwise"
 source_open_q: room-booking-api:OQ-006
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-002
-  - room-booking-api:BEH-007
-  - room-booking-api:BEH-020
-notes: 'source: L20, L29, L54'
+  - "BEH-014: from=2026-11-02T10:00 not a UTC time with Z => 400 invalid_query"
+  - "BEH-018: end=2026-11-02T10:00 => 400 invalid_query"
+notes: "source: L14, L44, L54"
 ---
 ```
 
@@ -2825,20 +2880,20 @@ lifecycle:
   approval_record:
     owner_role: product-owner
     approver_identity: cyberash
-    timestamp: 2026-10-31T02:31:36.704Z
-    change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
     scope: first-time-approval
 partition_id: room-booking-api
-title: whitespace-only strings are empty
-assumption: "a room name or booking title that consists only of whitespace counts as empty and is rejected with 400 invalid_room or 400 invalid_booking"
+title: "Availability attendees must be a positive integer"
+assumption: "the availability parameter attendees must be an integer of at least 1 and answers 400 invalid_query otherwise"
 source_open_q: room-booking-api:OQ-007
 blocking: no
 review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
 tests:
-  - room-booking-api:BEH-002
-  - room-booking-api:BEH-010
-notes: 'source: L20, L33'
+  - "BEH-018: attendees=0 => 400 invalid_query"
+  - "BEH-017: attendees=11 against a largest capacity of 10 => 200 with an empty room list"
+notes: "source: L54, L57"
 ---
 ```
 
@@ -2846,22 +2901,25 @@ notes: 'source: L20, L33'
 ---
 id: room-booking-api:ASM-008
 type: ASSUMPTION
-lifecycle: {status: approved}
-approval_record:
-  owner_role: product-owner
-  approver_identity: cyberash
-  timestamp: 2026-10-31T02:31:36.704Z
-  change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
-  scope: first-time-approval
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
 partition_id: room-booking-api
-title: query times obey the whole-minute rule
-assumption: "the query time parameters `from`, `to`, `start` and `end` must be accepted times under room-booking-api:CTR-009, so a query value whose seconds part is not `00`, that carries a non-UTC offset or that is unparseable answers 400 invalid_query on the route that consumes it"
+title: "Ordering by id compares the numeric suffix"
+assumption: "ordering by id compares the numeric suffix of the id, so r9 precedes r10 and the room list follows creation order"
 source_open_q: room-booking-api:OQ-008
 blocking: no
-review_by: 2027-01-29
+review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
-tests: [room-booking-api:BEH-015, room-booking-api:BEH-020, room-booking-api:CTR-009]
-notes: "decided by GA-001; source: L14, L44, L54, L57"
+tests:
+  - "BEH-004: with twelve rooms GET /rooms lists r1 then r2 up to r12"
+  - "BEH-012: bookings with an equal start are ordered by ascending booking number"
+notes: "source: L12-L13, L28, L43"
 ---
 ```
 
@@ -2869,22 +2927,101 @@ notes: "decided by GA-001; source: L14, L44, L54, L57"
 ---
 id: room-booking-api:ASM-009
 type: ASSUMPTION
-lifecycle: {status: approved}
-approval_record:
-  owner_role: product-owner
-  approver_identity: cyberash
-  timestamp: 2026-10-31T02:31:36.704Z
-  change_request: "room-booking-api-20261031-021626: pre-authorised at launch"
-  scope: first-time-approval
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
 partition_id: room-booking-api
-title: availability attendees must be a positive integer
-assumption: "the attendees query parameter of GET /availability must be an integer of at least 1, and a missing, non-integer or non-positive value answers 400 invalid_query"
-source_open_q: null
+title: "Known routes are the declared paths"
+assumption: "the known routes are POST /rooms, GET /rooms, POST /rooms/:roomId/bookings, GET /rooms/:roomId/bookings, DELETE /bookings/:bookingId and GET /availability; any other path answers 404 not_found and a known path with another method answers 405 method_not_allowed"
+source_open_q: room-booking-api:OQ-009
 blocking: no
-review_by: 2027-01-29
+review_by: "2027-01-29"
 default_if_unresolved: keep_assumption
-tests: [room-booking-api:BEH-020, room-booking-api:CTR-006]
-notes: "decided by GA-003; source: L29, L33, L54-L57"
+tests:
+  - "BEH-021: GET /bookings/b1 => 405 method_not_allowed"
+  - "BEH-020: GET /rooms/r1 => 404 not_found"
+notes: "source: L64"
+---
+```
+
+```yaml
+---
+id: room-booking-api:ASM-010
+type: ASSUMPTION
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "An empty or non-object body is invalid_json"
+assumption: "a body that is empty, unparsable, or valid JSON that is not an object answers 400 invalid_json"
+source_open_q: room-booking-api:OQ-010
+blocking: no
+review_by: "2027-01-29"
+default_if_unresolved: keep_assumption
+tests:
+  - "BEH-019: empty body on POST /rooms => 400 invalid_json"
+  - "BEH-019: body [1,2,3] on POST /rooms => 400 invalid_json"
+notes: "source: L63"
+---
+```
+
+```yaml
+---
+id: room-booking-api:ASM-011
+type: ASSUMPTION
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "Ties are broken by the lowest booking number"
+assumption: "conflictingBookingId names the conflicting booking with the earliest start and, among equal starts, the lowest booking number"
+source_open_q: room-booking-api:OQ-011
+blocking: no
+review_by: "2027-01-29"
+default_if_unresolved: keep_assumption
+tests:
+  - "BEH-010: two conflicts starting at 10:00 => conflictingBookingId names the lower booking id"
+notes: "source: L39"
+---
+```
+
+```yaml
+---
+id: room-booking-api:ASM-012
+type: ASSUMPTION
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:49:14.614Z
+    change_request: "room-booking-api-20261031-034223: pre-authorised at launch"
+    scope: first-time-approval
+partition_id: room-booking-api
+title: "A booking of exactly eight hours is accepted"
+assumption: "a booking duration of exactly 8 hours is valid and only a longer duration answers 400 invalid_booking"
+source_open_q: room-booking-api:OQ-012
+blocking: no
+review_by: "2027-01-29"
+default_if_unresolved: keep_assumption
+tests:
+  - "BEH-008: 09:00 to 17:00 => 201 and 09:00 to 17:01 => 400 invalid_booking"
+notes: "source: L37"
 ---
 ```
 
@@ -2892,12 +3029,12 @@ notes: "decided by GA-003; source: L29, L33, L54-L57"
 
 ## 19. Out of scope
 
-- Persistence of rooms and bookings across process restarts.
-- Authentication and authorization.
+- Persistence of rooms or bookings across process restarts; no file, database or snapshot is written.
+- Authentication and authorisation of clients.
 - Recurring bookings.
-- Time zones other than UTC.
+- Time zones other than UTC; no local time input or output.
 - Updating or deleting rooms.
-- A user interface or any client application beyond the HTTP API.
-- Pagination of the room and booking lists.
+- Pagination of room or booking lists.
+- Rate limiting, CORS and metrics endpoints.
 
 ---

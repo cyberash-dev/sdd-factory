@@ -6,121 +6,54 @@ decision: accept
 
 ```yaml
 - id: GA-001
-  kind: conflict
-  target_ids: [room-booking-api:CTR-009, room-booking-api:ASM-008, room-booking-api:OQ-008]
-  source: L14
+  kind: missing_negative
+  target_ids: [room-booking-api:BEH-013]
+  source: L44
   resolution: decide
-  finding: "room-booking-api:CTR-009 makes a query time parameter that is not an accepted time answer 400 invalid_query and its accepted set requires a seconds part of 00, while room-booking-api:ASM-008 and the default option OPT-001 of room-booking-api:OQ-008 state that the whole-minute rule is not applied to query times, so for a query time whose seconds part is not 00 the two records cannot both hold"
-  resolution_text: "The source fixes the time format once at L14 with minute precision and the query specifications at L44 and L54 reuse that same time, so the reading already encoded in the error_taxonomy of room-booking-api:CTR-009 is the faithful one and the default option of room-booking-api:OQ-008 is the side that breaks a source-backed record"
-  required_change: |
-    Replace the body of room-booking-api:ASM-008 with the body given in the Assumptions section of
-    this review, which states that the query time parameters from, to, start and end must be
-    accepted times under room-booking-api:CTR-009, so a query value whose seconds part is not 00,
-    that carries a non-UTC offset or that is unparseable answers 400 invalid_query on the route
-    that consumes it. In room-booking-api:BEH-015 and room-booking-api:BEH-020 add the boundary
-    class and the negative case of a query time whose seconds part is not 00 answering 400
-    invalid_query. Keep room-booking-api:CTR-009 unchanged.
-  assumption: room-booking-api:ASM-008
+  required_change: "Add to room-booking-api:BEH-013 at least one negative case naming a code from the error_taxonomy of room-booking-api:CTR-005, for example \"only from given without to => 400 invalid_query\" or \"GET /rooms/r99/bookings with a valid window => 404 room_not_found\", instead of relying on room-booking-api:BEH-014 to carry every code-naming negative case of the GET /rooms/:roomId/bookings surface."
+  assumption: null
   applied: yes
-
 - id: GA-002
-  kind: missing_negative
-  target_ids: [room-booking-api:BEH-005]
-  source: L29
+  kind: untestable
+  target_ids: [room-booking-api:CON-004]
+  source: L3
   resolution: decide
-  finding: "room-booking-api:BEH-005 carries no negative case naming a code from the error_taxonomy of room-booking-api:CTR-002; its only negative case is the empty room list"
-  resolution_text: "The missing negative case is dictated by L29 and by the error_taxonomy of room-booking-api:CTR-002, so the fix is mechanical and needs no assumption"
-  required_change: |
-    In room-booking-api:BEH-005 add the negative case that GET /rooms?minCapacity=abc answers
-    400 invalid_query, so the behavior carries a code-naming negative case drawn from the
-    error_taxonomy of room-booking-api:CTR-002.
+  required_change: "Replace the test_obligation of room-booking-api:CON-004 with a predicate checkable from responses, exit status or persisted state — for example the restart observation of room-booking-api:INV-005 combined with the keep-serving observation of room-booking-api:POL-002 — because \"no request leaves the process and no service other than the HTTP listener is contacted\" is not observable from the Surface room-booking-api:SUR-001."
   assumption: null
   applied: yes
-
 - id: GA-003
-  kind: gap
-  target_ids: [room-booking-api:BEH-020, room-booking-api:CTR-006]
-  source: L54
+  kind: unmodeled_term
+  target_ids: [room-booking-api:BEH-020, room-booking-api:BEH-021]
+  source: L64
   resolution: decide
-  finding: "room-booking-api:BEH-020 asserts that an attendees value that is not a positive integer answers 400 invalid_query, but the source asks only for an integer in the availability query and states the positive-integer rule explicitly only for minCapacity, and no ASSUMPTION records the stronger reading"
-  resolution_text: "The glossary defines attendees as an integer of at least 1 and the source applies that bound to booking bodies, so the spec keeps its rejection and records it explicitly, which also keeps the availability answer deterministic"
-  required_change: |
-    Insert room-booking-api:ASM-009 with the body given in the Assumptions section of this review,
-    stating that the attendees query parameter of GET /availability must be an integer of at least
-    1 and that a missing, non-integer or non-positive value answers 400 invalid_query. Change the
-    query of room-booking-api:CTR-006 to attendees=<integer of at least 1>. Cite
-    room-booking-api:ASM-009 in the notes of room-booking-api:BEH-020.
-  assumption: room-booking-api:ASM-009
-  applied: yes
-
-- id: GA-004
-  kind: missing_negative
-  target_ids: [room-booking-api:BEH-024]
-  source: L61
-  resolution: decide
-  finding: "room-booking-api:BEH-024 carries no negative case naming a code from the error_taxonomy of room-booking-api:CTR-010; its negative cases assert only the empty 204 body and the 200 content type"
-  resolution_text: "The missing negative case is dictated by L61 and L62 and by the error_taxonomy of room-booking-api:CTR-010, so the fix is mechanical and needs no assumption"
-  required_change: |
-    In room-booking-api:BEH-024 add the negative case that an error response, for example
-    GET /rooms?minCapacity=abc answering 400 invalid_query, carries Content-Type application/json
-    and a code from the error_taxonomy of room-booking-api:CTR-010.
-  assumption: null
-  applied: yes
-
-- id: GA-005
-  kind: gap
-  target_ids: [room-booking-api:CON-003]
-  source: L72
-  resolution: decide
-  finding: "the acceptance line of the source is traced by no record because room-booking-api:CON-003 cites L67, which carries no requirement, instead of the acceptance line"
-  resolution_text: "The acceptance criteria are already carried by the constraint itself and the ephemeral-port allowance is already a boundary class of room-booking-api:CTR-011, so the citation is the only defect"
-  required_change: |
-    In the notes of room-booking-api:CON-003 replace the citation L67 with L72 and keep every
-    other field of the constraint unchanged.
+  required_change: "Add Glossary entries in section 2 for Route, Path and Endpoint — a Route being the method and path pair that a Contract of room-booking-api:SUR-001 declares — so that room-booking-api:BEH-020, room-booking-api:BEH-021 and room-booking-api:ASM-009 use modeled terms when they fix the 404 not_found versus 405 method_not_allowed boundary."
   assumption: null
   applied: yes
 ```
 
 ## Assumptions
 
-```yaml
----
-id: room-booking-api:ASM-008
-type: ASSUMPTION
-lifecycle: {status: proposed}
-partition_id: room-booking-api
-title: query times obey the whole-minute rule
-assumption: "the query time parameters `from`, `to`, `start` and `end` must be accepted times under room-booking-api:CTR-009, so a query value whose seconds part is not `00`, that carries a non-UTC offset or that is unparseable answers 400 invalid_query on the route that consumes it"
-source_open_q: room-booking-api:OQ-008
-blocking: no
-review_by: 2027-01-29
-default_if_unresolved: keep_assumption
-tests: [room-booking-api:BEH-015, room-booking-api:BEH-020, room-booking-api:CTR-009]
-notes: "decided by GA-001; source: L14, L44, L54, L57"
----
-```
-
-```yaml
----
-id: room-booking-api:ASM-009
-type: ASSUMPTION
-lifecycle: {status: proposed}
-partition_id: room-booking-api
-title: availability attendees must be a positive integer
-assumption: "the attendees query parameter of GET /availability must be an integer of at least 1, and a missing, non-integer or non-positive value answers 400 invalid_query"
-source_open_q: null
-blocking: no
-review_by: 2027-01-29
-default_if_unresolved: keep_assumption
-tests: [room-booking-api:BEH-020, room-booking-api:CTR-006]
-notes: "decided by GA-003; source: L29, L33, L54-L57"
----
-```
+No ASSUMPTION body is written in round 2. All three round-1 findings were mechanical fixes dictated by the source or by a lint rule and mint no body; the twelve existing bodies room-booking-api:ASM-001 through room-booking-api:ASM-012 are present in spec.md section 18 unchanged.
 
 ## Open-Q decisions
 
-Round 2 is verification only; no Open-Q is re-decided. The decisions of round 1 stand unchanged: room-booking-api:OQ-001 through room-booking-api:OQ-007 by their existing assumption records, room-booking-api:OQ-008 by OPT-002 through GA-001, whose replacement body of room-booking-api:ASM-008 is now present in section 18 of the spec.
+Carried over from round 1; every Open-Q is closed as `assume` on its `default_if_unresolved` with the matching existing ASSUMPTION body, and no record changed in round 2:
+
+| Open-Q | option | finding | rationale |
+| --- | --- | --- | --- |
+| room-booking-api:OQ-001 | reject_whitespace_only | none (assume) | equals default_if_unresolved; room-booking-api:ASM-001 pins the BEH-002 and BEH-008 obligations |
+| room-booking-api:OQ-002 | utf16_code_units | none (assume) | equals default_if_unresolved; room-booking-api:ASM-002 pins the length-boundary obligations |
+| room-booking-api:OQ-003 | ignore_extra | none (assume) | equals default_if_unresolved; room-booking-api:ASM-003 keeps the accepted request class widest |
+| room-booking-api:OQ-004 | route_then_resource_then_body | none (assume) | equals default_if_unresolved; L36-L39 put the unknown-room answer before the body classes; room-booking-api:ASM-004 records the full order |
+| room-booking-api:OQ-005 | strict_minute_z | none (assume) | equals default_if_unresolved; L14 fixes the Time form; room-booking-api:ASM-005 exists |
+| room-booking-api:OQ-006 | same_strict_rules | none (assume) | equals default_if_unresolved; one Time rule keeps the surface smallest; room-booking-api:ASM-006 exists |
+| room-booking-api:OQ-007 | positive_integer_only | none (assume) | equals default_if_unresolved; L33 fixes attendees at 1 or more; room-booking-api:ASM-007 exists |
+| room-booking-api:OQ-008 | numeric_suffix | none (assume) | equals default_if_unresolved; L12 assigns ids in creation order; room-booking-api:ASM-008 exists |
+| room-booking-api:OQ-009 | declared_paths_only | none (assume) | equals default_if_unresolved; room-booking-api:ASM-009 enumerates the routes |
+| room-booking-api:OQ-010 | invalid_json | none (assume) | equals default_if_unresolved; L63 keeps one code for an unusable body; room-booking-api:ASM-010 exists |
+| room-booking-api:OQ-011 | lowest_id | none (assume) | equals default_if_unresolved; L39 names the earliest-starting conflicting Booking; room-booking-api:ASM-011 makes the tie deterministic |
+| room-booking-api:OQ-012 | inclusive_bound | none (assume) | equals default_if_unresolved; L37 rejects only a Booking longer than 8 hours; room-booking-api:ASM-012 exists |
 
 ## Coverage
 
-Verification notes: every required change of round 1 is present in the spec. room-booking-api:ASM-008 and room-booking-api:ASM-009 are inserted verbatim in section 18, room-booking-api:BEH-005 carries the missing_negative case for room-booking-api:CTR-002, room-booking-api:BEH-015 and room-booking-api:BEH-020 carry the whole-minute query-time boundary class and negative case, room-booking-api:BEH-024 carries a negative case naming a code from the taxonomy of room-booking-api:CTR-010, room-booking-api:CTR-006 states the attendees bound, and room-booking-api:CON-003 cites L72. No new finding is opened and no assume finding is revisited.
+Unchanged from round 1. Source lines with no record: none; L1-L8 map to room-booking-api:SUR-001, CTR-001 and CON-006, L12-L14 to the Glossary, INV-001, INV-002, BEH-011 and the Contract compatibility rules, L16-L57 to CTR-002 through CTR-007 and BEH-001 through BEH-018, L61-L64 to POL-001, POL-002 and BEH-019 through BEH-022, L68 to section 19 and INV-004, INV-005, L72 to NFR-001 and CON-003. Records with no source line: room-booking-api:BL-001 only, the greenfield baseline of the scaffold commit.

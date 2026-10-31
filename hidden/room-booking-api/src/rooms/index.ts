@@ -1,49 +1,30 @@
-import type { URLSearchParams } from "node:url";
-import { LIMITS, formatId, idNumber, isValidText } from "../core/index.js";
-import type { ApiError, Room } from "../core/index.js";
+import { fail, ok } from "../errors/index.js";
+import type { Result } from "../errors/index.js";
+import { addRoom, compareIds } from "../domain/index.js";
+import type { Room, Store } from "../domain/index.js";
 
-export interface RoomStore {
-  readonly rooms: Room[];
-  nextSequence: number;
-}
-
-export function createRoomStore(): RoomStore {
-  return { rooms: [], nextSequence: 0 };
-}
-
-function isValidCapacity(capacity: unknown): capacity is number {
-  return (
-    typeof capacity === "number" &&
-    Number.isInteger(capacity) &&
-    capacity >= LIMITS.capacityMin &&
-    capacity <= LIMITS.capacityMax
-  );
-}
-
-export function createRoom(store: RoomStore, body: unknown): Room | ApiError {
-  if (typeof body !== "object" || body === null) return { error: "invalid_room" };
-  const name: unknown = Reflect.get(body, "name");
-  const capacity: unknown = Reflect.get(body, "capacity");
-  if (typeof name !== "string" || !isValidText(name, LIMITS.roomNameMax) || !isValidCapacity(capacity)) {
-    return { error: "invalid_room" };
+export function createRoom(store: Store, body: Record<string, unknown>): Result<Room> {
+  const { name, capacity } = body;
+  if (typeof name !== "string") return fail({ code: "invalid_room" });
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 40) return fail({ code: "invalid_room" });
+  if (typeof capacity !== "number" || !Number.isInteger(capacity) || capacity < 1 || capacity > 100) {
+    return fail({ code: "invalid_room" });
   }
-  const folded = name.toLowerCase();
-  if (store.rooms.some((room) => room.name.toLowerCase() === folded)) {
-    return { error: "room_name_taken" };
+  const lowered = trimmed.toLowerCase();
+  if (store.rooms.some((r) => r.name.toLowerCase() === lowered)) {
+    return fail({ code: "room_name_taken" });
   }
-  const room: Room = { id: formatId("room", ++store.nextSequence), name, capacity };
-  store.rooms.push(room);
-  return room;
+  return ok(addRoom(store, trimmed, capacity));
 }
 
-export function listRooms(store: RoomStore, query: URLSearchParams): Room[] | ApiError {
+export function listRooms(store: Store, query: URLSearchParams): Result<{ rooms: Room[] }> {
   const raw = query.get("minCapacity");
-  let minCapacity = 0;
+  let min = 0;
   if (raw !== null) {
-    if (!/^[0-9]+$/.test(raw) || Number(raw) < 1) return { error: "invalid_query" };
-    minCapacity = Number(raw);
+    if (!/^[1-9][0-9]*$/.test(raw)) return fail({ code: "invalid_query" });
+    min = Number(raw);
   }
-  return store.rooms
-    .filter((room) => room.capacity >= minCapacity)
-    .sort((a, b) => idNumber(a.id) - idNumber(b.id));
+  const rooms = store.rooms.filter((r) => r.capacity >= min).sort((a, b) => compareIds(a.id, b.id));
+  return ok({ rooms });
 }
