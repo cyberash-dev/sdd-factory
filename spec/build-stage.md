@@ -2887,6 +2887,74 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-013
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T11:51:07.561Z
+    change_request: "operator decision 2026-10-31: a capped review accepts the last green rework"
+    scope: first-time-approval
+partition_id: build-stage
+title: a review that would exceed the routed role's cap approves the green task with advisory findings
+target_ids:
+  - build-stage:BEH-013
+  - build-stage:BEH-014
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  A review in review mode runs only after task.verified{green}: the task's
+  tests pass, typecheck is clean, the frozen tests are unchanged and the
+  write-set holds. When such a review answers request_changes and the
+  route it names (implementer, test-writer, architect or contract) would
+  start an attempt beyond that role's configured cap (factory:DLT-015),
+  BEH-014 fails the task and the run ends, discarding a green result for
+  findings the reviewer could not get fixed within the budget. Change, by
+  analogy with the critic's final round (spec-stage:DLT-001): in review
+  mode, a request_changes whose route would exceed the routed role's cap
+  approves the task on the Verifier's green evidence, exactly as
+  advisory_only does (task.approved{taskId, implSha}, merge), the
+  review report stays in place with its findings, and the foreman logs
+  "<task> approved on green evidence: <role> cap reached, review findings
+  kept as advisory". A request_changes under the cap routes as before. In
+  arbitration mode there is no green evidence, and cap exhaustion fails
+  the task as before.
+tests_old_behavior:
+  - a request_changes under the routed role's cap still routes the rework
+  - cap exhaustion outside review mode still fails the task with cap_exhausted
+tests_new_behavior:
+  - to:build-stage:BEH-013
+  - to:build-stage:BEH-014
+test_obligation:
+  predicate: |
+    Given a task verified green whose implementer attempts equal the
+    configured cap, task.reviewed{decision: request_changes, target:
+    implementer} in review mode emits task.approved with the verified
+    implSha and no task.failed; the same for target test-writer with the
+    test-writer reworks at their cap and for target architect with the
+    run's architect repairs at their cap; the same review with attempts
+    under the cap emits the rework; a request_changes in arbitration mode
+    with the cap reached emits task.failed cap_exhausted.
+  test_template: unit
+  boundary_classes:
+    - implementer at its cap
+    - test-writer at its cap
+    - architect at its cap
+    - under the cap
+    - arbitration mode at the cap
+  failure_scenarios:
+    - a green task failed by a review beyond the budget
+    - a rework routed beyond its cap
+    - an arbitration loss approved
+---
+```
+
 ---
 
 ## 16. Implementation bindings
