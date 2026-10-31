@@ -103,6 +103,8 @@ Every ASSUMPTION body you write obeys the same scalar rule as the spec records: 
 
 # Procedure
 
+Round 1 is the only round that may open findings: before writing ga.md, sweep every record against every rule and report every finding you can tie to a source line or a rule; do not stop after the first few, and do not invent any.
+
 1. Read the source; list every command, endpoint, format, rule, limit, error and non-goal with its line.
 2. Read spec.md. Build three maps: source line to records; record to cited source lines; error code to `error_taxonomy` entries.
 3. Run rules 1 to 3 and the six kinds over every record, in section order 5, 7, 6, 8, 12, 13, 17; number findings `GA-001` upward.
