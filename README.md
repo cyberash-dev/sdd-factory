@@ -111,7 +111,17 @@ Cost caveat: API roles are priced from token usage with the `pricing` table in `
 
 ## Results
 
-First end-to-end publication: `specs/url-shortener-api.md`, run `url-shortener-api-20261031-004751` on the shipped cheap profile, published to [`hidden/url-shortener-api/`](hidden/url-shortener-api/) with its full trace in [`hidden/url-shortener-api/trace/`](hidden/url-shortener-api/trace/trace.md). Zero human interventions after launch.
+Rehearsal runs on 2026-10-31, all on the shipped cheap profile, each a fresh `npm run factory -- run specs/<spec>.md --no-push`:
+
+| spec | product | duration | cost (USD) | tasks | max concurrent lanes | human steps | published to |
+|---|---|---|---|---|---|---|---|
+| `specs/url-shortener-api.md` | HTTP API, 4 endpoints | 31 min | 3.47 | 5 | 2 | 0 | [`hidden/url-shortener-api/`](hidden/url-shortener-api/) |
+| `specs/todo-cli.md` | CLI, 5 commands, JSON storage | 24 min | 2.56 | 5 | 3 | 0 | [`hidden/todo-cli/`](hidden/todo-cli/) |
+| `specs/room-booking-api.md` | HTTP API, 6 endpoints, interval overlaps | 53 min | 3.75 | 6 | 4 | 1 resume | [`hidden/room-booking-api/`](hidden/room-booking-api/) |
+
+Every published product was checked from a clean checkout (`npm ci && npm run build && npm test`) and black-box against its source spec (curl for the APIs, `node dist/cli.js` for the CLI). The room booking run needed one resume: the root task's tests asserted on Node's internal `net.Socket.prototype.connect` arguments, the reviewer correctly sent them back twice, and the test-writer cap ended the run; after a prompt fix the resumed run (`--note` in `interventions.md`) re-authored the tests and published. An earlier room booking run had published a product whose `npm run build` failed and that lacked the `start` script its spec names; the assembly now runs the build (`assembly-stage:DLT-005`), checks every npm script the spec names (`assembly-stage:DLT-006`) and the tooling step pins Node types for the build config (`design-stage:DLT-011`).
+
+First end-to-end publication in detail: `specs/url-shortener-api.md`, run `url-shortener-api-20261031-004751` on the shipped cheap profile, published to [`hidden/url-shortener-api/`](hidden/url-shortener-api/) with its full trace in [`hidden/url-shortener-api/trace/`](hidden/url-shortener-api/trace/trace.md). Zero human interventions after launch.
 
 | stage | duration | cost (USD) |
 |---|---|---|
