@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { runApprove } from "../../src/spec-stage/application/approve.js";
@@ -6,6 +7,13 @@ import type { CommandResult } from "../../src/spec-stage/ports/command-runner.js
 import { CLI_SPEC, effectContext, exitZero, OPERATOR, RUN_ID, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace } from "./harness.js";
 
 const FINALIZED: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"plan_id":"p","flipped":["todo-cli:SUR-001","todo-cli:CTR-001","todo-cli:OQ-001","todo-cli:ASM-001"],"files_changed":["spec/spec.md"],"archived_path":"x"}\n', stderr: "" };
+
+const READY_CLEAN: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"violations":[]}\n', stderr: "" };
+
+function lintWithErrors(errorCount: number): CommandResult {
+  const diagnostics = Array.from({ length: errorCount }, (_, index) => ({ severity: "error", rule: "sdd:required-field", file: "spec/spec.md", line: index + 1, message: "missing field" }));
+  return { exitCode: errorCount === 0 ? 0 : 1, stdout: JSON.stringify({ format_version: 1, ok: errorCount === 0, error_count: errorCount, warn_count: 0, diagnostics }), stderr: "" };
+}
 
 const APPROVE_FLAGS = ["--approver", OPERATOR, "--owner-role", "product-owner", "--change-request", `${RUN_ID}: pre-authorised at launch`, "--scope", "first-time-approval", "--format=json"];
 
@@ -23,6 +31,10 @@ describe("spec.approve effect", () => {
         ["approve", "--id", "todo-cli:*", ...APPROVE_FLAGS],
         ["approve", "--id", "todo-cli:BL-001", ...APPROVE_FLAGS],
         ["finalize", "--format=json"],
+        ["ready", "--format=json"],
+        ["approve", "--id", "todo-cli:*", ...APPROVE_FLAGS],
+        ["approve", "--id", "todo-cli:BL-001", ...APPROVE_FLAGS],
+        ["finalize", "--format=json"],
         ["lint", "--format=json"],
       ],
       [{ type: "spec.approved", producer: "foreman", payload: { approver: OPERATOR, mode: "pre-authorized-at-launch", approvedIds: 4 } }],
@@ -35,7 +47,7 @@ describe("spec.approve effect", () => {
       if (argv[0] === "approve" && argv[2] === "todo-cli:BL-001") {
         return { exitCode: 1, stdout: '{"format_version":1,"ok":false,"reason":"no-id-match","detail":"no normative ID records matched"}\n', stderr: "" };
       }
-      return argv[0] === "finalize" ? FINALIZED : exitZero();
+      return argv[0] === "finalize" ? FINALIZED : argv[0] === "ready" ? READY_CLEAN : exitZero();
     });
     const { context, published } = effectContext(runStateAt("spec_review"));
 
@@ -44,24 +56,27 @@ describe("spec.approve effect", () => {
     expect(published.map((event) => event.type)).toEqual(["spec.approved"]);
   });
 
-  it("blocks with finalize_failed and the CLI output when finalize refuses proposed references", async () => {
+  // @covers spec-stage:DLT-011
+  it("reports finalize_failed with the CLI output to the gate when finalize refuses proposed references", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
-    const commands = scriptedCommands(sddReplies({ finalize: { exitCode: 1, stdout: '{"format_version":1,"ok":false,"reason":"proposed-references"}', stderr: "" } }));
+    const refused: CommandResult = { exitCode: 1, stdout: '{"format_version":1,"ok":false,"reason":"proposed-references"}', stderr: "" };
+    const commands = scriptedCommands((argv, call) => (argv[0] === "ready" ? READY_CLEAN : argv[0] === "finalize" ? (call === 4 ? FINALIZED : refused) : exitZero()));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
 
-    expect([commands.calls.length, published]).toEqual([4, [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: 'finalize_failed: {"format_version":1,"ok":false,"reason":"proposed-references"}' } }]]);
+    expect([commands.calls.length, published]).toEqual([8, [{ type: "spec.gate_failed", producer: "foreman", payload: { findingsPath: "spec/review/gate.md", detail: 'finalize_failed: {"format_version":1,"ok":false,"reason":"proposed-references"}' } }]]);
   });
 
-  it("blocks with lint_failed before approving anything when lint is red", async () => {
+  // @covers spec-stage:DLT-011
+  it("reports lint_failed to the gate before approving anything when lint is red", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
     const commands = scriptedCommands(sddReplies({ lint: { exitCode: 1, stdout: "", stderr: "sdd:weasel-word at line 9" } }));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
 
-    expect([commands.calls.length, published]).toEqual([1, [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: "lint_failed: sdd:weasel-word at line 9" } }]]);
+    expect([commands.calls.length, published]).toEqual([1, [{ type: "spec.gate_failed", producer: "foreman", payload: { findingsPath: "spec/review/gate.md", detail: "lint_failed: sdd:weasel-word at line 9" } }]]);
   });
 
   // @covers spec-stage:INV-001
@@ -84,14 +99,15 @@ describe("spec.approve effect", () => {
   });
 
   // @covers spec-stage:DLT-003
-  it("still blocks approval on a blocking open question", async () => {
+  // @covers spec-stage:DLT-011
+  it("still refuses approval on a blocking open question and reports it to the gate", async () => {
     const ws = await stageWorkspace(CLI_SPEC.replace("blocking: no\ndefault_if_unresolved: a", "blocking: yes\ndefault_if_unresolved: a"));
     const commands = scriptedCommands(sddReplies({ finalize: FINALIZED }));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });
 
-    expect([commands.calls.map((argv) => argv[0]), published[0]?.type, String(published[0]?.payload["detail"]).startsWith("spec_integrity: todo-cli:OQ-001 is blocking")]).toEqual([["lint"], "spec.blocked", true]);
+    expect([commands.calls.map((argv) => argv[0]), published[0]?.type, String(published[0]?.payload["detail"]).startsWith("spec_integrity: todo-cli:OQ-001 is blocking")]).toEqual([["lint"], "spec.gate_failed", true]);
   });
 
   // @covers spec-stage:CTR-001
@@ -107,20 +123,34 @@ describe("spec.approve effect", () => {
     expect([published.map((event) => event.type), commands.calls[0]?.[0], spec.includes("members:\n  - todo-cli:CTR-001\nversion: \"0.1.0\"")]).toEqual([["spec.approved"], "lint", true]);
   });
 
+  // @covers spec-stage:DLT-009
+  it("reverts the surface members repair that raises the lint error count and logs the counts", async () => {
+    const unrepaired = CLI_SPEC.replace("members: [todo-cli:CTR-001]", "members: []");
+    const ws = await stageWorkspace(unrepaired);
+    const logged: string[] = [];
+    const commands = scriptedCommands((argv) => (argv[0] === "lint" ? lintWithErrors(readFileSync(ws.specPath, "utf8") === unrepaired ? 0 : 4) : exitZero()));
+    const { context } = effectContext(runStateAt("spec_review"));
+
+    await runApprove({ kind: "spec.approve" }, context, { ...sliceContext(ws, scriptedRoles([])), log: (line) => logged.push(line) }, { commands, clock: createStageClock() });
+
+    expect([(await readFile(ws.specPath, "utf8")) === unrepaired, logged.filter((line) => line.includes("reverted"))]).toEqual([true, ["spec.approve: surface members reverted: lint errors 0 -> 4"]]);
+  });
+
   // @covers spec-stage:DLT-004
-  it("still blocks with spec_integrity when the spec holds two surfaces", async () => {
+  // @covers spec-stage:DLT-011
+  it("still refuses approval with spec_integrity when the spec holds two surfaces and reports it to the gate", async () => {
     const secondSurface = CLI_SPEC.slice(CLI_SPEC.indexOf("```yaml"), CLI_SPEC.indexOf("## 7.")).replace("todo-cli:SUR-001", "todo-cli:SUR-002");
     const ws = await stageWorkspace(CLI_SPEC.replace("## 7. Data contracts", `${secondSurface}\n## 7. Data contracts`));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands: scriptedCommands(sddReplies({ finalize: FINALIZED })), clock: createStageClock() });
 
-    expect([published[0]?.type, String(published[0]?.payload["detail"]).startsWith("spec_integrity: expected exactly one Surface, found 2")]).toEqual(["spec.blocked", true]);
+    expect([published[0]?.type, String(published[0]?.payload["detail"]).startsWith("spec_integrity: expected exactly one Surface, found 2")]).toEqual(["spec.gate_failed", true]);
   });
 
   it("blocks when lint fails after finalize", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
-    const commands = scriptedCommands((argv, call) => (argv[0] === "finalize" ? FINALIZED : argv[0] === "lint" && call === 5 ? { exitCode: 1, stdout: "", stderr: "approval_record invalid" } : exitZero()));
+    const commands = scriptedCommands((argv, call) => (argv[0] === "finalize" ? FINALIZED : argv[0] === "ready" ? READY_CLEAN : argv[0] === "lint" && call === 9 ? { exitCode: 1, stdout: "", stderr: "approval_record invalid" } : exitZero()));
     const { context, published } = effectContext(runStateAt("spec_review"));
 
     await runApprove({ kind: "spec.approve" }, context, sliceContext(ws, scriptedRoles([])), { commands, clock: createStageClock() });

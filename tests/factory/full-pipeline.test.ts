@@ -163,7 +163,7 @@ describe("the whole factory on a scripted spec", () => {
     await writeFile(join(root, "specs", `${SLUG}.md`), "# todo\n\nA CLI that counts its arguments.\n", "utf8");
     const productDir = join(root, ".factory", "runs");
     const env = { PATH: process.env["PATH"] ?? "", HOME: process.env["HOME"] ?? "", ANTHROPIC_API_KEY: "sk-ant-sentinel-0123456789" };
-    const specCommands = { run: async (argv: readonly string[]) => ({ exitCode: 0, stdout: argv[0] === "finalize" ? JSON.stringify({ format_version: 1, ok: true, finalized_ids: [`${SLUG}:SUR-001`, `${SLUG}:CTR-001`, `${SLUG}:BEH-002`, `${SLUG}:CST-001`, `${SLUG}:POL-001`] }) : argv[0] === "lint" ? LINT_OK : argv[1] === "list" ? recordsJson(DEFAULT_RECORDS) : "", stderr: "" }) };
+    const specCommands = { run: async (argv: readonly string[]) => ({ exitCode: 0, stdout: argv[0] === "finalize" ? JSON.stringify({ format_version: 1, ok: true, finalized_ids: [`${SLUG}:SUR-001`, `${SLUG}:CTR-001`, `${SLUG}:BEH-002`, `${SLUG}:CST-001`, `${SLUG}:POL-001`] }) : argv[0] === "lint" ? LINT_OK : argv[0] === "ready" ? JSON.stringify({ format_version: 1, ok: true, violations: [] }) : argv[1] === "list" ? recordsJson(DEFAULT_RECORDS) : "", stderr: "" }) };
     const designCommands = { run: async (request: { readonly file: string; readonly args: readonly string[] }) => ({ exitCode: 0, stdout: request.args[1] === "record" ? recordsJson(DEFAULT_RECORDS) : "", stderr: "" }) };
     const assemblyCommands = fakeCommandRunner((invocation) => {
       const [command, tool, subcommand] = invocation.argv;

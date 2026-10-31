@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRunState, createTaskState, simpleFixAttempts, stageOf, withSimpleFix, withCostEntry } from "./run-state.js";
+import { createRunState, createTaskState, simpleFixAttempts, specGateReworks, stageOf, withSimpleFix, withCostEntry, type RunState } from "./run-state.js";
 
 describe("run state snapshot", () => {
   // @covers bus:CTR-008
@@ -15,7 +15,7 @@ describe("run state snapshot", () => {
       startedAt: "2026-10-29T12:00:00.000Z",
       updatedAt: "2026-10-29T12:00:00.000Z",
       lastSeq: 0,
-      stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0 },
+      stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0, specGateReworks: 0 },
       stageHandoffReruns: {},
       design: { techReady: false, verificationReady: false, tasksPath: null },
       assumptionsByRecord: {},
@@ -24,6 +24,21 @@ describe("run state snapshot", () => {
       failure: null,
       simpleFixes: {},
     });
+  });
+
+  // @covers bus:DLT-010
+  it("starts a fresh run with zero spec gate reworks", () => {
+    const state = createRunState({ runId: "todo-cli-20261029-120000", slug: "todo-cli", operator: "cyberash", startedAt: "2026-10-29T12:00:00.000Z" });
+
+    expect(state.stageAttempts.specGateReworks).toBe(0);
+  });
+
+  // @covers bus:DLT-010
+  it("reads zero spec gate reworks from a snapshot written without the counter", () => {
+    const fresh = createRunState({ runId: "todo-cli-20261029-120000", slug: "todo-cli", operator: "cyberash", startedAt: "2026-10-29T12:00:00.000Z" });
+    const snapshot: RunState = { ...fresh, status: "spec_review", stageAttempts: { lintCycles: 0, criticRounds: 2, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0 } };
+
+    expect(specGateReworks(snapshot)).toBe(0);
   });
 
   // @covers bus:DLT-005

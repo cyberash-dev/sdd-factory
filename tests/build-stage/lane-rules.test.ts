@@ -307,7 +307,7 @@ describe("findings and arbitration", () => {
     expect([first.emits, forwarded.emits, forwarded.state.stageAttempts, second.emits.map((event) => [event.type, event.payload["detail"]])]).toEqual([
       [{ type: "task.rework", producer: "foreman", payload: { taskId: "T-001", target: "planner", attempt: 1, reason: "task_overflow", findingPath: "/run/handoffs/tasks/T-001/implementer-1/handoff.md" } }],
       [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "task_overflow", attempt: 2, originTaskId: "T-001", specIds: [], findingPath: "/run/handoffs/tasks/T-001/implementer-1/handoff.md" } }],
-      { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 1, assemblyRounds: 0 },
+      { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 1, assemblyRounds: 0, specGateReworks: 0 },
       [["task.failed", "planner"]],
     ]);
   });

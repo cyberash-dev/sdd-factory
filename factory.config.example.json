@@ -8,7 +8,8 @@
     "architectRepairs": 3,
     "criticAssumptionsPerId": 1,
     "assemblyRounds": 3,
-    "handoffRerun": 2
+    "handoffRerun": 2,
+    "specGateReworks": 1
   },
   "timeouts": {
     "specStageMs": 2400000,

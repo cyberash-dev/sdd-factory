@@ -11,7 +11,8 @@
     "handoffRerun": 2,
     "graphDepth": 3,
     "minCoversPerTask": 3,
-    "simpleFixes": 2
+    "simpleFixes": 2,
+    "specGateReworks": 1
   },
   "timeouts": {
     "specStageMs": 2400000,

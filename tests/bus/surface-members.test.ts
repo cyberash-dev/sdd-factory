@@ -60,10 +60,11 @@ describe("bus surfaces after the member, state and roster deltas", () => {
   });
 
   // @covers bus:DLT-009
-  it("carries version 0.8.0 after assembly.verified gained the build step", async () => {
+  // @covers bus:DLT-010
+  it("carries version 0.9.0 after assembly.verified gained the build step and spec.gate_failed joined the catalogue", async () => {
     const events = await surfaceRecord("bus:SUR-001");
 
-    expect(events.version).toBe("0.8.0");
+    expect(events.version).toBe("0.9.0");
   });
 
   // @covers bus:DLT-003

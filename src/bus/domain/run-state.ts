@@ -69,6 +69,8 @@ export interface StageAttempts {
   readonly plannerRecuts: number;
   readonly architectRepairs: number;
   readonly assemblyRounds: number;
+  /* bus:DLT-010: absent in snapshots written before factory-events 0.9.0; read through specGateReworks. */
+  readonly specGateReworks?: number;
 }
 
 export interface CostEntry {
@@ -127,7 +129,7 @@ export function createRunState(input: {
     startedAt: input.startedAt,
     updatedAt: input.startedAt,
     lastSeq: 0,
-    stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0 },
+    stageAttempts: { lintCycles: 0, criticRounds: 0, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0, specGateReworks: 0 },
     stageHandoffReruns: {},
     design: { techReady: false, verificationReady: false, tasksPath: null },
     assumptionsByRecord: {},
@@ -203,6 +205,10 @@ export function simpleFixAttempts(state: RunState, owner: string, unit: string):
 export function withSimpleFix(state: RunState, owner: string, unit: string): RunState {
   const key = simpleFixKey(owner, unit);
   return { ...state, simpleFixes: { ...state.simpleFixes, [key]: simpleFixAttempts(state, owner, unit) + 1 } };
+}
+
+export function specGateReworks(state: RunState): number {
+  return state.stageAttempts.specGateReworks ?? 0;
 }
 
 export function criticAttempts(task: TaskState): number {

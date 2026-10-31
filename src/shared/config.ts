@@ -13,6 +13,7 @@ export interface Caps {
   readonly graphDepth: number;
   readonly minCoversPerTask: number;
   readonly simpleFixes: number;
+  readonly specGateReworks: number;
 }
 
 export interface Timeouts {
@@ -68,6 +69,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
     graphDepth: 3,
     minCoversPerTask: 3,
     simpleFixes: 2,
+    specGateReworks: 1,
   },
   timeouts: {
     specStageMs: 20 * 60 * 1000,
@@ -175,6 +177,7 @@ export function mergeConfig(base: FactoryConfig, override: unknown): FactoryConf
       graphDepth: pickInteger(caps, "graphDepth", base.caps.graphDepth),
       minCoversPerTask: pickInteger(caps, "minCoversPerTask", base.caps.minCoversPerTask),
       simpleFixes: pickInteger(caps, "simpleFixes", base.caps.simpleFixes),
+      specGateReworks: pickInteger(caps, "specGateReworks", base.caps.specGateReworks),
     },
     timeouts: {
       specStageMs: pickInteger(timeouts, "specStageMs", base.timeouts.specStageMs),

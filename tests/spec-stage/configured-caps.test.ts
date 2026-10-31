@@ -43,6 +43,16 @@ function reworkAnsweredInRound(caps: Caps, round: number): TransitionResult {
   return outcome.result;
 }
 
+function gateFailedAfterReworks(caps: Caps, specGateReworks: number): TransitionResult {
+  const state = runStateAt("spec_review", { stageAttempts: { lintCycles: 0, criticRounds: 2, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0, specGateReworks } });
+  const event: DeliveredEvent<EventType> = { type: "spec.gate_failed", runId: RUN_ID, occurredAt: "2026-10-29T12:00:05.000Z", producer: "foreman", payload: { findingsPath: "spec/review/gate.md", detail: "approve_failed: no-id-match" }, seq: 5 };
+  const outcome = reduce(specStageRules(caps), state, event, new Set());
+  if (outcome.kind !== "applied") {
+    throw new Error(`expected applied, got ${outcome.kind}`);
+  }
+  return outcome.result;
+}
+
 function criticWritesGarbage(ws: StageWorkspace): RoleScript {
   return () => writeText(criticHandoffPath(ws), "no frontmatter here\n");
 }
@@ -56,6 +66,26 @@ function analystLinting(ws: StageWorkspace, lintCalls: number, replies: unknown[
     await writeText(analystHandoffPath(ws), analystHandoff(1, { status: "blocked", lint_exit: 1, blocked_reason: "lint_cap sdd:weasel-word" }));
   };
 }
+
+describe("caps.specGateReworks read from the configuration", () => {
+  // @covers factory:DLT-015
+  it("routes a second gate failure to the analyst when caps.specGateReworks is 2", () => {
+    const caps = configWithCaps({ specGateReworks: 2 }).caps;
+
+    const result = gateFailedAfterReworks(caps, 1);
+
+    expect([result.state.status, result.state.stageAttempts.specGateReworks, result.effects]).toEqual(["spec_drafting", 2, [{ kind: "spec.draft", attempt: 3, reworkFinding: "spec/review/gate.md" }]]);
+  });
+
+  // @covers factory:DLT-015
+  it("blocks the third gate failure when caps.specGateReworks is 2", () => {
+    const caps = configWithCaps({ specGateReworks: 2 }).caps;
+
+    const result = gateFailedAfterReworks(caps, 2);
+
+    expect(result.emits).toEqual([{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: "approve_failed: no-id-match" } }]);
+  });
+});
 
 describe("caps.criticRounds read from the configuration", () => {
   // @covers factory:DLT-015

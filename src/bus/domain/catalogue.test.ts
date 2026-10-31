@@ -17,6 +17,7 @@ const VALID_PAYLOADS: Readonly<Record<EventType, EventPayload>> = {
   "spec.rework": { round: 1, findingsPath: "spec/review/ga.md" },
   "spec.approved": { approver: "cyberash", mode: "pre-authorized-at-launch", approvedIds: 12 },
   "spec.blocked": { reason: "lint_cap", detail: "5 cycles" },
+  "spec.gate_failed": { findingsPath: "spec/review/gate.md", detail: "lint_failed: sdd:boundary-policy-ref" },
   "design.tech.ready": { path: "design/tech.md" },
   "design.verification.ready": { path: "design/verification.md" },
   "design.tasks.ready": { path: "design/tasks.json", taskCount: 3 },
@@ -112,6 +113,20 @@ describe("event catalogue validation", () => {
     const event = eventOf("design.rework", { ...VALID_PAYLOADS["design.rework"], originTaskId: "task-1" });
 
     expect(codeOf(() => validateEvent(event))).toBe("envelope_invalid:payload.originTaskId");
+  });
+
+  // @covers bus:DLT-010
+  it("accepts a spec.gate_failed from the foreman with findingsPath and detail", () => {
+    const event = eventOf("spec.gate_failed", { findingsPath: "spec/review/gate.md", detail: "lint_failed: sdd:boundary-policy-ref" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
+  // @covers bus:DLT-010
+  it("rejects a spec.gate_failed without findingsPath", () => {
+    const event = eventOf("spec.gate_failed", { detail: "lint_failed: sdd:boundary-policy-ref" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("envelope_invalid:payload.findingsPath");
   });
 
   // @covers bus:DLT-008

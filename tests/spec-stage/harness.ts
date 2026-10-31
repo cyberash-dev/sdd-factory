@@ -82,8 +82,11 @@ export function scriptedCommands(reply: (argv: readonly string[], call: number) 
 
 export const exitZero = (): CommandResult => ({ exitCode: 0, stdout: "", stderr: "" });
 
+const READY_CLEAN: CommandResult = { exitCode: 0, stdout: '{"format_version":1,"ok":true,"violations":[]}\n', stderr: "" };
+
 export function sddReplies(overrides: Readonly<Record<string, CommandResult>>): (argv: readonly string[]) => CommandResult {
-  return (argv) => overrides[argv[0] ?? ""] ?? exitZero();
+  const replies: Readonly<Record<string, CommandResult>> = { ready: READY_CLEAN, ...overrides };
+  return (argv) => replies[argv[0] ?? ""] ?? exitZero();
 }
 
 export function sliceContext(workspace: StageWorkspace, roles: ApiRoleRunner, config: FactoryConfig = DEFAULT_CONFIG): SliceContext {

@@ -82,6 +82,7 @@ export const EVENT_CATALOGUE = {
   "spec.rework": { round: integer({ min: 1 }), findingsPath: string() },
   "spec.approved": { approver: string(), mode: string({ literal: "pre-authorized-at-launch" }), approvedIds: integer({ min: 0 }) },
   "spec.blocked": { reason: string({ values: ["lint_cap", "critic_cap", "analyst_blocked"] }), detail: string() },
+  "spec.gate_failed": { findingsPath: string(), detail: string() },
   "design.tech.ready": { path: string() },
   "design.verification.ready": { path: string() },
   "design.tasks.ready": { path: string(), taskCount: integer({ min: 1 }) },

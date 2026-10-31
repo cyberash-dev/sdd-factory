@@ -26,6 +26,19 @@ function criticAnswers(ws: StageWorkspace, round: number, decision: "accept" | "
   };
 }
 
+function twoSurfaceSpec(): string {
+  const secondSurface = CLI_SPEC.slice(CLI_SPEC.indexOf("```yaml"), CLI_SPEC.indexOf("## 7.")).replace("todo-cli:SUR-001", "todo-cli:SUR-002");
+  return CLI_SPEC.replace("## 7. Data contracts", `${secondSurface}\n## 7. Data contracts`);
+}
+
+function analystRedraftsFromGate(ws: StageWorkspace, attempt: number, messages: string[]): RoleScript {
+  return async (request) => {
+    messages.push(request.message);
+    await writeText(ws.specPath, CLI_SPEC);
+    await writeText(join(ws.handoffsDir, "spec-analyst", "handoff.md"), analystHandoff(attempt));
+  };
+}
+
 async function scriptedStage(ws: StageWorkspace, scripts: readonly RoleScript[]): Promise<{ readonly trace: DeliveredEvent<EventType>[]; readonly engine: RunEngine }> {
   const roles = scriptedRoles(scripts);
   const context = sliceContext(ws, roles);
@@ -99,6 +112,46 @@ describe("spec stage through the run engine", () => {
       "spec_approved",
       true,
       true,
+    ]);
+  });
+
+  // @covers spec-stage:DLT-011
+  it("sends a failed approval gate back to the analyst with gate.md and approves the redraft after the next critic round", async () => {
+    const ws = await stageWorkspace(twoSurfaceSpec());
+    const redraftMessages: string[] = [];
+
+    const { trace, engine } = await scriptedStage(ws, [analystWrites(ws, 1), criticAnswers(ws, 1, "accept"), analystRedraftsFromGate(ws, 2, redraftMessages), criticAnswers(ws, 2, "accept")]);
+
+    expect([
+      trace.map((event) => [event.type, event.payload["attempt"] ?? event.payload["round"] ?? event.payload["findingsPath"] ?? null]),
+      engine.state.stageAttempts.specGateReworks,
+      redraftMessages.map((message) => message.includes("Critic findings to apply (none on attempt 1): spec/review/gate.md")),
+    ]).toEqual([
+      [
+        ["workspace.ready", null],
+        ["spec.drafted", 1],
+        ["spec.reviewed", 1],
+        ["spec.gate_failed", "spec/review/gate.md"],
+        ["spec.rework", 1],
+        ["spec.drafted", 2],
+        ["spec.reviewed", 2],
+        ["spec.approved", null],
+      ],
+      1,
+      [true],
+    ]);
+  });
+
+  // @covers spec-stage:DLT-011
+  it("fails the run with analyst_blocked when the gate fails again after the gate rework cap is spent", async () => {
+    const ws = await stageWorkspace(twoSurfaceSpec());
+
+    const { trace } = await scriptedStage(ws, [analystWrites(ws, 1), criticAnswers(ws, 1, "accept"), analystWrites(ws, 2), criticAnswers(ws, 2, "accept")]);
+
+    expect(trace.slice(-3).map((event) => [event.type, event.payload["reason"] ?? null])).toEqual([
+      ["spec.gate_failed", null],
+      ["spec.blocked", "analyst_blocked"],
+      ["run.failed", "analyst_blocked"],
     ]);
   });
 

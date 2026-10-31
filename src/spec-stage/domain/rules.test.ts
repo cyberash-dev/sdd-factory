@@ -13,6 +13,11 @@ function stateAt(status: RunState["status"], criticRounds = 0): RunState {
   return { ...base, status, stageAttempts: { ...base.stageAttempts, criticRounds } };
 }
 
+function stateAfterGateReworks(criticRounds: number, specGateReworks: number): RunState {
+  const state = stateAt("spec_review", criticRounds);
+  return { ...state, stageAttempts: { ...state.stageAttempts, specGateReworks } };
+}
+
 function delivered(type: EventType, payload: EventPayload): DeliveredEvent<EventType> {
   return { type, runId: RUN_ID, occurredAt: "2026-10-29T12:00:05.000Z", producer: "foreman", payload, seq: 5 };
 }
@@ -69,6 +74,40 @@ describe("spec-stage rules", () => {
     const result = applied(stateAt("spec_review", 2), "spec.reviewed", { round: 2, decision: "rework", findingsPath: "spec/review/ga.md" });
 
     expect([result.state.status, result.emits, result.effects]).toEqual(["spec_review", [], [{ kind: "spec.assume_findings", round: 2, findingsPath: "spec/review/ga.md" }]]);
+  });
+
+  // @covers spec-stage:DLT-011
+  it("routes a gate failure under the cap to the analyst at attempt round + 1 with gate.md as the rework finding", () => {
+    const result = applied(stateAfterGateReworks(1, 0), "spec.gate_failed", { findingsPath: "spec/review/gate.md", detail: "lint_failed: sdd:boundary-policy-ref" });
+
+    expect([result.state.status, result.state.stageAttempts.specGateReworks, result.emits, result.effects]).toEqual([
+      "spec_drafting",
+      1,
+      [{ type: "spec.rework", producer: "foreman", payload: { round: 1, findingsPath: "spec/review/gate.md" } }],
+      [{ kind: "spec.draft", attempt: 2, reworkFinding: "spec/review/gate.md" }],
+    ]);
+  });
+
+  // @covers spec-stage:DLT-011
+  it("blocks with analyst_blocked and the failure text when the gate rework cap is reached", () => {
+    const result = applied(stateAfterGateReworks(2, 1), "spec.gate_failed", { findingsPath: "spec/review/gate.md", detail: "lint_failed: sdd:boundary-policy-ref" });
+
+    expect([result.state.status, result.state.stageAttempts.specGateReworks, result.emits, result.effects]).toEqual([
+      "spec_review",
+      1,
+      [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: "lint_failed: sdd:boundary-policy-ref" } }],
+      [],
+    ]);
+  });
+
+  // @covers spec-stage:DLT-011
+  it("counts the first gate rework of a snapshot written without the counter", () => {
+    const state = stateAt("spec_review", 1);
+    const snapshot: RunState = { ...state, stageAttempts: { lintCycles: 0, criticRounds: 1, plannerRecuts: 0, architectRepairs: 0, assemblyRounds: 0 } };
+
+    const result = applied(snapshot, "spec.gate_failed", { findingsPath: "spec/review/gate.md", detail: "spec_integrity: expected exactly one Surface, found 2" });
+
+    expect([result.state.status, result.state.stageAttempts.specGateReworks]).toEqual(["spec_drafting", 1]);
   });
 
   it("treats spec.rework as bookkeeping without state change or effects", () => {

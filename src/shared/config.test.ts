@@ -32,6 +32,13 @@ describe("factory config", () => {
     expect([merged.caps.graphDepth, merged.caps.minCoversPerTask, merged.caps.simpleFixes, DEFAULT_CONFIG.caps.graphDepth, DEFAULT_CONFIG.caps.minCoversPerTask, DEFAULT_CONFIG.caps.simpleFixes]).toEqual([4, 3, 1, 3, 3, 2]);
   });
 
+  // @covers spec-stage:DLT-011
+  it("reads the spec gate rework cap with its built-in default of 1", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, { caps: { specGateReworks: 2 } });
+
+    expect([merged.caps.specGateReworks, mergeConfig(DEFAULT_CONFIG, {}).caps.specGateReworks]).toEqual([2, 1]);
+  });
+
   // @covers factory:DLT-002
   it("reads the reviewer model and falls back to the default model while it is unset", () => {
     const withReviewer = mergeConfig(DEFAULT_CONFIG, { models: { default: "claude-opus-5-5", reviewer: "gpt-6.1-sol" } });

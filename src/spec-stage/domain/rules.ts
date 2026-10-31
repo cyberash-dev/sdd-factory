@@ -1,5 +1,6 @@
 import type { Caps } from "../../shared/config.js";
 import type { PendingEvent, TransitionRule } from "../../bus/domain/transition.js";
+import { specGateReworks } from "../../bus/domain/run-state.js";
 import { DESIGN_EFFECT_KINDS, SPEC_EFFECT_KINDS } from "../effect-kinds.js";
 
 function integerField(payload: Readonly<Record<string, unknown>>, field: string): number {
@@ -55,6 +56,25 @@ export function specStageRules(caps: Caps): readonly TransitionRule[] {
         }
         return {
           state: { ...state, status: "spec_drafting" },
+          emits: [{ type: "spec.rework", producer: "foreman", payload: { round, findingsPath } }],
+          effects: [{ kind: SPEC_EFFECT_KINDS.draft, attempt: round + 1, reworkFinding: findingsPath }],
+        };
+      },
+    },
+    {
+      name: "spec.gate_failed -> rework | analyst_blocked",
+      eventType: "spec.gate_failed",
+      acceptsRunStatus: ["spec_review"],
+      apply: ({ state, event }) => {
+        const findingsPath = stringField(event.payload, "findingsPath");
+        const gateReworks = specGateReworks(state);
+        /* spec-stage:DLT-011: a failed approval gate goes back to the analyst until caps.specGateReworks is spent. */
+        if (gateReworks >= caps.specGateReworks) {
+          return { state, emits: [{ type: "spec.blocked", producer: "foreman", payload: { reason: "analyst_blocked", detail: stringField(event.payload, "detail") } }], effects: [] };
+        }
+        const round = state.stageAttempts.criticRounds;
+        return {
+          state: { ...state, status: "spec_drafting", stageAttempts: { ...state.stageAttempts, specGateReworks: gateReworks + 1 } },
           emits: [{ type: "spec.rework", producer: "foreman", payload: { round, findingsPath } }],
           effects: [{ kind: SPEC_EFFECT_KINDS.draft, attempt: round + 1, reworkFinding: findingsPath }],
         };
