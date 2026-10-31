@@ -2879,6 +2879,86 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-015
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T07:30:27.995Z
+    change_request: "operator decision 2026-10-31: cap and timeout values are instance configuration, not specification"
+    scope: first-time-approval
+partition_id: factory
+title: cap and time budget values are instance configuration, not specification
+target_ids:
+  - spec-stage:CST-001
+  - spec-stage:CST-002
+  - spec-stage:CST-003
+  - spec-stage:DLT-001
+  - build-stage:CST-001
+  - build-stage:CST-002
+  - build-stage:CST-003
+  - build-stage:CST-004
+  - build-stage:CST-005
+  - build-stage:DLT-012
+  - design-stage:CST-001
+  - design-stage:CST-002
+  - assembly-stage:CST-001
+  - bus:CST-003
+  - factory:CST-005
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The targeted records fix numbers (at most 1 architect repair, 2
+  assembly rounds, 5 lint cycles, one handoff re-run, shipped values)
+  that are tuning of one factory instance: an operator sets them in its
+  factory.config.json, and two instances may differ. Since 2026-10-30
+  the shipped profiles already carried other values than the records
+  state. Change: every cap and time budget of the factory is the value of
+  its key in the loaded configuration (caps.lintCycles,
+  caps.criticRounds, caps.criticAssumptionsPerId,
+  caps.implementerAttempts, caps.testWriterRework, caps.plannerRecuts,
+  caps.architectRepairs, caps.assemblyRounds, caps.handoffRerun,
+  caps.simpleFixes, caps.graphDepth, caps.minCoversPerTask,
+  maxParallelLanes, timeouts.*). The specification fixes that each bound
+  exists, what it counts and what happens when it is exhausted; a number
+  in a targeted record, and an ordinal such as "round 2" or "second
+  repair" in a Behavior or Scenario bound by it, reads as the configured
+  value or the attempt after it. Values in a shipped profile and the
+  built-in defaults are not normative.
+tests_old_behavior:
+  - an exhausted cap still ends in the outcome its record names (cap_exhausted, planner_cap, architect_cap, critic_cap, run.failed after the last assembly round)
+tests_new_behavior:
+  - to:factory:CST-005
+test_obligation:
+  predicate: |
+    For each cap a profile can set above the built-in default, a run
+    configured with the default plus one lets one more counted attempt
+    or round proceed at the default's boundary and ends with the
+    record's exhausted outcome one attempt later; the API role time
+    budget the role runner enforces is timeouts.apiRoleMs of the loaded
+    configuration.
+  test_template: unit
+  boundary_classes:
+    - caps.lintCycles
+    - caps.criticRounds
+    - caps.plannerRecuts
+    - caps.architectRepairs
+    - caps.assemblyRounds
+    - caps.handoffRerun
+    - caps.testWriterRework
+    - timeouts.apiRoleMs
+  failure_scenarios:
+    - a rule enforcing a literal bound instead of the configured value
+    - a configured value above the default ignored
+---
+```
+
 ---
 
 ## 16. Implementation bindings

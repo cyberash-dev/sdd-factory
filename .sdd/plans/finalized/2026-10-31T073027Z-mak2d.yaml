@@ -1,0 +1,10 @@
+plan_id: 2026-10-31T073027Z-mak2d
+created_at: 2026-10-31T07:30:27.997Z
+pending_attestations:
+  - id: factory:DLT-015
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T07:30:27.995Z
+    change_request: "operator decision 2026-10-31: cap and timeout values are instance configuration, not specification"
+    scope: first-time-approval
+    target_status: approved
