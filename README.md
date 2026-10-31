@@ -24,6 +24,23 @@ npm run factory -- run specs/todo-cli.md
 
 `npm run factory` loads `.env` (git-ignored) when present. The run works in `.factory/runs/<slug>-<YYYYMMDD-HHMMSS>/` (`product/`, `worktrees/`, `handoffs/`, `trace/`, `state.json`, `run.json`). On success the verified product tree plus `trace/` is copied to `hidden/<slug>/`, committed in this repository as `factory: <slug> <runId>` and pushed to `origin`. `--no-push` keeps the commit local; `--out <dir>` publishes somewhere else. Sample inputs: `specs/todo-cli.md`, `specs/url-shortener-api.md`.
 
+### Check it without API keys
+
+The factory's own suite is offline: every model role is replaced by a scripted participant, and `tests/factory/full-pipeline.test.ts` drives the whole factory (spec, design, two dependent lanes, assembly, publication to `hidden/<slug>/`) without a key or a network call.
+
+```sh
+npm ci && npm test
+```
+
+Every published product builds and tests on its own:
+
+```sh
+cd hidden/todo-cli && npm ci && npm run build && npm test
+node dist/cli.js --help
+```
+
+Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
+
 ## Pipeline
 
 | Stage | Role | Model (`factory.config.json`) | Runs as | Concurrency |
