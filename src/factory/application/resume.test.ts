@@ -402,6 +402,19 @@ const CAP_RULES: readonly TransitionRule[] = [
     },
   },
   {
+    name: "finding with a lane-level design cap",
+    eventType: "task.finding",
+    apply: ({ state, event }) => {
+      const taskId = taskIdOf(event.payload);
+      const role = event.payload["route"] === "planner" ? "planner" : event.payload["route"] === "critic" ? "critic" : "architect";
+      const used = role === "planner" ? state.stageAttempts.plannerRecuts : state.stageAttempts.architectRepairs;
+      if (role === "critic" || used >= 1) {
+        return { state, emits: [capFailed(taskId, role)], effects: [] };
+      }
+      return { state, emits: [{ type: "design.rework", producer: "foreman", payload: { target: role, reason: "design_repair", originTaskId: taskId } }], effects: [] };
+    },
+  },
+  {
     name: "design rework with cap",
     eventType: "design.rework",
     apply: ({ state }) => {
@@ -480,6 +493,40 @@ describe("resume after a cap failure", () => {
     const plan = planReplay(CAP_RULES, { ...initial(), status: "planning" }, events);
 
     expect([plan.state.stageAttempts.plannerRecuts, plan.redo.map((event) => [event.type, event.seq]), plan.grant]).toEqual([0, [["design.rework", 2]], { role: "planner", taskId: null }]);
+  });
+
+  function laneDesignCapped(route: string): ReturnType<typeof delivered>[] {
+    return [
+      delivered(1, "task.ready", "foreman", { taskId: "T-003" }),
+      delivered(2, "task.finding", "implementer", { taskId: "T-003", type: "VD-INFEASIBLE", route }),
+      delivered(3, "task.failed", "foreman", { taskId: "T-003", reason: "cap_exhausted", detail: route }),
+      delivered(4, "run.failed", "foreman"),
+    ];
+  }
+
+  // @covers factory:DLT-014
+  it("lowers the architect repairs and redoes the finding after task.failed{cap_exhausted: architect}", () => {
+    const capped = { ...buildingWith(["T-003"]), stageAttempts: { ...initial().stageAttempts, architectRepairs: 2 } };
+
+    const plan = planReplay(CAP_RULES, capped, laneDesignCapped("architect"));
+
+    expect([plan.state.stageAttempts.architectRepairs, plan.redo.map((event) => [event.type, event.seq]), plan.grant]).toEqual([1, [["task.finding", 2]], { role: "architect", taskId: "T-003" }]);
+  });
+
+  // @covers factory:DLT-014
+  it("lowers the planner re-cuts after task.failed{cap_exhausted: planner}", () => {
+    const capped = { ...buildingWith(["T-003"]), stageAttempts: { ...initial().stageAttempts, plannerRecuts: 2 } };
+
+    const plan = planReplay(CAP_RULES, capped, laneDesignCapped("planner"));
+
+    expect([plan.state.stageAttempts.plannerRecuts, plan.grant]).toEqual([1, { role: "planner", taskId: "T-003" }]);
+  });
+
+  // @covers factory:DLT-014
+  it("grants nothing after task.failed{cap_exhausted: critic}", () => {
+    const plan = planReplay(CAP_RULES, buildingWith(["T-003"]), laneDesignCapped("critic"));
+
+    expect(plan.grant).toBeNull();
   });
 
   // @covers factory:DLT-012

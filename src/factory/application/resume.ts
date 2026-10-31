@@ -135,7 +135,8 @@ function beforeFailureChain(events: readonly DeliveredEvent<EventType>[]): reado
   return events.slice(0, failureChainStart(events));
 }
 
-const TASK_CAP_ROLES: readonly GrantedRole[] = ["test-writer", "implementer"];
+/* factory:DLT-014: the build-stage rules report the architect and planner caps of a lane as task.failed too. */
+const TASK_CAP_ROLES: readonly GrantedRole[] = ["test-writer", "implementer", "architect", "planner"];
 
 const DESIGN_CAP_ROLES: Readonly<Record<string, GrantedRole>> = { planner_cap: "planner", architect_cap: "architect" };
 
