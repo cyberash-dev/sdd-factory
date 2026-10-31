@@ -112,7 +112,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: trace
 name: trace-files
-version: "0.4.0"
+version: "0.5.0"
 boundary_type: public_storage
 members:
   - trace:CTR-001
@@ -1535,6 +1535,66 @@ test_obligation:
   failure_scenarios:
     - fixer cost re-priced from the table
     - fixer cost missing from totals
+---
+```
+
+```yaml
+---
+id: trace:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:12:01.820Z
+    change_request: resumed-run trace gap on the room booking publication; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: trace
+title: trace-files 0.4.0 -> 0.5.0 - a resumed run's report covers every run of its chain
+target_ids:
+  - trace:SUR-001
+  - trace:CTR-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: trace:SUR-001
+    intended_version: "0.5.0"
+description: |
+  A resumed run writes trace.md from its own events only: the published
+  room booking report (run room-booking-api-20261031-030005, resume of
+  room-booking-api-20261031-021626) has an empty Stages table and none
+  of the first run's 43 minutes and 3.27 USD, so the time and cost per
+  task the judges read is incomplete whenever a run is resumed. Change
+  to trace:CTR-002: when the run's manifest names resumedFrom, trace.md
+  gains a `## Chain` section listing every run of the chain from the
+  first to this one (runId, outcome and failure reason, startedAt,
+  finishedAt, duration, cost, link to its report under
+  `chain/<runId>/trace.md`) and the chain totals (duration as the sum of
+  the runs' durations, cost, tokens); the chain is read through the
+  resumedFrom links of each run.json and each run's costs.json. A run
+  that is not a resume writes no Chain section.
+tests_old_behavior:
+  - a fresh run's trace.md is unchanged
+tests_new_behavior:
+  - to:trace:CTR-002
+test_obligation:
+  predicate: |
+    Given run B resumed from run A whose run.json and costs.json record
+    failed, cap_exhausted, 2609901 ms and 3.272092 USD, and B's own
+    totals 558217 ms and 0.4809 USD, B's trace.md has a Chain section
+    with a row for A (failed, cap_exhausted, 3.27) and a row for B
+    (published, 0.48), and chain totals of 3168118 ms and 3.75 USD; a
+    run without resumedFrom has no Chain section; trace:SUR-001 is at
+    0.5.0 after finalize.
+  test_template: integration
+  boundary_classes:
+    - two-run chain
+    - three-run chain
+    - fresh run
+  failure_scenarios:
+    - a resumed run reporting only its own time and cost
 ---
 ```
 

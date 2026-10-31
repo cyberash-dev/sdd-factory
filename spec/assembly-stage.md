@@ -1690,6 +1690,59 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: assembly-stage:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T03:12:02.131Z
+    change_request: resumed-run trace gap on the room booking publication; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: assembly-stage
+title: publication of a resumed run carries the trace of every earlier run of its chain
+target_ids:
+  - assembly-stage:BEH-008
+  - assembly-stage:INV-002
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Publication copies the current run's trace/ into hidden/<slug>/trace/.
+  For a resumed run, the earlier runs of its chain did the spec, design
+  and most of the build, and their traces stayed under .factory/ (which
+  is not published), while trace:DLT-005 links them from the Chain
+  section. Change to assembly-stage:BEH-008 and INV-002: the published
+  tree is the verified integration tree plus trace/, and for a resumed
+  run trace/chain/<runId>/ holds the trace directory of each earlier run
+  of the chain (trace.jsonl, trace.md, costs.json, interventions.md),
+  found through the resumedFrom links of run.json; a fresh run publishes
+  no chain directory.
+tests_old_behavior:
+  - a fresh run publishes trace/ exactly as before
+tests_new_behavior:
+  - to:assembly-stage:BEH-008
+  - to:assembly-stage:INV-002
+test_obligation:
+  predicate: |
+    Given run C resumed from B resumed from A, each with a trace
+    directory, publication writes hidden/<slug>/trace/ from C and
+    hidden/<slug>/trace/chain/A/ and chain/B/ with their trace.md and
+    costs.json; a fresh run's hidden/<slug>/trace/ has no chain
+    directory.
+  test_template: integration
+  boundary_classes:
+    - resumed chain
+    - fresh run
+  failure_scenarios:
+    - an earlier run's trace missing from the publication
+---
+```
+
 ---
 
 ## 16. Implementation bindings
