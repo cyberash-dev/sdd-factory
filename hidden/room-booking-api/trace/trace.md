@@ -1,38 +1,39 @@
-# Run room-booking-api-20261031-034223
+# Run room-booking-api-20261031-101230
 
 - slug: room-booking-api
 - operator: cyberash
 - mode: autonomous
-- startedAt: 2026-10-31T03:42:23.301Z
-- finishedAt: 2026-10-31T04:17:24.545Z
+- startedAt: 2026-10-31T10:12:30.222Z
+- finishedAt: 2026-10-31T11:11:08.337Z
 - outcome: published
-- cloud: https://app.jigjoy.ai/?s=loop_94b6eb3962c34c88b115de4a0929022a
+- cloud: https://app.jigjoy.ai/?s=loop_49d8590c59b843a7b31fde91877cbfff
 
 ## Stages
 
 | stage | startedAt | endedAt | durationMs | costUsd |
 |---|---|---|---|---|
-| workspace | 2026-10-31T03:42:23.301Z | 2026-10-31T03:46:34.376Z | 251075 | 0.0000 |
-| spec | 2026-10-31T03:46:34.376Z | 2026-10-31T03:50:39.256Z | 244880 | 0.1837 |
-| design | 2026-10-31T03:50:39.256Z | 2026-10-31T03:54:49.137Z | 249881 | 0.3324 |
-| build | 2026-10-31T03:54:49.137Z | 2026-10-31T04:17:08.869Z | 1339732 | 2.5044 |
-| assembly | 2026-10-31T04:17:08.869Z | 2026-10-31T04:17:24.482Z | 15613 | 0.0000 |
+| workspace | 2026-10-31T10:12:30.222Z | 2026-10-31T10:21:17.458Z | 527236 | 0.0000 |
+| spec | 2026-10-31T10:21:17.458Z | 2026-10-31T10:30:36.197Z | 558739 | 0.5748 |
+| design | 2026-10-31T10:30:36.197Z | 2026-10-31T10:34:34.829Z | 238632 | 0.3690 |
+| build | 2026-10-31T10:34:34.829Z | 2026-10-31T11:11:00.057Z | 2185228 | 3.1177 |
+| assembly | 2026-10-31T11:11:00.057Z | 2026-10-31T11:11:08.270Z | 8213 | 0.0000 |
 
 ## Tasks
 
 | taskId | title | implementer attempts | test-writer attempts | durationMs | costUsd | inputTokens | outputTokens | outcome | fixes |
 |---|---|---|---|---|---|---|---|---|---|
-| T-001 | Hold rooms and bookings, assign ids, serve /rooms | 1 | 1 | 158748 | 0.5041 | 551759 | 32849 | approved | 0 |
-| T-002 | Create, list and delete bookings with conflict checks | 1 | 1 | 293531 | 0.5487 | 413664 | 42121 | approved | 0 |
-| T-003 | List bookings and availability inside a window | 1 | 1 | 210920 | 0.5004 | 442026 | 30076 | approved | 0 |
-| T-004 | Compose the HTTP server, routing and port | 1 | 1 | 887080 | 0.9512 | 1235508 | 149578 | approved | 0 |
+| T-001 | hold the in-memory Store, Time parsing and Error codes | 1 | 1 | 257533 | 0.4580 | 129721 | 41275 | approved | 0 |
+| T-002 | serve the room endpoints | 1 | 1 | 433561 | 0.4940 | 510701 | 58987 | approved | 0 |
+| T-003 | serve the booking creation endpoint | 2 | 1 | 342130 | 0.6837 | 778969 | 50688 | approved | 0 |
+| T-004 | serve booking reads, deletion and Availability | 1 | 1 | 351168 | 0.5764 | 702490 | 46613 | approved | 0 |
+| T-005 | route requests, write JSON responses and wire the process | 2 | 1 | 1233724 | 0.9056 | 1677172 | 204182 | approved | 0 |
 
 ## Totals
 
-- durationMs: 2101244
-- costUsd: 3.0205
-- inputTokens: 5322245
-- outputTokens: 448996
+- durationMs: 3518115
+- costUsd: 4.0615
+- inputTokens: 9059926
+- outputTokens: 667916
 - unknown-cost entries: 0
 
 ## Assumptions
@@ -47,6 +48,14 @@ mid-run interventions: 0 (see [interventions.md](interventions.md))
 
 none
 
-## Task T-002
+## Task T-001
+
+- review advisory_only: 
+
+## Task T-004
+
+- review advisory_only: 
+
+## Task T-005
 
 - review advisory_only: 
