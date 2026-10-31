@@ -221,10 +221,10 @@ describe("reviewer decision routing", () => {
     expect(result.emits.map((event) => [event.type, event.payload["reason"]])).toEqual([["task.failed", "unparseable_handoff"]]);
   });
 
-  it("counts a reviewer request_changes toward the implementer cap", () => {
+  it("counts a reviewer request_changes toward the implementer cap and integrates the green task at the cap", () => {
     const result = run(reviewState(3), "task.reviewed", reviewed("request_changes", "implementer"));
 
-    expect(result.emits.map((event) => [event.type, event.payload["detail"]])).toEqual([["task.failed", "implementer"]]);
+    expect([result.emits, result.effects]).toEqual([[], [{ kind: "build.integrate", taskId: "T-001", capReachedRole: "implementer" }]]);
   });
 
   it("ledgers the reviewer cost when the payload carries it", () => {

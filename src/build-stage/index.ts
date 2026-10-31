@@ -70,7 +70,8 @@ const HANDLERS: Readonly<Record<string, LaneHandler>> = {
       attempt: integerField(effect, "attempt"),
       finding: arbitrationFindingOf(effect),
     }),
-  [BUILD_EFFECT_KINDS.integrate]: (slice, deps, context, effect) => runIntegrate(slice, deps, context, stringField(effect, "taskId")),
+  [BUILD_EFFECT_KINDS.integrate]: (slice, deps, context, effect) =>
+    runIntegrate(slice, deps, context, stringField(effect, "taskId"), Object.hasOwn(effect, "capReachedRole") ? stringField(effect, "capReachedRole") : null),
   [BUILD_EFFECT_KINDS.restartLane]: (slice, deps, context, effect) =>
     runRestartLane(slice, deps, context, { taskId: stringField(effect, "taskId"), attempt: integerField(effect, "attempt"), reworkFinding: reworkFindingOf(effect) }),
   [BUILD_EFFECT_KINDS.terminateLanes]: (slice, deps) => runTerminateLanes(slice, deps),

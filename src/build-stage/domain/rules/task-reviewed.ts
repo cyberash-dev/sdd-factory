@@ -5,7 +5,7 @@ import type { PendingEvent, TransitionRule } from "../../../bus/domain/transitio
 import type { RunState } from "../../../bus/domain/run-state.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { PayloadFieldError, stringField } from "../payload.js";
-import { architectRework, costEntryOf, criticRework, findingTextOf, foreman, hasCostFields, implementerRework, laneEffect, specIdsOf, taskOf, testWriterRework, withTask, type RuleDeps } from "./support.js";
+import { architectRework, costEntryOf, criticRework, findingTextOf, foreman, hasCostFields, implementerRework, isArchitectCapReached, isCriticCapReached, isImplementerCapReached, isTestWriterCapReached, laneEffect, specIdsOf, taskOf, testWriterRework, withTask, type RuleDeps } from "./support.js";
 
 interface Decision {
   readonly state: RunState;
@@ -45,6 +45,23 @@ function routeTarget(input: Decision, caps: RuleDeps["caps"], implementerReason:
   }
 }
 
+/* build-stage:DLT-013: the role names match the cap_exhausted detail the guard of the same route emits. */
+function capReachedRoleOf(input: Decision, caps: RuleDeps["caps"]): string | null {
+  const { state, task, target, specIds } = input;
+  switch (target) {
+    case "implementer":
+      return isImplementerCapReached(task, caps) ? "implementer" : null;
+    case "test-writer":
+      return isTestWriterCapReached(task, caps) ? "test-writer" : null;
+    case "architect":
+      return isArchitectCapReached(state, caps) ? "architect" : null;
+    case "contract":
+      return isCriticCapReached(state, caps, specIds) ? "critic" : null;
+    default:
+      return null;
+  }
+}
+
 export function taskReviewedRule(deps: RuleDeps): TransitionRule {
   return {
     name: "task.reviewed -> integrate or rework",
@@ -63,8 +80,15 @@ export function taskReviewedRule(deps: RuleDeps): TransitionRule {
         }
         return { state: stamped, emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.integrate, { taskId })] };
       }
-      const emitted = isArbitration ? routeTarget(input, deps.caps, "claim_rejected", "test_contract_conflict") : routeTarget(input, deps.caps, "review_changes", "review_changes");
-      return { state: stamped, emits: [emitted], effects: [] };
+      if (isArbitration) {
+        return { state: stamped, emits: [routeTarget(input, deps.caps, "claim_rejected", "test_contract_conflict")], effects: [] };
+      }
+      /* build-stage:DLT-013: a review runs only after task.verified{green}, so a route beyond its cap approves on that evidence. */
+      const capReachedRole = capReachedRoleOf(input, deps.caps);
+      if (capReachedRole !== null) {
+        return { state: stamped, emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.integrate, { taskId, capReachedRole })] };
+      }
+      return { state: stamped, emits: [routeTarget(input, deps.caps, "review_changes", "review_changes")], effects: [] };
     },
   };
 }

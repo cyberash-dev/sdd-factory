@@ -28,7 +28,7 @@ function publishConflict(slice: SliceContext, context: EffectContext, taskId: st
   context.publish({ type: "assembly.triaged", producer: "foreman", payload: { taskId, target: "planner", reason: WRITE_SET_CONFLICT } });
 }
 
-export async function runIntegrate(slice: SliceContext, deps: LaneDeps, context: EffectContext, taskId: string): Promise<void> {
+export async function runIntegrate(slice: SliceContext, deps: LaneDeps, context: EffectContext, taskId: string, capReachedRole: string | null): Promise<void> {
   const task = taskStateOf(context.state, taskId);
   const implSha = requireSha(task.implSha, "implSha");
   await deps.git.checkout(slice.paths.productDir, INTEGRATION_BRANCH);
@@ -38,5 +38,8 @@ export async function runIntegrate(slice: SliceContext, deps: LaneDeps, context:
     return;
   }
   await publishReview(slice, deps, task.worktree, taskId);
+  if (capReachedRole !== null) {
+    slice.log(`${taskId} approved on green evidence: ${capReachedRole} cap reached, review findings kept as advisory`);
+  }
   context.publish({ type: "task.approved", producer: "foreman", payload: { taskId, implSha } });
 }
