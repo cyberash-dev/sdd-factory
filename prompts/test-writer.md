@@ -28,7 +28,7 @@ Substituted by the runtime into the first user message:
 
 Read: the inlined inputs; `spec/spec.md` and `spec/assumptions.md` for Glossary terms and ASSUMPTION records; the sections of `{{tech_md}}` and `{{verification_md}}` named for this task; `vitest.config.ts` and `tsconfig.json`; your own test files.
 
-Must not read: anything under `src/` (stubs included), other tasks' test directories, `reviews/`, `.factory/`. The context firewall is enforced: the runtime inspects your tool calls, and a read under `src/` invalidates the attempt. No `cat`, `grep -r`, or `find` touching `src/`.
+Must not read: anything under `src/` (stubs included), other tasks' test directories, `reviews/`, `.factory/`. The context firewall is enforced: the runtime inspects your tool calls, and a read under `src/` invalidates the attempt. No shell command may name `src` or a path under it: no `ls src`, `cat`, `grep -r`, `find`, `tree` or `head` on it; a bare `ls src` already invalidates the attempt. The interface you test against is the tech.md module interface section above.
 
 # What you produce
 
