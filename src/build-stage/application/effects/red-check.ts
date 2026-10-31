@@ -25,8 +25,11 @@ interface RedOutcome {
   readonly baseSha: string;
 }
 
-async function judgeRun(deps: LaneDeps, task: TaskState, run: RedCheckRun, commands: VerifierCommands): Promise<RedJudgement> {
-  const changedFiles = roleChangedFiles(await deps.git.changedFiles(task.worktree));
+/* build-stage:DLT-015: a rework on frozen tests leaves them committed, so the judgement spans every file that differs from baseSha;
+   the fixer's committed repairs outside tests/** stay out of it, as rule (e) is about the test-writer's own changes. */
+async function judgeRun(deps: LaneDeps, task: TaskState, run: RedCheckRun, commands: VerifierCommands, fixerCommitted: readonly string[]): Promise<RedJudgement> {
+  const sinceBase = await deps.git.changedFilesSince(task.worktree, requireSha(task.baseSha, "baseSha"));
+  const changedFiles = roleChangedFiles(sinceBase).filter((path) => !fixerCommitted.includes(path));
   const coversFound = await coversFoundIn(
     task.worktree,
     changedFiles.filter((path) => isTaskTestFile(path, task.writes)),
@@ -46,10 +49,10 @@ async function judgeRun(deps: LaneDeps, task: TaskState, run: RedCheckRun, comma
 }
 
 /* Only the fixer's surviving edits outside tests/** go into the fix commit; the test-writer's own changes stay subject to rule (e). */
-async function commitFixerChanges(deps: LaneDeps, worktree: string, runs: readonly SimpleFixRun[], message: string): Promise<string | null> {
+async function commitFixerChanges(deps: LaneDeps, worktree: string, runs: readonly SimpleFixRun[], message: string): Promise<{ readonly sha: string | null; readonly paths: readonly string[] }> {
   const kept = new Set(runs.filter((fixRun) => fixRun.outcome !== "discarded").flatMap((fixRun) => fixRun.filesChanged));
   const pending = (await deps.git.changedFiles(worktree)).filter((path) => kept.has(path) && !isUnderTests(path));
-  return pending.length === 0 ? null : deps.git.commitPaths(worktree, pending, message);
+  return { sha: pending.length === 0 ? null : await deps.git.commitPaths(worktree, pending, message), paths: pending };
 }
 
 async function fixSuiteError(slice: SliceContext, deps: LaneDeps, context: EffectContext, task: TaskState, run: RedCheckRun, failed: RedOutcome, rerun: () => Promise<VerifierCommands>): Promise<RedOutcome | "terminated" | null> {
@@ -76,8 +79,8 @@ async function fixSuiteError(slice: SliceContext, deps: LaneDeps, context: Effec
   if (result.verdict !== "fixed" || lastRun === undefined) {
     return null;
   }
-  const fixSha = await commitFixerChanges(deps, task.worktree, result.runs, `fix ${run.taskId} red ${lastRun.attempt}`);
-  return { commands: latest, judgement: await judgeRun(deps, task, run, latest), baseSha: fixSha ?? failed.baseSha };
+  const fixCommit = await commitFixerChanges(deps, task.worktree, result.runs, `fix ${run.taskId} red ${lastRun.attempt}`);
+  return { commands: latest, judgement: await judgeRun(deps, task, run, latest, fixCommit.paths), baseSha: fixCommit.sha ?? failed.baseSha };
 }
 
 function isFixableSuiteError(outcome: RedOutcome): boolean {
@@ -129,7 +132,7 @@ export async function runRedCheck(slice: SliceContext, deps: LaneDeps, context: 
     publishToolingBroken(context, run.taskId, "red-check", commands);
     return;
   }
-  const first: RedOutcome = { commands, judgement: await judgeRun(deps, task, run, commands), baseSha: requireSha(task.baseSha, "baseSha") };
+  const first: RedOutcome = { commands, judgement: await judgeRun(deps, task, run, commands, []), baseSha: requireSha(task.baseSha, "baseSha") };
   const fixed = isFixableSuiteError(first) ? await fixSuiteError(slice, deps, context, task, run, first, rerun) : null;
   if (!deps.lanes.isLive(token) || fixed === "terminated") {
     return;

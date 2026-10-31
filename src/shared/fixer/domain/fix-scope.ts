@@ -11,7 +11,7 @@ export interface PathScope {
 export type FixScopeInput =
   | { readonly trigger: "spec_yaml_invalid" }
   | { readonly trigger: "design_file_invalid"; readonly file: string }
-  | { readonly trigger: "red_suite_error" | GreenTrigger; readonly writes: readonly string[] }
+  | { readonly trigger: "red_suite_error" | "arbitration_tests" | GreenTrigger; readonly writes: readonly string[] }
   | { readonly trigger: AssemblyTrigger };
 
 export const ANY_PATH = "**";
@@ -30,6 +30,8 @@ export function fixScopeOf(input: FixScopeInput): PathScope {
       return { allowed: [input.file], forbidden: [], concurrent: CONCURRENT_DESIGN_FILES[input.file] ?? [] };
     case "red_suite_error":
       return { allowed: input.writes, forbidden: [] };
+    case "arbitration_tests":
+      return { allowed: input.writes.filter((glob) => glob.startsWith("tests/")), forbidden: [] };
     case "green_typecheck":
     case "green_load_failure":
       return { allowed: input.writes, forbidden: [TESTS] };

@@ -59,6 +59,7 @@ export const FIX_TRIGGERS = [
   "assembly_install",
   "assembly_typecheck",
   "assembly_load_failure",
+  "arbitration_tests",
 ] as const;
 export const FIX_OUTCOMES = ["fixed", "unfixed", "discarded"] as const;
 

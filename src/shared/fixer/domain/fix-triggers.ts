@@ -24,6 +24,7 @@ export const TRIGGER_TABLE: Readonly<Record<FixTrigger, TriggerRow>> = {
   assembly_install: { stage: "assembly", owners: ["assembler"], formatOnly: false },
   assembly_typecheck: { stage: "assembly", owners: ["assembler"], formatOnly: false },
   assembly_load_failure: { stage: "assembly", owners: ["assembler"], formatOnly: false },
+  arbitration_tests: { stage: "build", owners: ["test-writer"], formatOnly: false },
 };
 
 export function isOwnerOf(trigger: FixTrigger, owner: FixOwner): boolean {

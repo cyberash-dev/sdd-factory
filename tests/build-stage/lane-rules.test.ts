@@ -105,6 +105,7 @@ describe("lane start and test authoring", () => {
     expect([result.emits, result.effects]).toEqual([[{ type: "task.failed", producer: "foreman", payload: { taskId: "T-001", reason: "cap_exhausted", detail: "test-writer" } }], []]);
   });
 
+  // @covers build-stage:DLT-015
   it("clears the implementation state when a reviewer routes a lane restart after an implementation existed", () => {
     const state = buildingState({ "T-001": aTask({ status: "review_pending", attempts: { implementer: 2, testWriter: 1 }, baseSha: BASE_SHA, testsSha: TESTS_SHA, implSha: IMPL_SHA }) });
 
@@ -115,7 +116,7 @@ describe("lane start and test authoring", () => {
       { implementer: 2, testWriter: 2 },
       null,
       null,
-      [{ kind: "build.restart-lane", taskId: "T-001", attempt: 2, reworkFinding: { reason: "review_changes", findingPath: "reviews/T-001.md" } }],
+      [{ kind: "build.restart-lane", taskId: "T-001", attempt: 2, reworkFinding: { reason: "review_changes", findingPath: "reviews/T-001.md" }, frozenTestsSha: TESTS_SHA }],
     ]);
   });
 });

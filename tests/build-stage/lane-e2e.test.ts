@@ -143,7 +143,8 @@ describe("build lane end to end", () => {
   // @covers build-stage:SCN-003
   // @covers build-stage:BEH-004
   // @covers build-stage:DLT-008
-  it("arbitrates a test-contract conflict to the test-writer, restarts the lane at baseSha and approves after the rewritten tests", async () => {
+  // @covers build-stage:DLT-015
+  it("arbitrates a test-contract conflict to the test-writer, restarts the lane at the frozen tests commit and approves after the rewritten tests", async () => {
     const restart: { head: string | null; status: string | null } = { head: null, status: null };
     const { engine } = await scenario(
       async (request) => {
@@ -173,7 +174,7 @@ describe("build lane end to end", () => {
       eventTypes(engine.events),
       engine.events.filter((event) => event.type === "task.reviewed").map((event) => [event.payload["decision"], event.payload["target"]]),
       engine.events.filter((event) => event.type === "task.impl_done").map((event) => event.payload["attempt"]),
-      restart.head === task?.baseSha,
+      restart.head === engine.events.find((event) => event.type === "task.tests_red")?.payload["testsSha"],
       restart.status,
       task?.attempts,
     ]).toEqual([

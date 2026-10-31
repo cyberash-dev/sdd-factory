@@ -10,7 +10,7 @@ import type { ReworkFinding } from "../../domain/rules/support.js";
 import { costFieldsOf, runCliLane, withLaneParticipant } from "../cli-lane.js";
 import { runWithHandoffRetry, type ParseOutcome } from "../handoff-roundtrip.js";
 import type { LaneDeps } from "../lane-deps.js";
-import { laneInputs, reworkFindingText, type LaneInputs } from "../lane-inputs.js";
+import { laneInputs, reworkFindingText, taskStateOf, type LaneInputs } from "../lane-inputs.js";
 
 export interface TestWriterRun {
   readonly taskId: string;
@@ -46,11 +46,15 @@ export function parseLaneHandoff(role: "test-writer" | "implementer", lastRun: C
 }
 
 export async function runTestWriter(slice: SliceContext, deps: LaneDeps, context: EffectContext, run: TestWriterRun): Promise<void> {
+  await runTestWriterOnFinding(slice, deps, context, run, await reworkFindingText(run.reworkFinding, taskStateOf(context.state, run.taskId).worktree));
+}
+
+export async function runTestWriterOnFinding(slice: SliceContext, deps: LaneDeps, context: EffectContext, run: TestWriterRun, findingText: string | null): Promise<void> {
   const token = deps.lanes.tokenOf(run.taskId);
   const inputs = await laneInputs(slice, deps, context.state, run.taskId);
   const handoffPath = laneHandoffPath(slice.paths.handoffsDir, run.taskId, "test-writer", run.attempt);
   const transcriptPath = laneTranscriptPath(slice.paths.handoffsDir, run.taskId, "test-writer", run.attempt);
-  const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, await reworkFindingText(run.reworkFinding, inputs.task.worktree));
+  const messageInput = laneMessageInput(slice, inputs, handoffPath, run.attempt, findingText);
   const instruction = slice.prompts.render(await slice.prompts.load("test-writer"), instructionVariables(messageInput));
   let lastRun: CliRoleOutcome | null = null;
   await withLaneParticipant(slice, "test-writer", run.taskId, async (lane) => {

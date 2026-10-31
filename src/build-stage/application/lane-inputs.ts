@@ -50,11 +50,15 @@ export async function laneInputs(slice: SliceContext, deps: LaneDeps, state: Run
 }
 
 /* A review report path is worktree-relative (build-stage:CTR-001); verifier evidence paths are absolute. */
+export async function findingReportOf(finding: ReworkFinding, worktree: string): Promise<string | null> {
+  return finding.findingPath === null ? null : readTextOrNull(isAbsolute(finding.findingPath) ? finding.findingPath : join(worktree, finding.findingPath));
+}
+
 export async function reworkFindingText(finding: ReworkFinding | null, worktree: string): Promise<string | null> {
   if (finding === null) {
     return null;
   }
-  const content = finding.findingPath === null ? null : await readTextOrNull(isAbsolute(finding.findingPath) ? finding.findingPath : join(worktree, finding.findingPath));
+  const content = await findingReportOf(finding, worktree);
   const reference = finding.findingPath === null ? "" : `\nsource: ${finding.findingPath}`;
   return content === null ? `${finding.reason}${reference}` : `${finding.reason}${reference}\n\n${content.trimEnd()}`;
 }

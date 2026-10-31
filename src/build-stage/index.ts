@@ -6,6 +6,7 @@ import type { EffectHandler, SliceContext, SliceFactory } from "../shared/slice.
 import { createExecFileCommandRunner } from "./adapters/outbound/exec-file-command-runner.js";
 import { createFileDesignSource } from "./adapters/outbound/file-design-source.js";
 import { createDesignCache } from "./application/design-cache.js";
+import { runArbitrationFix } from "./application/effects/arbitration-fix.js";
 import { runGreenCheck } from "./application/effects/green-check.js";
 import { runImplementer } from "./application/effects/implementer.js";
 import { runIntegrate } from "./application/effects/integrate.js";
@@ -20,7 +21,7 @@ import { createGit } from "./application/git.js";
 import type { LaneDeps } from "./application/lane-deps.js";
 import { LaneRegistry } from "./application/lane-registry.js";
 import type { ArbitrationFinding } from "./domain/lane-messages.js";
-import { integerField, optionalStringsField, stringField, stringOrNullField, stringsField } from "./domain/payload.js";
+import { integerField, optionalStringsField, PayloadFieldError, stringField, stringOrNullField, stringsField } from "./domain/payload.js";
 import { buildStageRules, type ReworkFinding } from "./domain/rules/index.js";
 import { BUILD_EFFECT_KINDS } from "./effect-kinds.js";
 import type { CommandRunner } from "./ports/outbound/command-runner.js";
@@ -48,6 +49,14 @@ function reworkFindingOf(effect: Effect): ReworkFinding | null {
   return isRecord(value) ? { reason: stringField(value, "reason"), findingPath: stringOrNullField(value, "findingPath") } : null;
 }
 
+function requiredReworkFindingOf(effect: Effect): ReworkFinding {
+  const finding = reworkFindingOf(effect);
+  if (finding === null) {
+    throw new PayloadFieldError("reworkFinding: expected an object");
+  }
+  return finding;
+}
+
 function arbitrationFindingOf(effect: Effect): ArbitrationFinding | null {
   const value = effect["finding"];
   return isRecord(value) ? { type: stringField(value, "type"), specIds: stringsField(value, "specIds"), detail: stringField(value, "detail") } : null;
@@ -73,7 +82,14 @@ const HANDLERS: Readonly<Record<string, LaneHandler>> = {
   [BUILD_EFFECT_KINDS.integrate]: (slice, deps, context, effect) =>
     runIntegrate(slice, deps, context, stringField(effect, "taskId"), Object.hasOwn(effect, "capReachedRole") ? stringField(effect, "capReachedRole") : null),
   [BUILD_EFFECT_KINDS.restartLane]: (slice, deps, context, effect) =>
-    runRestartLane(slice, deps, context, { taskId: stringField(effect, "taskId"), attempt: integerField(effect, "attempt"), reworkFinding: reworkFindingOf(effect) }),
+    runRestartLane(slice, deps, context, {
+      taskId: stringField(effect, "taskId"),
+      attempt: integerField(effect, "attempt"),
+      reworkFinding: reworkFindingOf(effect),
+      frozenTestsSha: Object.hasOwn(effect, "frozenTestsSha") ? stringField(effect, "frozenTestsSha") : null,
+    }),
+  [BUILD_EFFECT_KINDS.arbitrationFix]: (slice, deps, context, effect) =>
+    runArbitrationFix(slice, deps, context, { taskId: stringField(effect, "taskId"), frozenTestsSha: stringField(effect, "frozenTestsSha"), reworkFinding: requiredReworkFindingOf(effect) }),
   [BUILD_EFFECT_KINDS.terminateLanes]: (slice, deps) => runTerminateLanes(slice, deps),
   [BUILD_EFFECT_KINDS.reprovision]: (slice, deps, context, effect) =>
     runReprovision(slice, deps, context, { taskId: stringField(effect, "taskId"), origin: reprovisionOriginOf(effect["origin"]), attempt: integerField(effect, "attempt") }),

@@ -181,6 +181,11 @@ function commonVariables(input: LaneMessageInput, role: string): PromptVariables
   };
 }
 
+/* build-stage:DLT-015: a rework on the frozen tests edits them; re-authoring the whole set brought new defects each time. */
+export function frozenTestsFinding(finding: string): string {
+  return `${finding}\n\nYour frozen tests are in place: the worktree is at the commit of your last passed red check and every implementation change is gone. Change only what this finding requires, leave every other test byte-identical, and do not re-author the set.`;
+}
+
 export function testWriterMessage(input: LaneMessageInput): string {
   return renderTemplate(TEST_WRITER_TEMPLATE, {
     ...commonVariables(input, "test-writer"),

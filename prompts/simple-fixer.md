@@ -35,6 +35,8 @@ Never change a file matching:
 
 Any change outside the allowed paths, or any change to the data of a record that parsed before your run, reverts every change you made and the run counts as discarded.
 
+{{trigger_rule}}
+
 # Procedure
 
 1. Read the failing output in the first user message and locate the exact file and line it names.

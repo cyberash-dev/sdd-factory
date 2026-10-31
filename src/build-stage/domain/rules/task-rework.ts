@@ -1,5 +1,5 @@
 import type { TransitionRule, TransitionResult } from "../../../bus/domain/transition.js";
-import { withCriticAttempt, type RunState, type TaskState } from "../../../bus/domain/run-state.js";
+import { simpleFixAttempts, withCriticAttempt, type RunState, type TaskState } from "../../../bus/domain/run-state.js";
 import { BUILD_EFFECT_KINDS } from "../../effect-kinds.js";
 import { PayloadFieldError, stringField, stringOrNullField } from "../payload.js";
 import { capExhausted, designReworkAttempt, findingTextOf, foreman, isTestWriterCapReached, laneEffect, specAssumeEffect, specIdsOf, tasksCovering, taskOf, withTask, type ReworkFinding, type RuleDeps } from "./support.js";
@@ -14,15 +14,30 @@ function isDesignRestartReason(reason: string): boolean {
   return reason.startsWith("architect_repair") || reason === "planner_recut";
 }
 
+/* build-stage:BEH-008 arbitration routes a frozen test that contradicts the records to the test-writer with this reason. */
+const ARBITRATION_REASON = "test_contract_conflict";
+
+/* build-stage:DLT-016: an arbitration loss at the cap goes to the simple-fixer on the frozen tests; the fixer run is no test-writer attempt. */
+function testWriterCapReached(state: RunState, task: TaskState, taskId: string, caps: RuleDeps["caps"], reworkFinding: ReworkFinding, lastEvent: string): TransitionResult {
+  const hasFixerBudget = simpleFixAttempts(state, "test-writer", taskId) < caps.simpleFixes;
+  if (reworkFinding.reason !== ARBITRATION_REASON || task.testsSha === null || !hasFixerBudget) {
+    return { state: withTask(state, taskId, { ...task, lastEvent }), emits: [capExhausted(taskId, "test-writer")], effects: [] };
+  }
+  const next = { ...task, status: "tests_pending" as const, implementerAtRestart: task.attempts.implementer, testsSha: null, implSha: null, lastEvent };
+  return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.arbitrationFix, { taskId, frozenTestsSha: task.testsSha, reworkFinding })] };
+}
+
 function laneRestart(state: RunState, task: TaskState, taskId: string, caps: RuleDeps["caps"], reworkFinding: ReworkFinding, lastEvent: string): TransitionResult {
   const isDesignRestart = isDesignRestartReason(reworkFinding.reason);
   if (!isDesignRestart && isTestWriterCapReached(task, caps)) {
-    return { state: withTask(state, taskId, { ...task, lastEvent }), emits: [capExhausted(taskId, "test-writer")], effects: [] };
+    return testWriterCapReached(state, task, taskId, caps, reworkFinding, lastEvent);
   }
   const attempt = task.attempts.testWriter + 1;
   const designRestarts = isDesignRestart ? { designRestarts: (task.designRestarts ?? 0) + 1 } : {};
+  /* build-stage:DLT-015: the state forgets testsSha here, so the effect carries the commit the worktree goes back to. */
+  const frozenTests = isDesignRestart || task.testsSha === null ? {} : { frozenTestsSha: task.testsSha };
   const next = { ...task, ...designRestarts, status: "tests_pending" as const, attempts: { ...task.attempts, testWriter: attempt }, implementerAtRestart: task.attempts.implementer, testsSha: null, implSha: null, lastEvent };
-  return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.restartLane, { taskId, attempt, reworkFinding })] };
+  return { state: withTask(state, taskId, next), emits: [], effects: [laneEffect(BUILD_EFFECT_KINDS.restartLane, { taskId, attempt, reworkFinding, ...frozenTests })] };
 }
 
 /* The counter moves in the same transition as the effect: spec-stage reads it to enforce CST-005. */

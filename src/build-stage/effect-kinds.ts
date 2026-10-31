@@ -8,6 +8,7 @@ export const BUILD_EFFECT_KINDS = {
   reviewer: "build.reviewer",
   integrate: "build.integrate",
   restartLane: "build.restart-lane",
+  arbitrationFix: "build.arbitration-fix",
   terminateLanes: "build.terminate-lanes",
   reprovision: "build.reprovision",
 } as const;

@@ -8,6 +8,7 @@ export interface Git {
   tryRun(cwd: string, args: readonly string[]): Promise<CommandResult>;
   revParse(cwd: string, ref: string): Promise<string>;
   changedFiles(cwd: string): Promise<readonly string[]>;
+  changedFilesSince(cwd: string, ref: string): Promise<readonly string[]>;
   diffNames(cwd: string, from: string, to: string): Promise<readonly string[]>;
   isUnchanged(cwd: string, ref: string, paths: readonly string[]): Promise<boolean>;
   commitAll(cwd: string, message: string): Promise<string | null>;
@@ -57,12 +58,15 @@ export function createGit(commands: CommandRunner): Git {
     await run(cwd, ["commit", "-q", "-m", message]);
     return revParse(cwd, "HEAD");
   };
+  const changedFiles = async (cwd: string): Promise<readonly string[]> => parsePorcelain((await run(cwd, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])).stdout);
   return {
     run,
     tryRun,
     revParse,
-    async changedFiles(cwd) {
-      return parsePorcelain((await run(cwd, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])).stdout);
+    changedFiles,
+    async changedFilesSince(cwd, ref) {
+      const committedOrTracked = (await run(cwd, ["diff", "--name-only", "-z", ref])).stdout.split("\0").filter((path) => path.length > 0);
+      return [...new Set([...committedOrTracked, ...(await changedFiles(cwd))])].sort();
     },
     async diffNames(cwd, from, to) {
       return (await run(cwd, ["diff", "--name-only", from, to])).stdout.split("\n").filter((line) => line.length > 0);
