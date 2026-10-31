@@ -84,7 +84,7 @@ describe("event catalogue validation", () => {
 
   // @covers bus:BEH-005
   it.each(
-    EVENT_TYPES.flatMap((type) => Object.keys(EVENT_CATALOGUE[type]).map((field) => [type, field] as const)),
+    EVENT_TYPES.flatMap((type) => Object.entries(EVENT_CATALOGUE[type]).filter(([, spec]) => spec.optional !== true).map(([field]) => [type, field] as const)),
   )("rejects %s without %s naming the field", (type, field) => {
     const { [field]: _removed, ...payload } = VALID_PAYLOADS[type];
 
@@ -112,6 +112,33 @@ describe("event catalogue validation", () => {
     const event = eventOf("design.rework", { ...VALID_PAYLOADS["design.rework"], originTaskId: "task-1" });
 
     expect(codeOf(() => validateEvent(event))).toBe("envelope_invalid:payload.originTaskId");
+  });
+
+  // @covers bus:DLT-008
+  // @covers bus:CTR-004
+  it("accepts a design.rework carrying the lane finding's spec ids and finding path", () => {
+    const event = eventOf("design.rework", { target: "architect", reason: "design_repair", attempt: 1, originTaskId: "T-003", specIds: ["todo-cli:INV-004"], findingPath: "/run/handoffs/tasks/T-003/implementer-2/handoff.md" });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
+  // @covers bus:DLT-008
+  // @covers bus:CTR-004
+  it("accepts a design.rework whose finding path is null", () => {
+    const event = eventOf("design.rework", { target: "planner", reason: "task_overflow", attempt: 1, originTaskId: "T-003", specIds: [], findingPath: null });
+
+    expect(codeOf(() => validateEvent(event))).toBe("no error");
+  });
+
+  // @covers bus:DLT-008
+  // @covers bus:CTR-004
+  it.each([
+    ["findingPath", 7],
+    ["specIds", "todo-cli:INV-004"],
+  ])("rejects a design.rework whose %s has the wrong type", (field, value) => {
+    const event = eventOf("design.rework", { target: "architect", reason: "design_repair", attempt: 1, originTaskId: "T-003", [field]: value });
+
+    expect(codeOf(() => validateEvent(event))).toBe(`envelope_invalid:payload.${field}`);
   });
 
   // @covers bus:DLT-007

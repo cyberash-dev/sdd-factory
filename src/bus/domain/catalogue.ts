@@ -8,6 +8,7 @@ export interface FieldSpec {
   readonly literal?: string;
   readonly pattern?: RegExp;
   readonly min?: number;
+  readonly optional?: boolean;
 }
 
 const string = (extra: Omit<FieldSpec, "kind"> = {}): FieldSpec => ({ kind: "string", ...extra });
@@ -17,6 +18,7 @@ const strings = (): FieldSpec => ({ kind: "string[]" });
 const object = (): FieldSpec => ({ kind: "object" });
 const numberOrNull = (): FieldSpec => ({ kind: "number|null" });
 const stringOrNull = (extra: Omit<FieldSpec, "kind"> = {}): FieldSpec => ({ kind: "string|null", ...extra });
+const optional = (spec: FieldSpec): FieldSpec => ({ ...spec, optional: true });
 
 const SHA = /^[0-9a-f]{40}$/;
 const TASK_ID = /^T-[0-9]{3}$/;
@@ -83,7 +85,7 @@ export const EVENT_CATALOGUE = {
   "design.tech.ready": { path: string() },
   "design.verification.ready": { path: string() },
   "design.tasks.ready": { path: string(), taskCount: integer({ min: 1 }) },
-  "design.rework": { target: string({ values: ["planner", "architect"] }), reason: string(), attempt: integer({ min: 1 }), originTaskId: stringOrNull({ pattern: TASK_ID }) },
+  "design.rework": { target: string({ values: ["planner", "architect"] }), reason: string(), attempt: integer({ min: 1 }), originTaskId: stringOrNull({ pattern: TASK_ID }), specIds: optional(strings()), findingPath: optional(stringOrNull()) },
   "design.blocked": { reason: string() },
   "task.ready": { taskId: string({ pattern: TASK_ID }), worktree: string(), baseSha: string({ pattern: SHA }), covers: strings(), writes: strings() },
   "task.tests_written": { taskId: string({ pattern: TASK_ID }), ...costFields },
@@ -171,6 +173,9 @@ export function validatePayload(type: EventType, payload: EventPayload): void {
   const fields: Record<string, FieldSpec> = EVENT_CATALOGUE[type];
   for (const [field, spec] of Object.entries(fields)) {
     if (!Object.hasOwn(payload, field)) {
+      if (spec.optional === true) {
+        continue;
+      }
       throw new BusError("envelope_invalid", `payload.${field}`, "missing required field");
     }
     validateField(`payload.${field}`, spec, payload[field]);
