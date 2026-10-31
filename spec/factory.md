@@ -2959,6 +2959,49 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-016
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T07:43:12.214Z
+    change_request: "operator decision 2026-10-31: role models and effort in a profile are instance configuration"
+    scope: first-time-approval
+partition_id: factory
+title: the models and reasoning effort a profile assigns to roles are instance configuration
+target_ids:
+  - factory:DLT-010
+kind: replace
+compatibility_action: no_longer_guaranteed
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  factory:DLT-010 states which model and effort the shipped
+  factory.config.json assigns to each lane role and requires the shipped
+  file to parse to those values. Like caps and time budgets
+  (factory:DLT-015), these are choices of one factory instance: its
+  operator picks models and effort in factory.config.json, and two
+  instances may differ. Change: the bullet "the shipped
+  factory.config.json sets lanes ..." and the predicate clause "the
+  shipped factory.config.json parses to the values listed above" are no
+  longer normative, and the test pinning the shipped values is removed.
+  The mechanism of DLT-010 stays normative and keeps its tests:
+  models.lanes per role with the models.lane fallback, --effort per
+  lane role, the fixer's lane model, lane models outside the API key
+  preflight.
+tests_old_behavior:
+  - mergeConfig reads models.lanes per role and keeps models.lane as the fallback
+tests_new_behavior:
+  - to:factory:DLT-010
+test_obligation:
+  not_applicable: "removes a guarantee about one instance's configuration values (compatibility_action no_longer_guaranteed); no behaviour is added, and the remaining mechanism of factory:DLT-010 keeps its tests"
+---
+```
+
 ---
 
 ## 16. Implementation bindings
