@@ -1,0 +1,10 @@
+plan_id: 2026-10-31T230630Z-tc2ox
+created_at: 2026-10-31T23:06:30.226Z
+pending_attestations:
+  - id: build-stage:DLT-017
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T23:06:30.225Z
+    change_request: "operator decision 2026-11-01 00:10: a blocked test-writer goes to the planner instead of failing the run"
+    scope: first-time-approval
+    target_status: approved

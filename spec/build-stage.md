@@ -3161,6 +3161,63 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-017
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T23:06:30.225Z
+    change_request: "operator decision 2026-11-01 00:10: a blocked test-writer goes to the planner instead of failing the run"
+    scope: first-time-approval
+partition_id: build-stage
+title: a blocked test-writer handoff goes to the planner as a re-cut instead of failing the task
+target_ids:
+  - build-stage:BEH-002
+  - build-stage:BEH-009
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  A test-writer handoff with status blocked fails the task, and the run
+  ends. In run box-office-20261031-215346 the review of T-001 asked for
+  HTTP-level tests of records whose observable boundary (the server and
+  route table) belongs to another task; the test-writer reported exactly
+  that, named the task that should carry the obligations, and the run
+  ended at 23:30. Such a block is a task-cut problem, the case BEH-009
+  routes to the planner for the implementer's TASK-OVERFLOW. Change: a
+  blocked test-writer handoff becomes task.rework{target: planner,
+  reason: test_writer_blocked} with the handoff as findingPath, through
+  the same planner route and cap as BEH-009 (caps.plannerRecuts); the
+  planner's first message carries the blocked reason. At the planner cap
+  the task fails with cap_exhausted planner as before.
+tests_old_behavior:
+  - with the planner re-cuts at their cap a blocked test-writer handoff fails the task
+tests_new_behavior:
+  - to:build-stage:BEH-002
+  - to:build-stage:BEH-009
+test_obligation:
+  predicate: |
+    Given a task whose test-writer handoff has status blocked with reason
+    R, the foreman emits task.rework{target: planner, reason:
+    test_writer_blocked, findingPath: <that handoff>} and no task.failed;
+    the planner invocation that follows carries R; with plannerRecuts at
+    caps.plannerRecuts the same handoff emits task.failed cap_exhausted
+    planner.
+  test_template: integration
+  boundary_classes:
+    - blocked handoff under the planner cap
+    - blocked handoff at the planner cap
+  failure_scenarios:
+    - a blocked test-writer ends the run
+    - the planner re-cuts without the blocked reason
+---
+```
+
 ---
 
 ## 16. Implementation bindings
