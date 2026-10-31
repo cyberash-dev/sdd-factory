@@ -1578,6 +1578,71 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-013
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T13:16:26.372Z
+    change_request: "operator direction 2026-10-31: runs must not proceed on a half-approved spec"
+    scope: first-time-approval
+partition_id: spec-stage
+title: the pre-authorised approval names every proposed record and checks that none is left
+target_ids:
+  - spec-stage:BEH-004
+  - spec-stage:DLT-010
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The approval queued one attestation for the pattern "<slug>:*" and ran
+  `sdd finalize`. agent-sdd 2.1.1 applies an attestation to the first spec
+  file in which it matches a record and stops there; the files are taken
+  in path order, so spec/assumptions.md comes before spec/spec.md. In run
+  room-booking-api-20261031-124420 the critic's final round had written
+  ASM-015 to spec/assumptions.md, the pattern flipped that one record and
+  BL-001, and the 76 proposed records of spec/spec.md stayed proposed while
+  the stage reported spec.approved; the design stage then saw almost no
+  approved record. The approval probe of DLT-010 did not notice because it
+  ignored unapproved violations. Change: (1) the approval lists the
+  records with `sdd record list --format=json` and queues one attestation
+  per proposed record id (BL-001 included) in a single plan, then runs
+  `sdd finalize` once; (2) after finalize, any record outside the
+  partition's sandbox_paths still proposed is a gate failure
+  (spec-stage:DLT-011) naming those ids, and spec.approved is not
+  published; (3) the probe of DLT-010 no longer ignores unapproved
+  violations; it still ignores uncovered, orphan_covers, aggregated_check
+  and debt_budget_increased.
+tests_old_behavior:
+  - a spec whose records are all approved by the plan still publishes spec.approved
+tests_new_behavior:
+  - to:spec-stage:BEH-004
+  - to:spec-stage:DLT-010
+test_obligation:
+  predicate: |
+    Given proposed records in spec/spec.md and one proposed ASSUMPTION in
+    spec/assumptions.md, the approval queues one attestation per proposed
+    id and, with a finalize that flips them all, publishes spec.approved
+    with that count; given a finalize after which a spec/spec.md record is
+    still proposed, the gate fails naming that id and spec.approved is not
+    published; a probe whose ready reports unapproved returns it as a
+    finding.
+  test_template: integration
+  boundary_classes:
+    - records in both spec files
+    - a record left proposed after finalize
+    - probe reporting unapproved
+  failure_scenarios:
+    - spec.approved published with records still proposed
+    - a pattern attestation that skips a spec file
+---
+```
+
 ---
 
 ## 16. Implementation bindings
