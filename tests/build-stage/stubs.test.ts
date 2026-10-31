@@ -59,7 +59,7 @@ describe("stub generation from the tech.md module table", () => {
   });
 
   it("renders an empty module for a module without exports", () => {
-    expect(stubSource(aModule({ exports: [] }))).toBe("export {};\n");
+    expect(stubSource(aModule({ exports: [] }), [])).toBe("export {};\n");
   });
 
   // @covers build-stage:DLT-003
@@ -69,7 +69,7 @@ describe("stub generation from the tech.md module table", () => {
       exports: [{ name: "run", kind: "function", signature: "run(argv: string[]): Result<string>" }],
     });
 
-    expect(stubSource(module)).toBe('import type { Result } from "../errors/index.js";\n\nexport function run(argv: string[]): Result<string> {\n  throw new Error("not implemented: run");\n}\n');
+    expect(stubSource(module, [])).toBe('import type { Result } from "../errors/index.js";\n\nexport function run(argv: string[]): Result<string> {\n  throw new Error("not implemented: run");\n}\n');
   });
 
   // @covers build-stage:DLT-003
@@ -82,26 +82,26 @@ describe("stub generation from the tech.md module table", () => {
       ],
     });
 
-    expect(stubSource(module)).toBe('import { parse } from "../parser/index.js";\nimport type {\n  Token,\n  Span,\n} from "../lexer/index.js";\n\nexport function first(source: string): Token {\n  throw new Error("not implemented: first");\n}\n\nexport function where(token: Token): Span {\n  throw new Error("not implemented: where");\n}\n');
+    expect(stubSource(module, [])).toBe('import { parse } from "../parser/index.js";\nimport type {\n  Token,\n  Span,\n} from "../lexer/index.js";\n\nexport function first(source: string): Token {\n  throw new Error("not implemented: first");\n}\n\nexport function where(token: Token): Span {\n  throw new Error("not implemented: where");\n}\n');
   });
 
   // @covers build-stage:DLT-003
   it("renders an interface without imports with no import lines", () => {
-    expect(stubSource(aModule())).toBe('export function greet(name: string): string {\n  throw new Error("not implemented: greet");\n}\n');
+    expect(stubSource(aModule(), [])).toBe('export function greet(name: string): string {\n  throw new Error("not implemented: greet");\n}\n');
   });
 
   // @covers build-stage:BEH-001
   it("reproduces a multi-line interface of the interface block verbatim with its body and closing brace", () => {
     const module = aModuleWithInterface("src/store/index.ts", "export interface TodoTask {\n  readonly id: number;\n  readonly text: string;\n}\nexport function readTodo(path: string): TodoTask;");
 
-    expect(stubSource(module)).toBe('export interface TodoTask {\n  readonly id: number;\n  readonly text: string;\n}\n\nexport function readTodo(path: string): TodoTask {\n  throw new Error("not implemented: readTodo");\n}\n');
+    expect(stubSource(module, [])).toBe('export interface TodoTask {\n  readonly id: number;\n  readonly text: string;\n}\n\nexport function readTodo(path: string): TodoTask {\n  throw new Error("not implemented: readTodo");\n}\n');
   });
 
   // @covers build-stage:BEH-001
   it("reproduces a multi-line union type alias verbatim with its trailing semicolon", () => {
     const module = aModuleWithInterface("src/cli/index.ts", 'export type Command =\n  | {\n      readonly kind: "add";\n      readonly text: string;\n    }\n  | { readonly kind: "help" };\nexport const VERSION: string;');
 
-    expect(stubSource(module).split("\nexport const")[0]).toBe('export type Command =\n  | {\n      readonly kind: "add";\n      readonly text: string;\n    }\n  | { readonly kind: "help" };\n');
+    expect(stubSource(module, []).split("\nexport const")[0]).toBe('export type Command =\n  | {\n      readonly kind: "add";\n      readonly text: string;\n    }\n  | { readonly kind: "help" };\n');
   });
 
   // @covers build-stage:DLT-003
@@ -118,7 +118,7 @@ describe("stub generation from the tech.md module table", () => {
       aModuleWithInterface("src/cli.ts", "export function main(argv: readonly string[]): Promise<number>;"),
     ];
 
-    const errors = typecheckErrors(new Map(modules.map((module) => [module.entry, stubSource(module)])));
+    const errors = typecheckErrors(new Map(modules.map((module) => [module.entry, stubSource(module, modules)])));
 
     expect(errors).toBe("");
   }, 60_000);
@@ -128,6 +128,108 @@ describe("stub generation from the tech.md module table", () => {
 
     expect(modulesOfTask(modules, aTaskSpec({ designRefs: ["M-02"] })).map((module) => module.id)).toEqual(["M-01", "M-02", "M-03"]);
   });
+});
+
+describe("relative imports of a stub re-anchored to the module entries of tech.md", () => {
+  // @covers build-stage:DLT-009
+  it.each([
+    ["an import one level short", "src/routes/links/index.ts", 'import type { HttpRequest } from "../errors/index.js";', 'import type { HttpRequest } from "../../errors/index.js";'],
+    ["an import one level short that resolves to the importing module itself", "src/routes/links/index.ts", 'import type { LinkStore } from "../links/index.js";', 'import type { LinkStore } from "../../links/index.js";'],
+    ["an import of the root module one level too high", "src/index.ts", 'import type { HttpRequest } from "../errors/index.js";', 'import type { HttpRequest } from "./errors/index.js";'],
+  ] as const)("rewrites %s to the listed entry with the same tail", (_label, entry, importLine, expected) => {
+    const module = aModuleWithInterface(entry, `${importLine}\nexport function handle(): string;`);
+
+    const stub = stubSource(module, ["src/errors/index.ts", "src/links/index.ts", "src/routes/links/index.ts", "src/index.ts"].map((listedEntry) => aModule({ entry: listedEntry })));
+
+    expect(stub.split("\n\n")[0]).toBe(expected);
+  });
+
+  // @covers build-stage:DLT-009
+  it.each([
+    ["an import already correct from the root module", "src/index.ts", 'import type { HttpRequest } from "./errors/index.js";', ["src/errors/index.ts", "src/index.ts"]],
+    ["an import already correct from a nested module", "src/cli/index.ts", 'import type { Result } from "../errors/index.js";', ["src/errors/index.ts", "src/cli/index.ts"]],
+    ["an import whose tail matches two module entries", "src/routes/links/index.ts", 'import type { HttpRequest } from "../errors/index.js";', ["src/errors/index.ts", "src/http/errors/index.ts", "src/routes/links/index.ts"]],
+    ["an import whose tail matches no module entry", "src/routes/links/index.ts", 'import type { Clock } from "../clock/index.js";', ["src/errors/index.ts", "src/routes/links/index.ts"]],
+    ["a package import whose tail matches a module entry", "src/routes/links/index.ts", 'import type { HttpError } from "errors/index.js";', ["src/errors/index.ts", "src/routes/links/index.ts"]],
+  ] as const)("keeps %s as written", (_label, entry, importLine, listedEntries) => {
+    const module = aModuleWithInterface(entry, `${importLine}\nexport function handle(): string;`);
+
+    const stub = stubSource(module, listedEntries.map((listedEntry) => aModule({ entry: listedEntry })));
+
+    expect(stub.split("\n\n")[0]).toBe(importLine);
+  });
+
+  // @covers build-stage:DLT-009
+  it("rewrites only the specifier of a multi-line import statement", () => {
+    const module = aModuleWithInterface("src/routes/redirect/index.ts", 'import type {\n  HttpRequest,\n  HttpResponse,\n} from "../errors/index.js";\nexport function handle(): string;');
+
+    const stub = stubSource(module, ["src/errors/index.ts", "src/routes/redirect/index.ts"].map((listedEntry) => aModule({ entry: listedEntry })));
+
+    expect(stub.split("\n\n")[0]).toBe('import type {\n  HttpRequest,\n  HttpResponse,\n} from "../../errors/index.js";');
+  });
+
+  // @covers build-stage:DLT-010
+  it.each([
+    ["an import that resolves to a module outside depends_on", "M-04", "src/routes/redirect/index.ts"],
+    ["an import that resolves to the importing module itself", "M-03", "src/routes/links/index.ts"],
+  ] as const)("rewrites %s to the dependency entry with the same tail", (_label, id, entry) => {
+    const module = { ...aModuleWithInterface(entry, 'import type { LinkStore } from "../links/index.js";\nexport function handle(): string;'), id, dependsOn: ["M-02"] };
+    const modules = [aModule({ id: "M-02", entry: "src/links/index.ts" }), aModule({ id: "M-03", entry: "src/routes/links/index.ts" }), aModule({ id: "M-04", entry: "src/routes/redirect/index.ts" })];
+
+    const stub = stubSource(module, modules);
+
+    expect(stub.split("\n\n")[0]).toBe('import type { LinkStore } from "../../links/index.js";');
+  });
+
+  // @covers build-stage:DLT-010
+  it("keeps an import that resolves to the entry of a dependency as written", () => {
+    const module = { ...aModuleWithInterface("src/routes/redirect/index.ts", 'import type { LinkStore } from "../../links/index.js";\nexport function handle(): string;'), id: "M-04", dependsOn: ["M-02"] };
+    const modules = [aModule({ id: "M-02", entry: "src/links/index.ts" }), aModule({ id: "M-03", entry: "src/routes/links/index.ts" }), aModule({ id: "M-04", entry: "src/routes/redirect/index.ts" })];
+
+    const stub = stubSource(module, modules);
+
+    expect(stub.split("\n\n")[0]).toBe('import type { LinkStore } from "../../links/index.js";');
+  });
+
+  // @covers build-stage:DLT-010
+  it("keeps an import that resolves to another listed module as written when depends_on is empty", () => {
+    const module = { ...aModuleWithInterface("src/routes/redirect/index.ts", 'import type { LinksRouteDeps } from "../links/index.js";\nexport function handle(): string;'), id: "M-04", dependsOn: [] };
+    const modules = [aModule({ id: "M-03", entry: "src/routes/links/index.ts" }), aModule({ id: "M-04", entry: "src/routes/redirect/index.ts" })];
+
+    const stub = stubSource(module, modules);
+
+    expect(stub.split("\n\n")[0]).toBe('import type { LinksRouteDeps } from "../links/index.js";');
+  });
+
+  // @covers build-stage:BEH-001
+  // @covers build-stage:DLT-009
+  // @covers build-stage:DLT-010
+  it("writes stubs for nested route modules imported one level short that typecheck against their dependency stubs", () => {
+    const modules = [
+      { ...aModuleWithInterface("src/errors/index.ts", "export interface HttpRequest {\n  readonly method: string;\n  readonly path: string;\n}\nexport interface HttpResponse {\n  readonly status: number;\n  readonly body: string;\n}"), id: "M-01" },
+      { ...aModuleWithInterface("src/links/index.ts", "export interface LinkStore {\n  readonly size: number;\n}\nexport function createLinkStore(): LinkStore;"), id: "M-02" },
+      {
+        ...aModuleWithInterface(
+          "src/routes/links/index.ts",
+          'import type { HttpRequest, HttpResponse } from "../errors/index.js";\nimport type { LinkStore } from "../links/index.js";\n\nexport interface LinksRouteDeps {\n  readonly store: LinkStore;\n  readonly port: number;\n}\n\nexport function routeLinks(request: HttpRequest, deps: LinksRouteDeps): HttpResponse | undefined;',
+        ),
+        id: "M-03",
+        dependsOn: ["M-01", "M-02"],
+      },
+      {
+        ...aModuleWithInterface(
+          "src/routes/redirect/index.ts",
+          'import type { HttpRequest, HttpResponse } from "../errors/index.js";\nimport type { LinkStore } from "../links/index.js";\n\nexport interface RedirectRouteDeps {\n  readonly store: LinkStore;\n}\n\nexport function routeRedirect(request: HttpRequest, deps: RedirectRouteDeps): HttpResponse | undefined;',
+        ),
+        id: "M-04",
+        dependsOn: ["M-01", "M-02"],
+      },
+    ];
+
+    const errors = typecheckErrors(new Map(modules.map((module) => [module.entry, stubSource(module, modules)])));
+
+    expect(errors).toBe("");
+  }, 60_000);
 });
 
 const ERRORS_INTERFACE = `export const USAGE_LINE: string;

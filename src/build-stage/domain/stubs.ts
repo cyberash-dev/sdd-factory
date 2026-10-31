@@ -1,3 +1,4 @@
+import { dirname, join, relative } from "node:path/posix";
 import type { TechExport, TechModule } from "../../shared/design-files/tech-md.js";
 
 function notImplemented(name: string): string {
@@ -112,11 +113,43 @@ function importStatements(interfaceSource: string): readonly string[] {
   return statements;
 }
 
-export function stubSource(module: TechModule): string {
+const RELATIVE_SPECIFIER = /^\.\.?\//;
+const STATEMENT_SPECIFIER = /(["'])([^"']+)\1(\s*;?)$/;
+
+function asSourceEntry(path: string): string {
+  return path.replace(/\.js$/, ".ts");
+}
+
+/* The module's own entry is never an import target: `../links/index.js` from src/routes/links/index.ts names src/links/index.ts. */
+function importTargets(module: TechModule, modules: readonly TechModule[]): readonly string[] {
+  const others = modules.filter((listed) => listed.entry !== module.entry);
+  const dependencies = module.dependsOn.length === 0 ? others : others.filter((listed) => module.dependsOn.includes(listed.id));
+  return dependencies.map((listed) => listed.entry);
+}
+
+function anchoredSpecifier(specifier: string, entry: string, targets: readonly string[]): string {
+  if (!RELATIVE_SPECIFIER.test(specifier) || targets.includes(asSourceEntry(join(dirname(entry), specifier)))) {
+    return specifier;
+  }
+  const tail = asSourceEntry(specifier.replace(/^(?:\.\.?\/)+/, ""));
+  const [target, ...others] = targets.filter((listed) => listed === tail || listed.endsWith(`/${tail}`));
+  if (target === undefined || others.length > 0) {
+    return specifier;
+  }
+  const path = relative(dirname(entry), target).replace(/\.ts$/, ".js");
+  return path.startsWith("../") ? path : `./${path}`;
+}
+
+function anchoredImport(statement: string, entry: string, targets: readonly string[]): string {
+  return statement.replace(STATEMENT_SPECIFIER, (_match, quote: string, specifier: string, end: string) => `${quote}${anchoredSpecifier(specifier, entry, targets)}${quote}${end}`);
+}
+
+export function stubSource(module: TechModule, modules: readonly TechModule[]): string {
   if (module.exports.length === 0) {
     return "export {};\n";
   }
-  const imports = importStatements(module.interfaceSource);
+  const targets = importTargets(module, modules);
+  const imports = importStatements(module.interfaceSource).map((statement) => anchoredImport(statement, module.entry, targets));
   const header = imports.length === 0 ? "" : `${imports.join("\n")}\n\n`;
   return `${header}${module.exports.map(stubForExport).join("\n\n")}\n`;
 }

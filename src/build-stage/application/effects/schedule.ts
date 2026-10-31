@@ -38,7 +38,7 @@ async function writeStubs(design: DesignBundle, worktree: string, taskId: string
     const absolute = join(worktree, module.entry);
     if (await needsStub(absolute)) {
       await mkdir(dirname(absolute), { recursive: true });
-      await writeFile(absolute, stubSource(module), "utf8");
+      await writeFile(absolute, stubSource(module, design.tech.modules), "utf8");
     }
   }
 }
