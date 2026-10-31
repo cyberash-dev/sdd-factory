@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from "../../src/shared/config.js";
 import { ApiRoleTimeoutError } from "../../src/shared/llm/api-role-runner.js";
 import { runDraft } from "../../src/spec-stage/application/draft.js";
 import { createStageClock } from "../../src/spec-stage/application/stage-clock.js";
-import { analystHandoff, CLI_SPEC, effectContext, exitZero, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type StageWorkspace } from "./harness.js";
+import { analystHandoff, CLI_SPEC, effectContext, exitZero, runStateAt, scriptedCommands, scriptedRoles, sddReplies, sliceContext, stageWorkspace, writeText, type RoleScript, type StageWorkspace } from "./harness.js";
 
 const handoffPath = (ws: StageWorkspace): string => join(ws.handoffsDir, "spec-analyst", "handoff.md");
 
@@ -16,6 +16,16 @@ function toolNamed(tools: readonly Tool[], name: string): Tool {
     throw new Error(`missing tool ${name}`);
   }
   return tool;
+}
+
+function analystLinting(ws: StageWorkspace, lintCalls: number, replies: unknown[]): RoleScript {
+  return async (request) => {
+    const sdd = toolNamed(request.tools, "run_sdd");
+    for (let call = 0; call < lintCalls; call += 1) {
+      replies.push(await sdd.invoke({ argv: "lint --format=json" }));
+    }
+    await writeText(handoffPath(ws), analystHandoff(1));
+  };
 }
 
 describe("spec.draft effect", () => {
@@ -65,14 +75,29 @@ describe("spec.draft effect", () => {
 
   // @covers spec-stage:BEH-001
   // @covers spec-stage:CST-001
-  it("maps a blocked handoff with blocked_reason lint_cap to spec.blocked{lint_cap}", async () => {
+  // @covers spec-stage:DLT-012
+  it("maps a blocked handoff with blocked_reason lint_cap to spec.blocked{lint_cap} when the foreman's lint still fails", async () => {
     const ws = await stageWorkspace(CLI_SPEC);
     const roles = scriptedRoles([() => writeText(handoffPath(ws), analystHandoff(1, { status: "blocked", lint_exit: 1, blocked_reason: "lint_cap sdd:weasel-word" }))]);
+    const commands = scriptedCommands(sddReplies({ lint: { exitCode: 1, stdout: '{"diagnostics":[{"rule":"sdd:weasel-word"}]}', stderr: "" } }));
+    const { context, published } = effectContext(runStateAt("spec_drafting"));
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands, clock: createStageClock() });
+
+    expect(published).toEqual([{ type: "spec.blocked", producer: "spec-analyst", payload: { reason: "lint_cap", detail: "lint_cap sdd:weasel-word" } }]);
+  });
+
+  // @covers spec-stage:DLT-012
+  it("publishes spec.drafted with the handoff's record counts instead of spec.blocked when a lint_cap handoff leaves a spec the foreman's lint passes", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const roles = scriptedRoles([() => writeText(handoffPath(ws), analystHandoff(1, { status: "blocked", lint_exit: 0, blocked_reason: "lint_cap none" }))]);
     const { context, published } = effectContext(runStateAt("spec_drafting"));
 
     await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands: scriptedCommands(sddReplies({})), clock: createStageClock() });
 
-    expect(published).toEqual([{ type: "spec.blocked", producer: "spec-analyst", payload: { reason: "lint_cap", detail: "lint_cap sdd:weasel-word" } }]);
+    expect(published).toEqual([
+      { type: "spec.drafted", producer: "spec-analyst", payload: { attempt: 1, lintExit: 0, recordCounts: { behaviors: 2, contracts: 1, invariants: 0, scenarios: 0, constraints: 1, policies: 2, open_questions: 1, assumptions: 1 } } },
+    ]);
   });
 
   // @covers spec-stage:BEH-001
@@ -106,10 +131,36 @@ describe("spec.draft effect", () => {
     await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands, clock: createStageClock() });
 
     expect([commands.calls.length, replies[4], replies[5]]).toEqual([
-      5,
+      6,
       'exit 1\n{"ok":false}',
       'ERROR: lint cap of 5 runs reached; write the handoff with status blocked and blocked_reason "lint_cap <rule ids>"',
     ]);
+  });
+
+  // @covers spec-stage:DLT-012
+  it("tells the analyst to write status complete when the run_sdd tool refuses a lint run after a last run that exited 0", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const commands = scriptedCommands((argv, call) => (call < 5 ? { exitCode: 1, stdout: '{"ok":false}', stderr: "" } : exitZero()));
+    const replies: unknown[] = [];
+    const roles = scriptedRoles([analystLinting(ws, 6, replies)]);
+    const { context } = effectContext(runStateAt("spec_drafting"));
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands, clock: createStageClock() });
+
+    expect(replies[5]).toBe("ERROR: lint cap of 5 runs reached; the last lint run exited 0, so write the handoff with status complete and lint_exit 0");
+  });
+
+  // @covers spec-stage:DLT-012
+  it("tells the analyst to block with lint_cap when the run_sdd tool refuses a lint run after a last run that failed", async () => {
+    const ws = await stageWorkspace(CLI_SPEC);
+    const commands = scriptedCommands((argv, call) => (call < 5 ? exitZero() : { exitCode: 1, stdout: '{"ok":false}', stderr: "" }));
+    const replies: unknown[] = [];
+    const roles = scriptedRoles([analystLinting(ws, 6, replies)]);
+    const { context } = effectContext(runStateAt("spec_drafting"));
+
+    await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles), { commands, clock: createStageClock() });
+
+    expect(replies[5]).toBe('ERROR: lint cap of 5 runs reached; write the handoff with status blocked and blocked_reason "lint_cap <rule ids>"');
   });
 
   // @covers spec-stage:BEH-001

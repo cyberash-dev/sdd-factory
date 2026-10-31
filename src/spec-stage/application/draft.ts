@@ -38,7 +38,13 @@ const RECORD_TYPE_BY_COUNT_KEY: Readonly<Record<(typeof RECORD_COUNT_KEYS)[numbe
 
 type RecordCounts = Readonly<Record<string, number>>;
 
-type DraftResult = { readonly kind: "complete"; readonly recordCounts: RecordCounts } | { readonly kind: "blocked"; readonly blockedReason: string };
+interface BlockedDraft {
+  readonly kind: "blocked";
+  readonly blockedReason: string;
+  readonly recordCounts: RecordCounts | null;
+}
+
+type DraftResult = { readonly kind: "complete"; readonly recordCounts: RecordCounts } | BlockedDraft;
 
 function recordCountsOf(raw: unknown): RecordCounts | string {
   if (!isRecord(raw)) {
@@ -59,7 +65,11 @@ async function verifyAnalystHandoff(handoff: ParsedHandoff): Promise<HandoffVerd
   const frontmatter = handoff.frontmatter;
   if (frontmatter["status"] === "blocked") {
     const blockedReason = frontmatter["blocked_reason"];
-    return typeof blockedReason === "string" ? { kind: "ok", value: { kind: "blocked", blockedReason } } : { kind: "retry", error: "blocked_reason must be text" };
+    if (typeof blockedReason !== "string") {
+      return { kind: "retry", error: "blocked_reason must be text" };
+    }
+    const recordCounts = recordCountsOf(frontmatter["records"]);
+    return { kind: "ok", value: { kind: "blocked", blockedReason, recordCounts: typeof recordCounts === "string" ? null : recordCounts } };
   }
   const lintExit = frontmatter["lint_exit"];
   if (typeof lintExit !== "number" || !Number.isInteger(lintExit)) {
@@ -81,17 +91,20 @@ function specDrafted(attempt: number, recordCounts: RecordCounts): PendingEvent 
   return { type: "spec.drafted", producer: "spec-analyst", payload: { attempt, lintExit: 0, recordCounts } };
 }
 
-/* spec-stage:DLT-006: a lint_cap handoff over a yaml_invalid fence the simple-fixer repairs continues as a draft. */
-async function concludeBlockedHandoff(context: EffectContext, slice: SliceContext, deps: StageDeps, attempt: number, blockedReason: string): Promise<void> {
-  const isLintCap = blockedReason.startsWith("lint_cap");
-  if (isLintCap && (await hasYamlInvalidRecords(slice.paths.productDir))) {
+/* spec-stage:DLT-006, spec-stage:DLT-012: a lint_cap handoff over a spec the foreman's lint passes, as written or after the simple-fixer repairs a yaml_invalid fence, continues as a draft. */
+async function concludeBlockedHandoff(context: EffectContext, slice: SliceContext, deps: StageDeps, attempt: number, blocked: BlockedDraft): Promise<void> {
+  const isLintCap = blocked.blockedReason.startsWith("lint_cap");
+  if (isLintCap) {
+    const productDir = slice.paths.productDir;
+    const hadYamlInvalidRecords = await hasYamlInvalidRecords(productDir);
     const lint = await lintProductSpecWithFix(slice, deps, context);
     if (lint.exitCode === 0) {
-      context.publish(specDrafted(attempt, await specRecordCounts(slice.paths.productDir)));
+      slice.log(`spec-analyst attempt ${attempt}: lint cap reached on a clean spec, draft accepted`);
+      context.publish(specDrafted(attempt, hadYamlInvalidRecords || blocked.recordCounts === null ? await specRecordCounts(productDir) : blocked.recordCounts));
       return;
     }
   }
-  concludeStage(deps, context, specBlocked("spec-analyst", isLintCap ? "lint_cap" : "analyst_blocked", blockedReason));
+  concludeStage(deps, context, specBlocked("spec-analyst", isLintCap ? "lint_cap" : "analyst_blocked", blocked.blockedReason));
 }
 
 function assertSourceInsideRepo(slice: SliceContext): void {
@@ -154,7 +167,7 @@ export async function runDraft(effect: Effect, context: EffectContext, slice: Sl
     return;
   }
   if (outcome.value.kind === "blocked") {
-    await concludeBlockedHandoff(context, slice, deps, attempt, outcome.value.blockedReason);
+    await concludeBlockedHandoff(context, slice, deps, attempt, outcome.value);
     return;
   }
   const lint = await lintProductSpecWithFix(slice, deps, context);

@@ -34,8 +34,17 @@ function scopedTool(inner: Tool, scope: PathScope, verb: string): Tool {
 
 const SDD_ALLOWED = [/^lint --format=json$/, /^record list( --partition \S+)?( --format=json)?$/, /^record get \S+( --format=json)?$/, /^record set \S+ --from-file \S+$/, /^record add --after \S+ --from-file \S+$/];
 
+/* spec-stage:DLT-012: past the cap the analyst is pointed at the outcome of its last lint run, so a clean spec is handed off as complete. */
+function lintCapRefusal(lintCap: number, lastLintExit: number | null): string {
+  if (lastLintExit === 0) {
+    return `ERROR: lint cap of ${lintCap} runs reached; the last lint run exited 0, so write the handoff with status complete and lint_exit 0`;
+  }
+  return `ERROR: lint cap of ${lintCap} runs reached; write the handoff with status blocked and blocked_reason "lint_cap <rule ids>"`;
+}
+
 export function sddTool(commands: CommandRunner, productDir: string, lintCap: number, trace: ToolTrace): { readonly tool: Tool; readonly lintRuns: () => number } {
   let lintRuns = 0;
+  let lastLintExit: number | null = null;
   const tool: Tool = {
     type: "function",
     name: "run_sdd",
@@ -50,12 +59,15 @@ export function sddTool(commands: CommandRunner, productDir: string, lintCap: nu
       const parts = argv.split(/\s+/);
       if (parts[0] === "lint") {
         if (lintRuns >= lintCap) {
-          return `ERROR: lint cap of ${lintCap} runs reached; write the handoff with status blocked and blocked_reason "lint_cap <rule ids>"`;
+          return lintCapRefusal(lintCap, lastLintExit);
         }
         lintRuns += 1;
       }
       trace({ tool: "run_sdd", path: null, argv: parts });
       const result = parts[0] === "lint" ? await lintProductSpec(commands, productDir) : await commands.run(parts, productDir);
+      if (parts[0] === "lint") {
+        lastLintExit = result.exitCode;
+      }
       return `exit ${result.exitCode}\n${result.stdout}${result.stderr}`;
     },
   };

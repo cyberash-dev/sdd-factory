@@ -142,7 +142,7 @@ describe("caps.lintCycles read from the configuration", () => {
 
     await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles, configWithCaps({ lintCycles: 6 })), { commands, clock: createStageClock() });
 
-    expect([commands.calls.length, replies[5]]).toEqual([6, 'exit 1\n{"ok":false}']);
+    expect([commands.calls.length, replies[5]]).toEqual([7, 'exit 1\n{"ok":false}']);
   });
 
   // @covers factory:DLT-015
@@ -155,7 +155,7 @@ describe("caps.lintCycles read from the configuration", () => {
 
     await runDraft({ kind: "spec.draft", attempt: 1, reworkFinding: null }, context, sliceContext(ws, roles, configWithCaps({ lintCycles: 6 })), { commands, clock: createStageClock() });
 
-    expect([commands.calls.length, replies[6]]).toEqual([6, 'ERROR: lint cap of 6 runs reached; write the handoff with status blocked and blocked_reason "lint_cap <rule ids>"']);
+    expect([commands.calls.length, replies[6]]).toEqual([7, 'ERROR: lint cap of 6 runs reached; write the handoff with status blocked and blocked_reason "lint_cap <rule ids>"']);
   });
 });
 
