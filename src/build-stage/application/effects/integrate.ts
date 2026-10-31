@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { cp, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { EffectContext } from "../../../bus/ports/outbound/effect-runner.js";
@@ -10,9 +11,13 @@ import { requireSha, taskStateOf } from "../lane-inputs.js";
 export const INTEGRATION_BRANCH = "integration";
 const WRITE_SET_CONFLICT = "write_set_conflict";
 
-/* The report lands on integration after the merge so the task branch head stays the verified implSha. */
+/* The report lands on integration after the merge so the task branch head stays the verified implSha.
+   build-stage:DLT-004: an advisory_only approval from the foreman has no report to publish. */
 async function publishReview(slice: SliceContext, deps: LaneDeps, worktree: string, taskId: string): Promise<void> {
   const report = reviewReportPath(taskId);
+  if (!existsSync(join(worktree, report))) {
+    return;
+  }
   const target = join(slice.paths.productDir, report);
   await mkdir(dirname(target), { recursive: true });
   await cp(join(worktree, report), target, { force: true });
