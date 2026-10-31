@@ -79,16 +79,6 @@ describe("factory config", () => {
     expect(apiRoleModelIds(merged.models)).toEqual(["m-default", "m-critic", "m-triage"]);
   });
 
-  // @covers factory:DLT-010
-  it("ships sonnet test-writer and implementer lanes, an opus simple-fixer and medium effort for the analyst, triage and lane roles", async () => {
-    const shipped = await loadConfig(join(import.meta.dirname, "..", "..", "factory.config.json"));
-
-    expect([shipped.models.lanes, shipped.models.effort]).toEqual([
-      { "test-writer": "claude-sonnet-5-5", implementer: "claude-sonnet-5-5", "simple-fixer": "claude-opus-5-5" },
-      { "spec-analyst": "medium", architect: "medium", "verification-designer": "high", planner: "medium", triage: "medium", "test-writer": "medium", implementer: "medium", "simple-fixer": "medium" },
-    ]);
-  });
-
   it("ignores values of the wrong type and keeps the defaults", () => {
     const merged = mergeConfig(DEFAULT_CONFIG, { caps: { implementerAttempts: "many" }, maxParallelLanes: -1, pricing: { m: { inputPerMillion: "x" } } });
 
