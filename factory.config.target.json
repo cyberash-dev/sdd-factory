@@ -3,7 +3,7 @@
     "lintCycles": 8,
     "criticRounds": 4,
     "implementerAttempts": 3,
-    "testWriterRework": 1,
+    "testWriterRework": 2,
     "plannerRecuts": 2,
     "architectRepairs": 2,
     "criticAssumptionsPerId": 1,
