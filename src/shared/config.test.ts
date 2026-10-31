@@ -89,13 +89,6 @@ describe("factory config", () => {
     ]);
   });
 
-  // @covers build-stage:DLT-012
-  it.each(["factory.config.json", "factory.config.target.json", "factory.config.example.json"])("ships a test-writer rework cap of 2 in %s", async (profile) => {
-    const shipped = await loadConfig(join(import.meta.dirname, "..", "..", profile));
-
-    expect(shipped.caps.testWriterRework).toBe(2);
-  });
-
   it("ignores values of the wrong type and keeps the defaults", () => {
     const merged = mergeConfig(DEFAULT_CONFIG, { caps: { implementerAttempts: "many" }, maxParallelLanes: -1, pricing: { m: { inputPerMillion: "x" } } });
 

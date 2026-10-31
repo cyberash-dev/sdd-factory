@@ -22,6 +22,7 @@ function rejected(testWriterAttempts: number): ReturnType<typeof applied> {
 describe("test-writer rework cap of two", () => {
   // @covers build-stage:DLT-012
   // @covers build-stage:CST-002
+  // @covers factory:DLT-015
   it("restarts the lane at attempt 3 when tests re-authored once are rejected", () => {
     const result = rejected(2);
 
@@ -30,6 +31,7 @@ describe("test-writer rework cap of two", () => {
 
   // @covers build-stage:DLT-012
   // @covers build-stage:CST-002
+  // @covers factory:DLT-015
   it("fails the task with detail test-writer when tests re-authored twice are rejected", () => {
     const result = rejected(3);
 
