@@ -1,39 +1,32 @@
-# Run room-booking-api-20261031-101230
+# Run room-booking-api-20261031-141800
 
 - slug: room-booking-api
 - operator: cyberash
 - mode: autonomous
-- startedAt: 2026-10-31T10:12:30.222Z
-- finishedAt: 2026-10-31T11:11:08.337Z
+- startedAt: 2026-10-31T14:18:00.303Z
+- finishedAt: 2026-10-31T14:23:46.290Z
 - outcome: published
-- cloud: https://app.jigjoy.ai/?s=loop_49d8590c59b843a7b31fde91877cbfff
+- cloud: https://app.jigjoy.ai/?s=loop_fe8610b7014d41108ea0c4de2de34b93
 
 ## Stages
 
 | stage | startedAt | endedAt | durationMs | costUsd |
 |---|---|---|---|---|
-| workspace | 2026-10-31T10:12:30.222Z | 2026-10-31T10:21:17.458Z | 527236 | 0.0000 |
-| spec | 2026-10-31T10:21:17.458Z | 2026-10-31T10:30:36.197Z | 558739 | 0.5748 |
-| design | 2026-10-31T10:30:36.197Z | 2026-10-31T10:34:34.829Z | 238632 | 0.3690 |
-| build | 2026-10-31T10:34:34.829Z | 2026-10-31T11:11:00.057Z | 2185228 | 3.1177 |
-| assembly | 2026-10-31T11:11:00.057Z | 2026-10-31T11:11:08.270Z | 8213 | 0.0000 |
+| workspace | 2026-10-31T14:18:00.303Z | 2026-10-31T14:18:00.304Z | 1 | 0.8109 |
+| build | 2026-10-31T14:18:00.304Z | 2026-10-31T14:23:40.885Z | 340581 | 0.5701 |
+| assembly | 2026-10-31T14:23:40.885Z | 2026-10-31T14:23:46.225Z | 5340 | 0.0000 |
 
 ## Tasks
 
 | taskId | title | implementer attempts | test-writer attempts | durationMs | costUsd | inputTokens | outputTokens | outcome | fixes |
 |---|---|---|---|---|---|---|---|---|---|
-| T-001 | hold the in-memory Store, Time parsing and Error codes | 1 | 1 | 257533 | 0.4580 | 129721 | 41275 | approved | 0 |
-| T-002 | serve the room endpoints | 1 | 1 | 433561 | 0.4940 | 510701 | 58987 | approved | 0 |
-| T-003 | serve the booking creation endpoint | 2 | 1 | 342130 | 0.6837 | 778969 | 50688 | approved | 0 |
-| T-004 | serve booking reads, deletion and Availability | 1 | 1 | 351168 | 0.5764 | 702490 | 46613 | approved | 0 |
-| T-005 | route requests, write JSON responses and wire the process | 2 | 1 | 1233724 | 0.9056 | 1677172 | 204182 | approved | 0 |
 
 ## Totals
 
-- durationMs: 3518115
-- costUsd: 4.0615
-- inputTokens: 9059926
-- outputTokens: 667916
+- durationMs: 345987
+- costUsd: 1.3810
+- inputTokens: 774759
+- outputTokens: 23005
 - unknown-cost entries: 0
 
 ## Assumptions
@@ -48,14 +41,19 @@ mid-run interventions: 0 (see [interventions.md](interventions.md))
 
 none
 
-## Task T-001
+## Chain
 
-- review advisory_only: 
+| runId | outcome | startedAt | finishedAt | durationMs | costUsd | report |
+|---|---|---|---|---|---|---|
+| room-booking-api-20261031-132516 | failed:build/unparseable_handoff | 2026-10-31T13:25:16.058Z | 2026-10-31T14:12:16.539Z | 2820454 | 15.1135 | [trace.md](chain/room-booking-api-20261031-132516/trace.md) |
+| room-booking-api-20261031-141800 | published | 2026-10-31T14:18:00.303Z | 2026-10-31T14:23:46.290Z | 345987 | 1.3810 | this report |
 
-## Task T-004
+- chain durationMs: 3166441
+- chain costUsd: 16.4945
+- chain inputTokens: 21916707
+- chain outputTokens: 633704
+- chain unavailable runs: 0
 
-- review advisory_only: 
-
-## Task T-005
+## Task T-007
 
 - review advisory_only: 

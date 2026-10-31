@@ -1,0 +1,4615 @@
+{
+  "schemaVersion": 1,
+  "runId": "room-booking-api-20261031-132516",
+  "pricing": {
+    "deepseek/deepseek-v4.1-flash-1017": {
+      "inputPerMTok": 0.15,
+      "outputPerMTok": 0.6
+    },
+    "anthropic/claude-opus-5.5": {
+      "inputPerMTok": 4,
+      "outputPerMTok": 20
+    },
+    "openai/gpt-6.1-terra": {
+      "inputPerMTok": 1,
+      "outputPerMTok": 5
+    },
+    "openai/gpt-6-luna": {
+      "inputPerMTok": 0.1,
+      "outputPerMTok": 0.5
+    },
+    "claude-opus-5-5": {
+      "inputPerMTok": 4,
+      "outputPerMTok": 20
+    },
+    "claude-sonnet-5-5": {
+      "inputPerMTok": 2,
+      "outputPerMTok": 10
+    },
+    "claude-haiku-4-5": {
+      "inputPerMTok": 1,
+      "outputPerMTok": 5
+    },
+    "gpt-6.1-terra": {
+      "inputPerMTok": 1,
+      "outputPerMTok": 5
+    },
+    "gpt-6-luna": {
+      "inputPerMTok": 0.1,
+      "outputPerMTok": 0.5
+    },
+    "deepseek/deepseek-v4.1-flash-1017:nitro": {
+      "inputPerMTok": 0.3,
+      "outputPerMTok": 1.2
+    }
+  },
+  "stages": [
+    {
+      "stage": "workspace",
+      "startedAt": "2026-10-31T13:25:16.063Z",
+      "endedAt": "2026-10-31T13:28:23.275Z",
+      "durationMs": 187212,
+      "costUsd": 0,
+      "inputTokens": 0,
+      "outputTokens": 0
+    },
+    {
+      "stage": "spec",
+      "startedAt": "2026-10-31T13:28:23.275Z",
+      "endedAt": "2026-10-31T13:46:12.376Z",
+      "durationMs": 1069101,
+      "costUsd": 4.085831,
+      "inputTokens": 10921327,
+      "outputTokens": 249617
+    },
+    {
+      "stage": "design",
+      "startedAt": "2026-10-31T13:46:12.376Z",
+      "endedAt": "2026-10-31T13:50:09.989Z",
+      "durationMs": 237613,
+      "costUsd": 1.825473,
+      "inputTokens": 5392535,
+      "outputTokens": 173094
+    },
+    {
+      "stage": "build",
+      "startedAt": "2026-10-31T13:50:09.989Z",
+      "endedAt": "2026-10-31T14:12:16.517Z",
+      "durationMs": 1326528,
+      "costUsd": 9.202205,
+      "inputTokens": 4828086,
+      "outputTokens": 187988
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "T-001",
+      "title": "own the error codes and the JSON response envelope",
+      "attempts": {
+        "implementer": 2,
+        "testWriter": 2
+      },
+      "durationMs": 204659,
+      "costUsd": 0.862164,
+      "inputTokens": 412572,
+      "outputTokens": 16390,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "approved"
+    },
+    {
+      "taskId": "T-002",
+      "title": "hold the entities, the in-memory store and shared primitives",
+      "attempts": {
+        "implementer": 2,
+        "testWriter": 2
+      },
+      "durationMs": 356297,
+      "costUsd": 1.412541,
+      "inputTokens": 687255,
+      "outputTokens": 33081,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "approved"
+    },
+    {
+      "taskId": "T-003",
+      "title": "serve room creation and the room list",
+      "attempts": {
+        "implementer": 2,
+        "testWriter": 1
+      },
+      "durationMs": 253117,
+      "costUsd": 1.250993,
+      "inputTokens": 732706,
+      "outputTokens": 19636,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "approved"
+    },
+    {
+      "taskId": "T-004",
+      "title": "serve booking creation on a room",
+      "attempts": {
+        "implementer": 2,
+        "testWriter": 2
+      },
+      "durationMs": 393313,
+      "costUsd": 1.720424,
+      "inputTokens": 762859,
+      "outputTokens": 37941,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "approved"
+    },
+    {
+      "taskId": "T-005",
+      "title": "serve booking listing and booking deletion",
+      "attempts": {
+        "implementer": 2,
+        "testWriter": 2
+      },
+      "durationMs": 305232,
+      "costUsd": 1.515988,
+      "inputTokens": 705525,
+      "outputTokens": 29604,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "approved"
+    },
+    {
+      "taskId": "T-006",
+      "title": "serve availability search",
+      "attempts": {
+        "implementer": 2,
+        "testWriter": 1
+      },
+      "durationMs": 164732,
+      "costUsd": 0.881543,
+      "inputTokens": 506629,
+      "outputTokens": 11940,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "approved"
+    },
+    {
+      "taskId": "T-007",
+      "title": "compose the server, route requests and start the process",
+      "attempts": {
+        "implementer": 1,
+        "testWriter": 1
+      },
+      "durationMs": 576289,
+      "costUsd": 0.950541,
+      "inputTokens": 501559,
+      "outputTokens": 21590,
+      "models": [
+        "openai/gpt-6.1-terra"
+      ],
+      "outcome": "failed"
+    }
+  ],
+  "participants": [
+    {
+      "name": "spec-analyst",
+      "inferences": 176,
+      "costUsd": 3.362437,
+      "inputTokens": 10256468,
+      "outputTokens": 237910
+    },
+    {
+      "name": "spec-critic",
+      "inferences": 46,
+      "costUsd": 1.331405,
+      "inputTokens": 1183840,
+      "outputTokens": 29513
+    },
+    {
+      "name": "architect",
+      "inferences": 20,
+      "costUsd": 0.278994,
+      "inputTokens": 734786,
+      "outputTokens": 48800
+    },
+    {
+      "name": "verification-designer",
+      "inferences": 13,
+      "costUsd": 0.370604,
+      "inputTokens": 949269,
+      "outputTokens": 71520
+    },
+    {
+      "name": "planner",
+      "inferences": 45,
+      "costUsd": 1.175875,
+      "inputTokens": 3708480,
+      "outputTokens": 52774
+    },
+    {
+      "name": "test-writer",
+      "inferences": 11,
+      "costUsd": 2.500127,
+      "inputTokens": 128,
+      "outputTokens": 83589
+    },
+    {
+      "name": "implementer",
+      "inferences": 13,
+      "costUsd": 1.503134,
+      "inputTokens": 130,
+      "outputTokens": 30176
+    },
+    {
+      "name": "reviewer",
+      "inferences": 111,
+      "costUsd": 4.590932,
+      "inputTokens": 4308847,
+      "outputTokens": 56417
+    }
+  ],
+  "entries": [
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.001687,
+      "inputTokens": 5074,
+      "outputTokens": 137,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 974
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.001937,
+      "inputTokens": 6262,
+      "outputTokens": 49,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 853
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015896,
+      "inputTokens": 6881,
+      "outputTokens": 11526,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 36234
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.022816,
+      "inputTokens": 6968,
+      "outputTokens": 17271,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 59459
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.039258,
+      "inputTokens": 7048,
+      "outputTokens": 30953,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 69767
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.008307,
+      "inputTokens": 27515,
+      "outputTokens": 44,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 896
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.008579,
+      "inputTokens": 27642,
+      "outputTokens": 239,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 972
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016488,
+      "inputTokens": 48053,
+      "outputTokens": 1727,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4905
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014653,
+      "inputTokens": 48232,
+      "outputTokens": 153,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 717
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014598,
+      "inputTokens": 48317,
+      "outputTokens": 86,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 596
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016506,
+      "inputTokens": 49957,
+      "outputTokens": 1266,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2745
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015908,
+      "inputTokens": 51232,
+      "outputTokens": 449,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1609
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.004206,
+      "inputTokens": 3851,
+      "outputTokens": 71,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1900
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.005063,
+      "inputTokens": 4963,
+      "outputTokens": 20,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2523
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.048797,
+      "inputTokens": 24692,
+      "outputTokens": 4821,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 54277
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.035921,
+      "inputTokens": 27861,
+      "outputTokens": 1612,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 19050
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029536,
+      "inputTokens": 29341,
+      "outputTokens": 39,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1744
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.001654,
+      "inputTokens": 5094,
+      "outputTokens": 105,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 7651
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.001943,
+      "inputTokens": 6282,
+      "outputTokens": 49,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 448
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.008463,
+      "inputTokens": 26694,
+      "outputTokens": 379,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1546
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.009826,
+      "inputTokens": 28334,
+      "outputTokens": 1105,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3466
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018632,
+      "inputTokens": 28419,
+      "outputTokens": 8422,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 23811
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.008819,
+      "inputTokens": 28598,
+      "outputTokens": 200,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 945
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.011159,
+      "inputTokens": 29013,
+      "outputTokens": 2046,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5305
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.02972,
+      "inputTokens": 32131,
+      "outputTokens": 16734,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 59031
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.009918,
+      "inputTokens": 32700,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 929
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.010427,
+      "inputTokens": 32827,
+      "outputTokens": 482,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1651
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.010828,
+      "inputTokens": 33365,
+      "outputTokens": 682,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1868
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.010323,
+      "inputTokens": 34050,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 593
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017219,
+      "inputTokens": 34177,
+      "outputTokens": 5805,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 15482
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.010469,
+      "inputTokens": 34734,
+      "outputTokens": 41,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 510
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.010673,
+      "inputTokens": 34792,
+      "outputTokens": 196,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 986
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.011958,
+      "inputTokens": 34921,
+      "outputTokens": 1235,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3479
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018857,
+      "inputTokens": 35239,
+      "outputTokens": 6904,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 22541
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.011109,
+      "inputTokens": 35801,
+      "outputTokens": 307,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1559
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012001,
+      "inputTokens": 35930,
+      "outputTokens": 1018,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2736
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.01227,
+      "inputTokens": 36493,
+      "outputTokens": 1102,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3744
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018976,
+      "inputTokens": 37056,
+      "outputTokens": 6549,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 25177
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018685,
+      "inputTokens": 37619,
+      "outputTokens": 6166,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 20740
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.011565,
+      "inputTokens": 38185,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 652
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012802,
+      "inputTokens": 38314,
+      "outputTokens": 1090,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3866
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.011985,
+      "inputTokens": 38999,
+      "outputTokens": 238,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1102
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012757,
+      "inputTokens": 39126,
+      "outputTokens": 849,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3052
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012098,
+      "inputTokens": 39723,
+      "outputTokens": 151,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1023
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012042,
+      "inputTokens": 39780,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 981
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014631,
+      "inputTokens": 39907,
+      "outputTokens": 2216,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 6566
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012986,
+      "inputTokens": 40636,
+      "outputTokens": 663,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4256
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013723,
+      "inputTokens": 40766,
+      "outputTokens": 1244,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3762
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012555,
+      "inputTokens": 41485,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 627
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014664,
+      "inputTokens": 41615,
+      "outputTokens": 1816,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5903
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.012738,
+      "inputTokens": 42101,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1733
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013441,
+      "inputTokens": 42228,
+      "outputTokens": 644,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2162
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013147,
+      "inputTokens": 42598,
+      "outputTokens": 306,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1067
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020021,
+      "inputTokens": 42923,
+      "outputTokens": 5953,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 20105
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013131,
+      "inputTokens": 43410,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1138
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015263,
+      "inputTokens": 43537,
+      "outputTokens": 1835,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 8670
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.01332,
+      "inputTokens": 44036,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 15308
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013641,
+      "inputTokens": 44166,
+      "outputTokens": 326,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2312
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014017,
+      "inputTokens": 44499,
+      "outputTokens": 556,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2874
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013634,
+      "inputTokens": 45083,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1763
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014073,
+      "inputTokens": 45213,
+      "outputTokens": 424,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1714
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014256,
+      "inputTokens": 45569,
+      "outputTokens": 488,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1503
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.013935,
+      "inputTokens": 46091,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4862
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014023,
+      "inputTokens": 46218,
+      "outputTokens": 131,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5036
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014595,
+      "inputTokens": 46375,
+      "outputTokens": 569,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2962
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014453,
+      "inputTokens": 46935,
+      "outputTokens": 310,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1609
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014918,
+      "inputTokens": 47062,
+      "outputTokens": 666,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5696
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014382,
+      "inputTokens": 47577,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2061
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015,
+      "inputTokens": 47707,
+      "outputTokens": 573,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2989
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014577,
+      "inputTokens": 48227,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1754
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015236,
+      "inputTokens": 48357,
+      "outputTokens": 607,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1763
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014796,
+      "inputTokens": 48955,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 734
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015365,
+      "inputTokens": 49085,
+      "outputTokens": 533,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1867
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.014993,
+      "inputTokens": 49615,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 667
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015548,
+      "inputTokens": 49735,
+      "outputTokens": 523,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1657
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015191,
+      "inputTokens": 50275,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 628
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.0152,
+      "inputTokens": 50402,
+      "outputTokens": 66,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 781
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015847,
+      "inputTokens": 50864,
+      "outputTokens": 490,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1687
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015525,
+      "inputTokens": 51390,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 9676
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015735,
+      "inputTokens": 51517,
+      "outputTokens": 233,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1188
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016435,
+      "inputTokens": 52096,
+      "outputTokens": 672,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1835
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.015954,
+      "inputTokens": 52821,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 664
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016423,
+      "inputTokens": 52948,
+      "outputTokens": 449,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1324
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016135,
+      "inputTokens": 53423,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 777
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016933,
+      "inputTokens": 53550,
+      "outputTokens": 723,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2466
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016333,
+      "inputTokens": 54084,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 731
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016943,
+      "inputTokens": 54211,
+      "outputTokens": 566,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1821
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016469,
+      "inputTokens": 54735,
+      "outputTokens": 40,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 567
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016524,
+      "inputTokens": 54793,
+      "outputTokens": 72,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 645
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016577,
+      "inputTokens": 54915,
+      "outputTokens": 85,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 671
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016742,
+      "inputTokens": 55032,
+      "outputTokens": 194,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 959
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017009,
+      "inputTokens": 55159,
+      "outputTokens": 384,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1296
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016946,
+      "inputTokens": 55482,
+      "outputTokens": 251,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1433
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016842,
+      "inputTokens": 55785,
+      "outputTokens": 89,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 607
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.01688,
+      "inputTokens": 55912,
+      "outputTokens": 89,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 609
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020574,
+      "inputTokens": 56039,
+      "outputTokens": 3135,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 11515
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.016997,
+      "inputTokens": 56498,
+      "outputTokens": 40,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 523
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017071,
+      "inputTokens": 56555,
+      "outputTokens": 87,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 654
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017059,
+      "inputTokens": 56699,
+      "outputTokens": 41,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 508
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017143,
+      "inputTokens": 56756,
+      "outputTokens": 97,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 676
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.027072,
+      "inputTokens": 56883,
+      "outputTokens": 8339,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 32591
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017827,
+      "inputTokens": 57274,
+      "outputTokens": 537,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2296
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.02001,
+      "inputTokens": 57400,
+      "outputTokens": 2325,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 8428
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017461,
+      "inputTokens": 57850,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1055
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017528,
+      "inputTokens": 57976,
+      "outputTokens": 113,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 923
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017772,
+      "inputTokens": 58140,
+      "outputTokens": 275,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1711
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020765,
+      "inputTokens": 58251,
+      "outputTokens": 2741,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 10605
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017712,
+      "inputTokens": 58687,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 857
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020344,
+      "inputTokens": 58813,
+      "outputTokens": 2250,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 8983
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.017879,
+      "inputTokens": 59246,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1204
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019418,
+      "inputTokens": 59372,
+      "outputTokens": 1339,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5003
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018046,
+      "inputTokens": 59801,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 637
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018438,
+      "inputTokens": 59927,
+      "outputTokens": 383,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1884
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.021308,
+      "inputTokens": 60357,
+      "outputTokens": 2667,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 6672
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018325,
+      "inputTokens": 60733,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 618
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018926,
+      "inputTokens": 60859,
+      "outputTokens": 557,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1477
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020036,
+      "inputTokens": 61280,
+      "outputTokens": 1377,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3937
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018806,
+      "inputTokens": 61715,
+      "outputTokens": 243,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 915
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019306,
+      "inputTokens": 61841,
+      "outputTokens": 628,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2141
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018989,
+      "inputTokens": 62112,
+      "outputTokens": 296,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 10795
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019422,
+      "inputTokens": 62269,
+      "outputTokens": 618,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2234
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019047,
+      "inputTokens": 62538,
+      "outputTokens": 238,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1095
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019087,
+      "inputTokens": 62659,
+      "outputTokens": 241,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 891
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.018988,
+      "inputTokens": 62929,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 565
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019188,
+      "inputTokens": 63059,
+      "outputTokens": 225,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 894
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019274,
+      "inputTokens": 63330,
+      "outputTokens": 229,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 792
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019189,
+      "inputTokens": 63590,
+      "outputTokens": 93,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 626
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019571,
+      "inputTokens": 63722,
+      "outputTokens": 379,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1236
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020285,
+      "inputTokens": 63807,
+      "outputTokens": 952,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4063
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019387,
+      "inputTokens": 64271,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 754
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019802,
+      "inputTokens": 64417,
+      "outputTokens": 397,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3076
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020684,
+      "inputTokens": 64563,
+      "outputTokens": 1096,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3360
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.01966,
+      "inputTokens": 65029,
+      "outputTokens": 126,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1326
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.022956,
+      "inputTokens": 65155,
+      "outputTokens": 2841,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 8910
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020307,
+      "inputTokens": 65603,
+      "outputTokens": 522,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2001
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.019927,
+      "inputTokens": 66058,
+      "outputTokens": 91,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 784
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020821,
+      "inputTokens": 66188,
+      "outputTokens": 804,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2907
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020217,
+      "inputTokens": 66658,
+      "outputTokens": 183,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 962
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.021988,
+      "inputTokens": 66784,
+      "outputTokens": 1627,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 6016
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.02478,
+      "inputTokens": 67260,
+      "outputTokens": 3835,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 13856
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.020488,
+      "inputTokens": 67529,
+      "outputTokens": 191,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 993
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.022216,
+      "inputTokens": 67720,
+      "outputTokens": 1583,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5370
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.021129,
+      "inputTokens": 68206,
+      "outputTokens": 556,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3384
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.021761,
+      "inputTokens": 68291,
+      "outputTokens": 1061,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3539
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.022646,
+      "inputTokens": 68684,
+      "outputTokens": 1701,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5532
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.022487,
+      "inputTokens": 69137,
+      "outputTokens": 1455,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5754
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030687,
+      "inputTokens": 91646,
+      "outputTokens": 2661,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 8382
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.027824,
+      "inputTokens": 92386,
+      "outputTokens": 90,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 759
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.028897,
+      "inputTokens": 92513,
+      "outputTokens": 953,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3993
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029837,
+      "inputTokens": 92598,
+      "outputTokens": 1715,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5269
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.028661,
+      "inputTokens": 93059,
+      "outputTokens": 619,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2261
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030162,
+      "inputTokens": 93185,
+      "outputTokens": 1839,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 6714
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029461,
+      "inputTokens": 93762,
+      "outputTokens": 1110,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3131
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030341,
+      "inputTokens": 94368,
+      "outputTokens": 1692,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4848
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031085,
+      "inputTokens": 94854,
+      "outputTokens": 2191,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 7381
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.02913,
+      "inputTokens": 95311,
+      "outputTokens": 447,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1720
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030557,
+      "inputTokens": 95437,
+      "outputTokens": 1605,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4967
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.028874,
+      "inputTokens": 95895,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1039
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.028918,
+      "inputTokens": 96041,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 659
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030414,
+      "inputTokens": 96167,
+      "outputTokens": 1303,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3944
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031291,
+      "inputTokens": 96653,
+      "outputTokens": 1913,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 7497
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029602,
+      "inputTokens": 97037,
+      "outputTokens": 409,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1672
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030879,
+      "inputTokens": 97541,
+      "outputTokens": 1347,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4907
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029506,
+      "inputTokens": 98003,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 672
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029987,
+      "inputTokens": 98121,
+      "outputTokens": 459,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1574
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029683,
+      "inputTokens": 98591,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 829
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031739,
+      "inputTokens": 98717,
+      "outputTokens": 1770,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5368
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.029866,
+      "inputTokens": 99200,
+      "outputTokens": 88,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 768
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031462,
+      "inputTokens": 99326,
+      "outputTokens": 1387,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4399
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031393,
+      "inputTokens": 99973,
+      "outputTokens": 1168,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3518
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031086,
+      "inputTokens": 100464,
+      "outputTokens": 789,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2935
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030361,
+      "inputTokens": 101043,
+      "outputTokens": 40,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 673
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031516,
+      "inputTokens": 101100,
+      "outputTokens": 988,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3475
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031591,
+      "inputTokens": 101399,
+      "outputTokens": 976,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3086
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032519,
+      "inputTokens": 101526,
+      "outputTokens": 1718,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4616
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032404,
+      "inputTokens": 102133,
+      "outputTokens": 1470,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4733
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031459,
+      "inputTokens": 102263,
+      "outputTokens": 650,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1964
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031429,
+      "inputTokens": 102348,
+      "outputTokens": 604,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1956
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031913,
+      "inputTokens": 102729,
+      "outputTokens": 912,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3667
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.033745,
+      "inputTokens": 103135,
+      "outputTokens": 2337,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 6835
+    },
+    {
+      "participant": "spec-analyst",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032523,
+      "inputTokens": 104742,
+      "outputTokens": 917,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4017
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.004371,
+      "inputTokens": 3851,
+      "outputTokens": 104,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2453
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.005078,
+      "inputTokens": 4963,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1889
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.008048,
+      "inputTokens": 7948,
+      "outputTokens": 20,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1213
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.033587,
+      "inputTokens": 29892,
+      "outputTokens": 739,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 10614
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.033588,
+      "inputTokens": 30003,
+      "outputTokens": 717,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 12106
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.034172,
+      "inputTokens": 30117,
+      "outputTokens": 811,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 14285
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030521,
+      "inputTokens": 30231,
+      "outputTokens": 58,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1856
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030635,
+      "inputTokens": 30345,
+      "outputTokens": 58,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1785
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030749,
+      "inputTokens": 30459,
+      "outputTokens": 58,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1654
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031713,
+      "inputTokens": 30573,
+      "outputTokens": 228,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3814
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.030977,
+      "inputTokens": 30687,
+      "outputTokens": 58,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1787
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031161,
+      "inputTokens": 30801,
+      "outputTokens": 72,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1941
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031289,
+      "inputTokens": 30929,
+      "outputTokens": 72,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1879
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031347,
+      "inputTokens": 31057,
+      "outputTokens": 58,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1682
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032666,
+      "inputTokens": 31171,
+      "outputTokens": 299,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 4466
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.031909,
+      "inputTokens": 31344,
+      "outputTokens": 113,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2323
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032078,
+      "inputTokens": 31513,
+      "outputTokens": 113,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2453
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.035422,
+      "inputTokens": 31682,
+      "outputTokens": 748,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 11877
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032747,
+      "inputTokens": 31877,
+      "outputTokens": 174,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3286
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.035097,
+      "inputTokens": 32107,
+      "outputTokens": 598,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 7662
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "spec",
+      "costUsd": 0.032716,
+      "inputTokens": 32601,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1430
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001225,
+      "inputTokens": 3771,
+      "outputTokens": 78,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 803
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001039,
+      "inputTokens": 3135,
+      "outputTokens": 82,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 847
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001204,
+      "inputTokens": 3858,
+      "outputTokens": 39,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 501
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001008,
+      "inputTokens": 3193,
+      "outputTokens": 42,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 488
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001225,
+      "inputTokens": 3916,
+      "outputTokens": 42,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 562
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.009614,
+      "inputTokens": 31644,
+      "outputTokens": 101,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 898
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.009932,
+      "inputTokens": 32799,
+      "outputTokens": 77,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 559
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.010296,
+      "inputTokens": 33987,
+      "outputTokens": 83,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 546
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.010311,
+      "inputTokens": 34050,
+      "outputTokens": 80,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 526
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.010493,
+      "inputTokens": 34254,
+      "outputTokens": 181,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 688
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.019374,
+      "inputTokens": 30921,
+      "outputTokens": 8415,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 33218
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.013262,
+      "inputTokens": 32076,
+      "outputTokens": 3033,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 12578
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.03255,
+      "inputTokens": 34405,
+      "outputTokens": 18524,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 50661
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.036971,
+      "inputTokens": 34474,
+      "outputTokens": 22191,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 51720
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.014245,
+      "inputTokens": 43616,
+      "outputTokens": 967,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2550
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.013683,
+      "inputTokens": 43919,
+      "outputTokens": 423,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1289
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.014302,
+      "inputTokens": 44281,
+      "outputTokens": 848,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2308
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.013821,
+      "inputTokens": 44655,
+      "outputTokens": 354,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1158
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.014065,
+      "inputTokens": 45042,
+      "outputTokens": 460,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1154
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.01445,
+      "inputTokens": 45422,
+      "outputTokens": 686,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1763
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.017736,
+      "inputTokens": 54432,
+      "outputTokens": 1172,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3162
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.016798,
+      "inputTokens": 54638,
+      "outputTokens": 339,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1209
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.018974,
+      "inputTokens": 54823,
+      "outputTokens": 2106,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3515
+    },
+    {
+      "participant": "architect",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.017099,
+      "inputTokens": 56800,
+      "outputTokens": 49,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 526
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.073171,
+      "inputTokens": 59804,
+      "outputTokens": 46025,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 108696
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.028176,
+      "inputTokens": 85515,
+      "outputTokens": 2101,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 7342
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.026088,
+      "inputTokens": 85672,
+      "outputTokens": 322,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1072
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.026849,
+      "inputTokens": 85925,
+      "outputTokens": 893,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3287
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.037466,
+      "inputTokens": 111546,
+      "outputTokens": 3335,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 13425
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.033966,
+      "inputTokens": 111737,
+      "outputTokens": 371,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2187
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.033944,
+      "inputTokens": 112046,
+      "outputTokens": 275,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1104
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.040684,
+      "inputTokens": 112300,
+      "outputTokens": 5828,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 14090
+    },
+    {
+      "participant": "verification-designer",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.035577,
+      "inputTokens": 115399,
+      "outputTokens": 798,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3756
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001315,
+      "inputTokens": 4055,
+      "outputTokens": 82,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1417
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.00128,
+      "inputTokens": 4111,
+      "outputTokens": 39,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1125
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.001301,
+      "inputTokens": 4169,
+      "outputTokens": 42,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 477
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.00962,
+      "inputTokens": 31897,
+      "outputTokens": 42,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 706
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.012415,
+      "inputTokens": 40952,
+      "outputTokens": 108,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 823
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.028865,
+      "inputTokens": 66565,
+      "outputTokens": 7413,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 16020
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.025211,
+      "inputTokens": 68120,
+      "outputTokens": 3979,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 11181
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.022296,
+      "inputTokens": 70343,
+      "outputTokens": 994,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3057
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.024687,
+      "inputTokens": 70497,
+      "outputTokens": 2948,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 7512
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.022106,
+      "inputTokens": 70651,
+      "outputTokens": 759,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2308
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.022029,
+      "inputTokens": 70805,
+      "outputTokens": 656,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1824
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.022547,
+      "inputTokens": 70959,
+      "outputTokens": 1049,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2656
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.022773,
+      "inputTokens": 71113,
+      "outputTokens": 1199,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3246
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.02211,
+      "inputTokens": 71347,
+      "outputTokens": 588,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2181
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.023129,
+      "inputTokens": 72846,
+      "outputTokens": 1063,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3492
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.02283,
+      "inputTokens": 73000,
+      "outputTokens": 775,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2434
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.023069,
+      "inputTokens": 73216,
+      "outputTokens": 920,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3106
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.023679,
+      "inputTokens": 73570,
+      "outputTokens": 1340,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4074
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.022857,
+      "inputTokens": 73786,
+      "outputTokens": 601,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1987
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.023578,
+      "inputTokens": 75285,
+      "outputTokens": 827,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2638
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.026033,
+      "inputTokens": 75501,
+      "outputTokens": 2819,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 7541
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.024463,
+      "inputTokens": 77670,
+      "outputTokens": 968,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2887
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.024773,
+      "inputTokens": 78016,
+      "outputTokens": 1140,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3467
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.025679,
+      "inputTokens": 79515,
+      "outputTokens": 1520,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4566
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.024887,
+      "inputTokens": 79669,
+      "outputTokens": 822,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2435
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.025507,
+      "inputTokens": 79823,
+      "outputTokens": 1300,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4390
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.027098,
+      "inputTokens": 80628,
+      "outputTokens": 2425,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4791
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.026172,
+      "inputTokens": 82183,
+      "outputTokens": 1264,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3959
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.025556,
+      "inputTokens": 82403,
+      "outputTokens": 696,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2298
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.0343,
+      "inputTokens": 108016,
+      "outputTokens": 1579,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4556
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.032642,
+      "inputTokens": 108288,
+      "outputTokens": 130,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 896
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.036047,
+      "inputTokens": 109787,
+      "outputTokens": 2592,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5408
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.033878,
+      "inputTokens": 111342,
+      "outputTokens": 396,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3162
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.034291,
+      "inputTokens": 113587,
+      "outputTokens": 179,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4588
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.035538,
+      "inputTokens": 113652,
+      "outputTokens": 1202,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4753
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.034856,
+      "inputTokens": 113806,
+      "outputTokens": 595,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 4535
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.034885,
+      "inputTokens": 113960,
+      "outputTokens": 581,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 1661
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.037491,
+      "inputTokens": 115459,
+      "outputTokens": 2378,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 5668
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.036231,
+      "inputTokens": 117014,
+      "outputTokens": 939,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2769
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.035998,
+      "inputTokens": 117242,
+      "outputTokens": 688,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2046
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.036018,
+      "inputTokens": 117396,
+      "outputTokens": 666,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2046
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.035366,
+      "inputTokens": 117572,
+      "outputTokens": 79,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 860
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.03683,
+      "inputTokens": 119071,
+      "outputTokens": 924,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 3218
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.036806,
+      "inputTokens": 119371,
+      "outputTokens": 829,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2142
+    },
+    {
+      "participant": "planner",
+      "taskId": null,
+      "stage": "design",
+      "costUsd": 0.036833,
+      "inputTokens": 120222,
+      "outputTokens": 639,
+      "model": "deepseek/deepseek-v4.1-flash-1017:nitro",
+      "durationMs": 2248
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.1233012,
+      "inputTokens": 8,
+      "outputTokens": 3368,
+      "model": null,
+      "durationMs": 29280
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.17244679999999998,
+      "inputTokens": 8,
+      "outputTokens": 6180,
+      "model": null,
+      "durationMs": 41715
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.08851010000000001,
+      "inputTokens": 8,
+      "outputTokens": 1899,
+      "model": null,
+      "durationMs": 18545
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.009208,
+      "inputTokens": 8688,
+      "outputTokens": 104,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2376
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.009497,
+      "inputTokens": 9132,
+      "outputTokens": 73,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3026
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.01034,
+      "inputTokens": 10065,
+      "outputTokens": 55,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1578
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.03696,
+      "inputTokens": 36845,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1589
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.1239388,
+      "inputTokens": 10,
+      "outputTokens": 2862,
+      "model": null,
+      "durationMs": 24503
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.013894,
+      "inputTokens": 13379,
+      "outputTokens": 103,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2914
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.015092,
+      "inputTokens": 14727,
+      "outputTokens": 73,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2249
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.017551,
+      "inputTokens": 17276,
+      "outputTokens": 55,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2961
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.044171,
+      "inputTokens": 44056,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1927
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.04944,
+      "inputTokens": 37930,
+      "outputTokens": 2302,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 26568
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.041966,
+      "inputTokens": 39166,
+      "outputTokens": 560,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 7316
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.039907,
+      "inputTokens": 39682,
+      "outputTokens": 45,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1686
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.063731,
+      "inputTokens": 45141,
+      "outputTokens": 3718,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 42347
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.050756,
+      "inputTokens": 46681,
+      "outputTokens": 815,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 10188
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.1292605,
+      "inputTokens": 10,
+      "outputTokens": 3867,
+      "model": null,
+      "durationMs": 37061
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.05468,
+      "inputTokens": 47420,
+      "outputTokens": 1452,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 19604
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.080207,
+      "inputTokens": 6,
+      "outputTokens": 1587,
+      "model": null,
+      "durationMs": 19983
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.051543,
+      "inputTokens": 48678,
+      "outputTokens": 573,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 8457
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.009475,
+      "inputTokens": 8870,
+      "outputTokens": 121,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3275
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.009643,
+      "inputTokens": 8958,
+      "outputTokens": 137,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2829
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.049416,
+      "inputTokens": 49276,
+      "outputTokens": 28,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 4486
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.009838,
+      "inputTokens": 9403,
+      "outputTokens": 87,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2315
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.010852,
+      "inputTokens": 10427,
+      "outputTokens": 85,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2163
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.037322,
+      "inputTokens": 37207,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1529
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.038662,
+      "inputTokens": 38292,
+      "outputTokens": 74,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1960
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.045293,
+      "inputTokens": 38373,
+      "outputTokens": 1384,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 16397
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.042254,
+      "inputTokens": 39459,
+      "outputTokens": 559,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 8644
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-001",
+      "stage": "build",
+      "costUsd": 0.040228,
+      "inputTokens": 40043,
+      "outputTokens": 37,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1628
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.2415084,
+      "inputTokens": 18,
+      "outputTokens": 9719,
+      "model": null,
+      "durationMs": 84436
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.1300681,
+      "inputTokens": 10,
+      "outputTokens": 2846,
+      "model": null,
+      "durationMs": 26194
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.014705,
+      "inputTokens": 14100,
+      "outputTokens": 121,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2951
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.014793,
+      "inputTokens": 14188,
+      "outputTokens": 121,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2436
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.014789,
+      "inputTokens": 14269,
+      "outputTokens": 104,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2647
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.041499,
+      "inputTokens": 41049,
+      "outputTokens": 90,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2609
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.042559,
+      "inputTokens": 42134,
+      "outputTokens": 85,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2251
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.043531,
+      "inputTokens": 43421,
+      "outputTokens": 22,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1527
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.048877,
+      "inputTokens": 47027,
+      "outputTokens": 370,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 5332
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.06249,
+      "inputTokens": 47095,
+      "outputTokens": 3079,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 35168
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.051284,
+      "inputTokens": 48339,
+      "outputTokens": 589,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 7705
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-002",
+      "stage": "build",
+      "costUsd": 0.049218,
+      "inputTokens": 48953,
+      "outputTokens": 53,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3606
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.16606949999999998,
+      "inputTokens": 10,
+      "outputTokens": 4631,
+      "model": null,
+      "durationMs": 36931
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.2460031,
+      "inputTokens": 12,
+      "outputTokens": 7522,
+      "model": null,
+      "durationMs": 62886
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.2821105,
+      "inputTokens": 12,
+      "outputTokens": 9895,
+      "model": null,
+      "durationMs": 64357
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.0933344,
+      "inputTokens": 8,
+      "outputTokens": 1664,
+      "model": null,
+      "durationMs": 28317
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.013752,
+      "inputTokens": 13212,
+      "outputTokens": 108,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2863
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.040387,
+      "inputTokens": 39992,
+      "outputTokens": 79,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2598
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.311486,
+      "inputTokens": 14,
+      "outputTokens": 10989,
+      "model": null,
+      "durationMs": 75281
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.041377,
+      "inputTokens": 41077,
+      "outputTokens": 60,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2136
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.041518,
+      "inputTokens": 41393,
+      "outputTokens": 25,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1856
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.1107291,
+      "inputTokens": 10,
+      "outputTokens": 1692,
+      "model": null,
+      "durationMs": 16756
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.020832,
+      "inputTokens": 20262,
+      "outputTokens": 114,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3504
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.047512,
+      "inputTokens": 47042,
+      "outputTokens": 94,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2597
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.050861,
+      "inputTokens": 43106,
+      "outputTokens": 1551,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 18230
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.048512,
+      "inputTokens": 48127,
+      "outputTokens": 77,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2424
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.13552730000000002,
+      "inputTokens": 12,
+      "outputTokens": 2932,
+      "model": null,
+      "durationMs": 31521
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.048668,
+      "inputTokens": 48533,
+      "outputTokens": 27,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1504
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.045633,
+      "inputTokens": 43878,
+      "outputTokens": 351,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 5469
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.044394,
+      "inputTokens": 44254,
+      "outputTokens": 28,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1784
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.020662,
+      "inputTokens": 20117,
+      "outputTokens": 109,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2727
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.047292,
+      "inputTokens": 46897,
+      "outputTokens": 79,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2937
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.1289656,
+      "inputTokens": 10,
+      "outputTokens": 2580,
+      "model": null,
+      "durationMs": 30184
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.048282,
+      "inputTokens": 47982,
+      "outputTokens": 60,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2586
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.048612,
+      "inputTokens": 48487,
+      "outputTokens": 25,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2254
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.022573,
+      "inputTokens": 22018,
+      "outputTokens": 111,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2900
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.022928,
+      "inputTokens": 22538,
+      "outputTokens": 78,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2123
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.027226,
+      "inputTokens": 26951,
+      "outputTokens": 55,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2303
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.053846,
+      "inputTokens": 53731,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2464
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.09674990000000001,
+      "inputTokens": 12,
+      "outputTokens": 1887,
+      "model": null,
+      "durationMs": 21883
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.01467,
+      "inputTokens": 14030,
+      "outputTokens": 128,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2782
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.067926,
+      "inputTokens": 53246,
+      "outputTokens": 2936,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 34723
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.015226,
+      "inputTokens": 14751,
+      "outputTokens": 95,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2610
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.015475,
+      "inputTokens": 15095,
+      "outputTokens": 76,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2065
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.017083,
+      "inputTokens": 16808,
+      "outputTokens": 55,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2097
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.056822,
+      "inputTokens": 54427,
+      "outputTokens": 479,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 6473
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.043703,
+      "inputTokens": 43588,
+      "outputTokens": 23,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2365
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.063696,
+      "inputTokens": 52021,
+      "outputTokens": 2335,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 28200
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.055331,
+      "inputTokens": 54856,
+      "outputTokens": 95,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2838
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.049223,
+      "inputTokens": 44673,
+      "outputTokens": 910,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 11273
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.046502,
+      "inputTokens": 45232,
+      "outputTokens": 254,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 4135
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-006",
+      "stage": "build",
+      "costUsd": 0.045585,
+      "inputTokens": 45510,
+      "outputTokens": 15,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3677
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.061622,
+      "inputTokens": 52982,
+      "outputTokens": 1728,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 22661
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.077096,
+      "inputTokens": 54816,
+      "outputTokens": 4456,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 50736
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.058407,
+      "inputTokens": 53907,
+      "outputTokens": 900,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 11387
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.055323,
+      "inputTokens": 54243,
+      "outputTokens": 216,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3589
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.065118,
+      "inputTokens": 56133,
+      "outputTokens": 1797,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 21319
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.09653320000000001,
+      "inputTokens": 8,
+      "outputTokens": 1131,
+      "model": null,
+      "durationMs": 17800
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.06022,
+      "inputTokens": 57135,
+      "outputTokens": 617,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 8184
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.057621,
+      "inputTokens": 57481,
+      "outputTokens": 28,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2113
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.2705529,
+      "inputTokens": 10,
+      "outputTokens": 8541,
+      "model": null,
+      "durationMs": 63237
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.021665,
+      "inputTokens": 21100,
+      "outputTokens": 113,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2514
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.022443,
+      "inputTokens": 21968,
+      "outputTokens": 95,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2430
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.049143,
+      "inputTokens": 48748,
+      "outputTokens": 79,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2171
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.050133,
+      "inputTokens": 49833,
+      "outputTokens": 60,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2046
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.050489,
+      "inputTokens": 50364,
+      "outputTokens": 25,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1463
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.1092129,
+      "inputTokens": 10,
+      "outputTokens": 1896,
+      "model": null,
+      "durationMs": 20967
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.062163,
+      "inputTokens": 53898,
+      "outputTokens": 1653,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 19485
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.019465,
+      "inputTokens": 18795,
+      "outputTokens": 134,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3524
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.057598,
+      "inputTokens": 54878,
+      "outputTokens": 544,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 7186
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-003",
+      "stage": "build",
+      "costUsd": 0.055399,
+      "inputTokens": 55249,
+      "outputTokens": 30,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2163
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.019583,
+      "inputTokens": 18883,
+      "outputTokens": 140,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2898
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.046298,
+      "inputTokens": 45663,
+      "outputTokens": 127,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2850
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.047278,
+      "inputTokens": 46748,
+      "outputTokens": 106,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3053
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.047276,
+      "inputTokens": 46786,
+      "outputTokens": 98,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2562
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.047369,
+      "inputTokens": 47234,
+      "outputTokens": 27,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1748
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.062017,
+      "inputTokens": 50812,
+      "outputTokens": 2241,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 25966
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.30852959999999996,
+      "inputTokens": 16,
+      "outputTokens": 10025,
+      "model": null,
+      "durationMs": 75315
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.053822,
+      "inputTokens": 51822,
+      "outputTokens": 400,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 5800
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": 0.054672,
+      "inputTokens": 52247,
+      "outputTokens": 485,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 6868
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-005",
+      "stage": "build",
+      "costUsd": null,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3217
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.1543575,
+      "inputTokens": 14,
+      "outputTokens": 3491,
+      "model": null,
+      "durationMs": 32281
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.020067,
+      "inputTokens": 19422,
+      "outputTokens": 129,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3247
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.02015,
+      "inputTokens": 19510,
+      "outputTokens": 128,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2636
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.020223,
+      "inputTokens": 19548,
+      "outputTokens": 135,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 4520
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.046818,
+      "inputTokens": 46328,
+      "outputTokens": 98,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2542
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.047973,
+      "inputTokens": 47413,
+      "outputTokens": 112,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2811
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.048115,
+      "inputTokens": 47980,
+      "outputTokens": 27,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1702
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.052731,
+      "inputTokens": 52216,
+      "outputTokens": 103,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3492
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.06457,
+      "inputTokens": 52300,
+      "outputTokens": 2454,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 28899
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.055817,
+      "inputTokens": 53387,
+      "outputTokens": 486,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 6553
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-004",
+      "stage": "build",
+      "costUsd": 0.053993,
+      "inputTokens": 53898,
+      "outputTokens": 19,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2955
+    },
+    {
+      "participant": "test-writer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.2488587,
+      "inputTokens": 10,
+      "outputTokens": 8852,
+      "model": null,
+      "durationMs": 122286
+    },
+    {
+      "participant": "implementer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.15500049999999999,
+      "inputTokens": 12,
+      "outputTokens": 3709,
+      "model": null,
+      "durationMs": 33013
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.028592,
+      "inputTokens": 27917,
+      "outputTokens": 135,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2988
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.055292,
+      "inputTokens": 54697,
+      "outputTokens": 119,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2741
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.056267,
+      "inputTokens": 55782,
+      "outputTokens": 97,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2610
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.06026,
+      "inputTokens": 56995,
+      "outputTokens": 653,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 8974
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.057455,
+      "inputTokens": 57185,
+      "outputTokens": 54,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2392
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.066001,
+      "inputTokens": 60721,
+      "outputTokens": 1056,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 14926
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.078972,
+      "inputTokens": 60807,
+      "outputTokens": 3633,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 41467
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.074931,
+      "inputTokens": 62746,
+      "outputTokens": 2437,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 28707
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": 0.068912,
+      "inputTokens": 64687,
+      "outputTokens": 845,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 10679
+    },
+    {
+      "participant": "reviewer",
+      "taskId": "T-007",
+      "stage": "build",
+      "costUsd": null,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2749
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.005016,
+      "inputTokens": 4326,
+      "outputTokens": 138,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 3031
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.005538,
+      "inputTokens": 5438,
+      "outputTokens": 20,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1253
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.048608,
+      "inputTokens": 32218,
+      "outputTokens": 3278,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 37736
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.039293,
+      "inputTokens": 34188,
+      "outputTokens": 1021,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 12819
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.037651,
+      "inputTokens": 35111,
+      "outputTokens": 508,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 6771
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.035726,
+      "inputTokens": 35536,
+      "outputTokens": 38,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1815
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.004963,
+      "inputTokens": 4408,
+      "outputTokens": 111,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2568
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.005608,
+      "inputTokens": 5508,
+      "outputTokens": 20,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1915
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.051138,
+      "inputTokens": 32288,
+      "outputTokens": 3770,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 42998
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.036084,
+      "inputTokens": 34669,
+      "outputTokens": 283,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 5651
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.045849,
+      "inputTokens": 34919,
+      "outputTokens": 2186,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 26827
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.039594,
+      "inputTokens": 37059,
+      "outputTokens": 507,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 6748
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.038953,
+      "inputTokens": 37593,
+      "outputTokens": 272,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 4291
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.038086,
+      "inputTokens": 37896,
+      "outputTokens": 38,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1650
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.005038,
+      "inputTokens": 4408,
+      "outputTokens": 126,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 2673
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.00562,
+      "inputTokens": 5520,
+      "outputTokens": 20,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1264
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.05289,
+      "inputTokens": 32300,
+      "outputTokens": 4118,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 46854
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.039095,
+      "inputTokens": 34495,
+      "outputTokens": 920,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 11380
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.037361,
+      "inputTokens": 35341,
+      "outputTokens": 404,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 5730
+    },
+    {
+      "participant": "spec-critic",
+      "taskId": null,
+      "stage": "build",
+      "costUsd": 0.0359,
+      "inputTokens": 35760,
+      "outputTokens": 28,
+      "model": "openai/gpt-6.1-terra",
+      "durationMs": 1913
+    }
+  ],
+  "totals": {
+    "durationMs": 2820454,
+    "costUsd": 15.113509,
+    "inputTokens": 21141948,
+    "outputTokens": 610699,
+    "unknownCostEntries": 2
+  }
+}

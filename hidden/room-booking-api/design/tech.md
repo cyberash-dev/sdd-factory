@@ -2,15 +2,15 @@
 
 ## 1. Overview
 
-`roomy` is a single-process HTTP API in TypeScript that manages Rooms and their Bookings for one organisation, with all state held in the in-memory Store and lost when the process stops. It exposes exactly six endpoints: create and list Rooms, create and list the Bookings of a Room, delete a Booking, and list the rooms that are Availability for an Interval. Every response is JSON carrying exactly the documented members; every failure is a stable snake_case Error code from a single table. The server is built on the HTTP server bundled with the Node runtime, takes its listen port from `PORT` (default `3000`), and is started with `npm start` after `npm run build`.
+`roomy` is an in-memory HTTP API, served by one Node.js process, that manages meeting rooms and their bookings and is reached only over HTTP; there is no other interface, no persistence and no authentication. A request enters at a single Node `http` server, is routed to one of five declared endpoints, is validated at that boundary, and is answered with a JSON body carrying either an entity, a list or a stable snake_case error code. All state lives in a monotonic in-memory store that a new process starts empty. The process listens on the port named by `PORT` (default `3000`) and starts with `npm start` after `npm run build`. Every response except the `204` of `DELETE /bookings/:bookingId` carries `Content-Type: application/json`.
 
 ## 2. Module map
 
-### M-01 domain core
-- responsibility: define the shared response and routing types, the Error code table, the whole-minute UTC Time parser, and the in-memory Store with id assignment, Overlap, Availability and listing-order queries.
-- covers: [room-booking-api:BEH-011, room-booking-api:BEH-012, room-booking-api:INV-001, room-booking-api:INV-002, room-booking-api:INV-003, room-booking-api:INV-005, room-booking-api:INV-006, room-booking-api:INV-007, room-booking-api:POL-001]
-- owns: src/core/**
-- entry: src/core/index.ts
+### M-01 errors
+- responsibility: Own the closed set of error codes, the code-to-status mapping and the JSON response value object.
+- covers: [room-booking-api:INV-004, room-booking-api:INV-005, room-booking-api:POL-001]
+- owns: src/errors/**
+- entry: src/errors/index.ts
 - depends_on: []
 - public interface:
   ```ts
@@ -27,6 +27,40 @@
     | "not_found"
     | "method_not_allowed";
 
+  export interface ApiError {
+    readonly code: ErrorCode;
+    readonly status: number;
+    readonly conflictingBookingId?: string;
+  }
+
+  export interface ApiResponse {
+    readonly status: number;
+    readonly body?: unknown;
+  }
+
+  export function apiError(code: ErrorCode, conflictingBookingId?: string): ApiError;
+
+  export function errorBody(error: ApiError): {
+    error: ErrorCode;
+    conflictingBookingId?: string;
+  };
+
+  export function errorResponse(error: ApiError): ApiResponse;
+
+  export function jsonResponse(status: number, body: unknown): ApiResponse;
+
+  export const JSON_CONTENT_TYPE = "application/json";
+  ```
+- notes: Code-to-status pairs: invalid_json 400, invalid_room 400, room_name_taken 409, invalid_query 400, room_not_found 404, invalid_booking 400, over_capacity 422, room_busy 409, booking_not_found 404, not_found 404, method_not_allowed 405. `errorBody` emits `conflictingBookingId` only for `room_busy`. `JSON_CONTENT_TYPE` is the single literal every response header uses.
+
+### M-02 core
+- responsibility: Hold the entity shapes, the monotonic in-memory store and the shared time, overlap, ordering and JSON-body primitives.
+- covers: [room-booking-api:INV-001, room-booking-api:INV-002, room-booking-api:INV-003, room-booking-api:INV-006, room-booking-api:INV-007, room-booking-api:INV-008, room-booking-api:SCN-003]
+- owns: src/core/**
+- entry: src/core/index.ts
+- depends_on: []
+- public interface:
+  ```ts
   export interface Room {
     readonly id: string;
     readonly name: string;
@@ -42,292 +76,276 @@
     readonly attendees: number;
   }
 
-  export interface ErrorBody {
-    readonly error: ErrorCode;
-    readonly conflictingBookingId?: string;
+  export interface Interval {
+    readonly startMs: number;
+    readonly endMs: number;
+  }
+
+  export interface NewBooking {
+    readonly roomId: string;
+    readonly title: string;
+    readonly start: string;
+    readonly end: string;
+    readonly startMs: number;
+    readonly endMs: number;
+    readonly attendees: number;
   }
 
   export interface Store {
-    addRoom(input: { name: string; capacity: number }): Room;
-    rooms(): readonly Room[];
-    findRoom(roomId: string): Room | undefined;
+    listRooms(minCapacity: number | null): Room[];
+    findRoom(roomId: string): Room | null;
     roomNameTaken(name: string): boolean;
-    addBooking(input: {
-      roomId: string;
-      title: string;
-      start: string;
-      end: string;
-      startMs: number;
-      endMs: number;
-      attendees: number;
-    }): Booking;
-    findBooking(bookingId: string): Booking | undefined;
-    removeBooking(bookingId: string): boolean;
-    bookingsOf(roomId: string): readonly Booking[];
-    bookingsOverlapping(roomId: string, fromMs: number, toMs: number): readonly Booking[];
-    earliestConflict(roomId: string, startMs: number, endMs: number): Booking | undefined;
-    availableRooms(startMs: number, endMs: number, attendees: number): readonly Room[];
-    instantOf(booking: Booking): { startMs: number; endMs: number };
+    addRoom(name: string, capacity: number): Room;
+    listBookings(roomId: string, window: Interval | null): Booking[];
+    addBooking(input: NewBooking): Booking;
+    findBooking(bookingId: string): Booking | null;
+    deleteBooking(bookingId: string): Booking | null;
+    earliestConflict(roomId: string, interval: Interval): Booking | null;
+    availableRooms(window: Interval, attendees: number): Room[];
   }
 
   export function createStore(): Store;
 
-  export function parseTime(value: unknown): number | undefined;
+  export function parseTime(value: string): number | null;
 
-  export function formatError(
-    code: ErrorCode,
-    conflict?: Booking,
-  ): { status: number; body: ErrorBody };
+  export function intervalsOverlap(a: Interval, b: Interval): boolean;
 
-  export interface HandlerRequest {
-    readonly params: Readonly<Record<string, string>>;
-    readonly query: URLSearchParams;
-    readonly body: unknown;
-  }
+  export type ParsedBody =
+    | { readonly kind: "empty" }
+    | { readonly kind: "invalid" }
+    | { readonly kind: "value"; readonly value: unknown };
 
-  export interface HandlerResponse {
-    readonly status: number;
-    readonly body?: unknown;
-  }
-
-  export interface Route {
-    readonly method: "GET" | "POST" | "DELETE";
-    readonly path: string;
-    readonly expectsJsonBody: boolean;
-    readonly handle: (request: HandlerRequest) => HandlerResponse;
-  }
+  export function parseJsonBody(raw: string): ParsedBody;
   ```
-- notes: raises no HTTP error itself; `formatError` holds the only copy of the code→status→body table (POL-001). The Store keeps rooms and bookings in creation-ordered arrays and two monotonic counters, so listing order is id creation order (ASM-005) and no id is ever reused (INV-001, INV-002, INV-006). `parseTime` returns whole-minute epoch milliseconds or `undefined`; a Booking keeps the submitted `start`/`end` text and its millisecond instants, exposed only through `instantOf`.
+- notes: `createStore` keeps two counters: the number of rooms created (room ids `r<N+1>`) and the highest booking id handed out (booking ids `b<N+1>`, global across rooms); neither counter decreases when an entity is deleted, so no id is ever reused. `listRooms` orders by the integer suffix of the id, ascending, and keeps rooms whose capacity is at least `minCapacity` when one is given. `listBookings` orders by `start` ascending then by the integer suffix of the id, keeps only bookings overlapping the half-open `window` when one is given, and keeps every booking of the room otherwise. `addBooking` stores the `start` and `end` strings exactly as given and never re-derives them, so a returned time is the spelling the requester sent. `earliestConflict` returns the overlapping booking of that room with the smallest `start` and, on equal `start`, the smallest integer id suffix. `availableRooms` keeps rooms whose capacity is at least `attendees` and which have no booking overlapping `window`, ordered by capacity ascending then id suffix. `parseTime` accepts only a whole-minute UTC string with an upper-case `Z` suffix in the forms `YYYY-MM-DDTHH:MMZ`, `YYYY-MM-DDTHH:MM:00Z` and `YYYY-MM-DDTHH:MM:00.000Z`, rejects any other spellings and non-calendar dates, and returns epoch milliseconds. `intervalsOverlap` implements the half-open rule `a.startMs < b.endMs && b.startMs < a.endMs`. `parseJsonBody` returns `empty` only for a zero-length body, `invalid` when `JSON.parse` throws, and `value` otherwise.
 
-### M-02 room endpoints
-- responsibility: serve `POST /rooms` and `GET /rooms`, including every room-body and query rule and room-name uniqueness.
-- covers: [room-booking-api:BEH-001, room-booking-api:BEH-002, room-booking-api:BEH-003, room-booking-api:BEH-004, room-booking-api:BEH-005, room-booking-api:BEH-006, room-booking-api:BEH-007, room-booking-api:CTR-001, room-booking-api:CTR-002, room-booking-api:SCN-001]
-- owns: src/rooms/**
-- entry: src/rooms/index.ts
-- depends_on: [M-01]
+### M-03 routes/rooms
+- responsibility: Serve `POST /rooms` and `GET /rooms`.
+- covers: [room-booking-api:BEH-001, room-booking-api:BEH-002, room-booking-api:BEH-003, room-booking-api:BEH-004, room-booking-api:BEH-005, room-booking-api:BEH-006, room-booking-api:CTR-001, room-booking-api:CTR-002]
+- owns: src/routes/rooms/**
+- entry: src/routes/rooms/index.ts
+- depends_on: [M-01, M-02]
 - public interface:
   ```ts
-  import type {
-    HandlerRequest,
-    HandlerResponse,
-    Route,
-    Store,
-  } from "../core/index.js";
+  import type { ApiResponse } from "../../errors/index.js";
+  import type { ParsedBody, Store } from "../../core/index.js";
 
-  export function createRoomRoutes(store: Store): readonly Route[];
+  export function handleCreateRoom(store: Store, body: ParsedBody): ApiResponse;
+
+  export function handleListRooms(
+    store: Store,
+    query: URLSearchParams,
+    body: ParsedBody,
+  ): ApiResponse;
   ```
-- notes: raises `invalid_room` (400), `room_name_taken` (409) and, for `GET /rooms?minCapacity=`, `invalid_query` (400). Validation order for `POST /rooms`: the body must be a JSON object other than an array (`invalid_room`), then name, then capacity, then the case-insensitive name check.
+- notes: `handleCreateRoom` answers in this fixed order (its contract's `code_precedence` with the body-level prerequisite first): `invalid_json` when the body is `invalid`; `invalid_room` when the body is `empty`, is not a non-null non-array object, carries a `name` that is not a string of length 1..40, or a `capacity` that is not an integer in 1..100 (the store is untouched); `room_name_taken` when `store.roomNameTaken(name)` reports a name equal under `toLowerCase`, otherwise `201` with the created room. `handleListRooms` validates the query first: a `minCapacity` present and not matching `/^[1-9][0-9]*$/` is `invalid_query`; then an `invalid` body is `invalid_json`; otherwise `200` with `{ rooms: store.listRooms(minCapacity) }`. `query.get` returns the first occurrence of a repeated parameter. Response bodies carry only the fields of `Room` or the `rooms` array.
 
-### M-03 booking creation endpoint
-- responsibility: serve `POST /rooms/:roomId/bookings` with every booking-body, capacity and Conflict rule in the documented precedence.
-- covers: [room-booking-api:BEH-008, room-booking-api:BEH-009, room-booking-api:BEH-010, room-booking-api:BEH-013, room-booking-api:BEH-014, room-booking-api:BEH-015, room-booking-api:BEH-016, room-booking-api:BEH-017, room-booking-api:BEH-028, room-booking-api:CTR-003, room-booking-api:SCN-002, room-booking-api:SCN-004]
-- owns: src/booking-create/**
-- entry: src/booking-create/index.ts
-- depends_on: [M-01]
+### M-04 routes/booking-create
+- responsibility: Serve `POST /rooms/:roomId/bookings`.
+- covers: [room-booking-api:BEH-007, room-booking-api:BEH-008, room-booking-api:BEH-009, room-booking-api:BEH-010, room-booking-api:BEH-011, room-booking-api:BEH-012, room-booking-api:CTR-003, room-booking-api:SCN-002]
+- owns: src/routes/booking-create/**
+- entry: src/routes/booking-create/index.ts
+- depends_on: [M-01, M-02]
 - public interface:
   ```ts
-  import type {
-    HandlerRequest,
-    HandlerResponse,
-    Route,
-    Store,
-  } from "../core/index.js";
+  import type { ApiResponse } from "../../errors/index.js";
+  import type { ParsedBody, Store } from "../../core/index.js";
 
-  export function createBookingCreateRoutes(store: Store): readonly Route[];
+  export function handleCreateBooking(
+    store: Store,
+    roomId: string,
+    body: ParsedBody,
+  ): ApiResponse;
   ```
-- notes: raises `room_not_found` (404), `invalid_booking` (400), `over_capacity` (422) and `room_busy` (409) with `conflictingBookingId`. Check order after the router's `invalid_json`: room existence, body validity (title, both times, end after start, at most 8 hours, attendees an integer at least 1), then capacity, then Conflict (BEH-028).
+- notes: Resolution order is fixed: `room_not_found` (404) when `store.findRoom(roomId)` is null, before the body is looked at; then `invalid_json` (400) when the body is `invalid`; then `invalid_booking` (400) when the body is `empty`, is not a non-null non-array object, carries a `title` that is not a string of length 1..80, a `start` or `end` that `parseTime` rejects, an `end` not after `start`, a duration above 28 800 000 ms, or an `attendees` that is not an integer of at least 1; then `over_capacity` (422) when `attendees` exceeds `room.capacity`; then `room_busy` (409) with `conflictingBookingId` set to the id of `store.earliestConflict(...)`; otherwise `201` with `store.addBooking(...)`. No step before a successful `addBooking` writes to the store.
 
-### M-04 booking reads, deletion and availability
-- responsibility: serve `GET /rooms/:roomId/bookings`, `DELETE /bookings/:bookingId` and `GET /availability`, including the interval-overlap filter and every listing order.
-- covers: [room-booking-api:BEH-018, room-booking-api:BEH-019, room-booking-api:BEH-020, room-booking-api:BEH-021, room-booking-api:BEH-022, room-booking-api:BEH-023, room-booking-api:BEH-024, room-booking-api:CTR-004, room-booking-api:CTR-005, room-booking-api:CTR-006, room-booking-api:SCN-003]
-- owns: src/booking-read/**
-- entry: src/booking-read/index.ts
-- depends_on: [M-01]
+### M-05 routes/booking-query
+- responsibility: Serve `GET /rooms/:roomId/bookings` and `DELETE /bookings/:bookingId`.
+- covers: [room-booking-api:BEH-013, room-booking-api:BEH-014, room-booking-api:BEH-015, room-booking-api:BEH-016, room-booking-api:BEH-017, room-booking-api:CTR-004, room-booking-api:CTR-005, room-booking-api:SCN-001]
+- owns: src/routes/booking-query/**
+- entry: src/routes/booking-query/index.ts
+- depends_on: [M-01, M-02]
 - public interface:
   ```ts
-  import type {
-    HandlerRequest,
-    HandlerResponse,
-    Route,
-    Store,
-  } from "../core/index.js";
+  import type { ApiResponse } from "../../errors/index.js";
+  import type { ParsedBody, Store } from "../../core/index.js";
 
-  export function createBookingReadRoutes(store: Store): readonly Route[];
+  export function handleListBookings(
+    store: Store,
+    roomId: string,
+    query: URLSearchParams,
+    body: ParsedBody,
+  ): ApiResponse;
+
+  export function handleDeleteBooking(
+    store: Store,
+    bookingId: string,
+    body: ParsedBody,
+  ): ApiResponse;
   ```
-- notes: raises `invalid_query` (400), `room_not_found` (404) and `booking_not_found` (404). On `GET /rooms/:roomId/bookings` the query is validated before the room lookup (BEH-028). `GET /availability` validates all three parameters before answering.
+- notes: `handleListBookings` validates the window first: `from` and `to` must be both absent or both present, each must parse through `parseTime`, and `to` must be after `from`, otherwise `invalid_query` (400) even for an unknown room; then an unknown room is `room_not_found` (404); then an `invalid` body is `invalid_json` (400); otherwise `200` with `{ bookings: store.listBookings(roomId, window) }` where `window` is null when no window was given. `handleDeleteBooking` answers `booking_not_found` (404) when `store.findBooking(bookingId)` is null, then `invalid_json` (400) when the body is `invalid`, otherwise removes the booking with `store.deleteBooking` and answers `204` with no body.
 
-### M-05 HTTP server and routing
-- responsibility: own the socket, read and parse request bodies, match requests to Routes, and write JSON responses, `not_found` and `method_not_allowed`.
-- covers: [room-booking-api:BEH-025, room-booking-api:BEH-026, room-booking-api:BEH-027, room-booking-api:CTR-007, room-booking-api:INV-004, room-booking-api:POL-002]
-- owns: src/http/**
-- entry: src/http/index.ts
-- depends_on: [M-01]
+### M-06 routes/availability
+- responsibility: Serve `GET /availability`.
+- covers: [room-booking-api:BEH-018, room-booking-api:BEH-019, room-booking-api:CTR-006]
+- owns: src/routes/availability/**
+- entry: src/routes/availability/index.ts
+- depends_on: [M-01, M-02]
 - public interface:
   ```ts
-  import type { Route } from "../core/index.js";
+  import type { ApiResponse } from "../../errors/index.js";
+  import type { ParsedBody, Store } from "../../core/index.js";
+
+  export function handleAvailability(
+    store: Store,
+    query: URLSearchParams,
+    body: ParsedBody,
+  ): ApiResponse;
+  ```
+- notes: `invalid_query` (400) when `start`, `end` or `attendees` is missing, when `start` or `end` fails `parseTime`, when `end` is not after `start`, or when `attendees` does not match `/^-?[0-9]+(\.[0-9]+)?$/` or does not denote an integer; then `invalid_json` (400) for an `invalid` body; otherwise `200` with `{ rooms: store.availableRooms(window, attendees) }`. No request to this route produces a response without a body.
+
+### M-07 server
+- responsibility: Compose the process: parse the request target, read the raw body, route by path and method, call the route module and serialise its `ApiResponse`.
+- covers: [room-booking-api:BEH-020, room-booking-api:BEH-021, room-booking-api:CTR-007, room-booking-api:POL-002, room-booking-api:CON-001, room-booking-api:CON-002, room-booking-api:NFR-001, room-booking-api:IB-001, room-booking-api:LOC-001]
+- owns: src/server/**, src/index.ts, tsconfig.build.json
+- entry: src/server/index.ts
+- depends_on: [M-01, M-02, M-03, M-04, M-05, M-06]
+- public interface:
+  ```ts
   import type { Server } from "node:http";
-
-  export function createHttpServer(routes: readonly Route[]): Server;
-  ```
-- notes: raises `invalid_json` (400), `not_found` (404) and `method_not_allowed` (405). It never inspects the request's `Content-Type`, always answers `Content-Type: application/json` when a body is written, and answers a 204 with no header and no body. A Route marked `expectsJsonBody` receives `JSON.parse` of the body text; a parse failure or a body above 1048576 bytes answers `invalid_json` before the handler runs. The router adds no Error code of its own: the handlers are total over `unknown` bodies and query strings, so no request can reach a missing branch.
-
-### M-06 composition root
-- responsibility: wire the Store, the three route groups and the HTTP server, parse `PORT`, and own the process entry and the emitting build configuration.
-- covers: [room-booking-api:CN-001, room-booking-api:CN-002, room-booking-api:CN-003]
-- owns: src/app/**, src/index.ts, tsconfig.build.json
-- entry: src/app/index.ts
-- depends_on: [M-01, M-02, M-03, M-04, M-05]
-- public interface:
-  ```ts
+  import type { ApiResponse } from "../errors/index.js";
   import type { Store } from "../core/index.js";
-  import type { Server } from "node:http";
 
-  export function buildServer(store?: Store): Server;
+  export interface RunningServer {
+    readonly port: number;
+    readonly url: string;
+    close(): Promise<void>;
+  }
 
-  export function startServer(
-    port: number,
-  ): Promise<{ readonly port: number; readonly close: () => Promise<void> }>;
+  export function createServer(store: Store): Server;
+
+  export function startServer(port: number): Promise<RunningServer>;
   ```
-- notes: `buildServer` creates one Store, concatenates the route tables of M-02, M-03 and M-04 and passes them to `createHttpServer`; it does not listen. `startServer` calls `buildServer()` and resolves with the port the runtime actually bound, so port `0` yields an ephemeral port (CN-003). `src/index.ts` reads `process.env.PORT`, defaulting to `3000`, calls `startServer`, writes a listen failure to stderr and exits with code 1. This task also adds the `build` script (`tsc -p tsconfig.build.json`, emitting to `dist`) and the `start` script (`node dist/index.js`) to `package.json`; it declares no dependency (CN-001) and makes no outbound request.
+- notes: `createServer` matches the path against exactly `/rooms`, `/availability`, `/rooms/<roomId>/bookings` and `/bookings/<bookingId>` on segments split at `/` with no percent-decoding and no trailing-slash tolerance; any other path is undeclared. Resolution is: when the path is undeclared, `invalid_json` (400) if the body is `invalid`, otherwise `not_found` (404); when the path is declared but its method is not one of the endpoint's declared methods, `invalid_json` (400) when the body is `invalid` otherwise `method_not_allowed` (405); otherwise the matching route function. Every `ApiResponse` is written with `JSON_CONTENT_TYPE` and the body serialised by `JSON.stringify`, except a response whose `body` is `undefined` (the `204`), which is sent with the status alone, no `Content-Type` and no body. Route functions do not throw for a documented failure, and the handler wraps the routing call in a `try`/`catch` so that an unexpected exception still produces a response from the closed code set: the catch answers `not_found` with status `404` and no connection is left without a response. `src/index.ts` is the process entry, is not imported by tests, reads `PORT`, and calls `startServer`. The module also owns `tsconfig.build.json` (`rootDir` `src`, `outDir` `dist`, `noEmit` false) and sets the `start` script of `package.json` to `node dist/index.js`.
 
 ## 3. Data shapes
 
+Room object, exactly three keys; the store and every response body share it.
 ```ts
-// room-booking-api:CTR-001, room-booking-api:CTR-002, room-booking-api:CTR-006, room-booking-api:INV-005
 export interface Room {
-  readonly id: string;        // "r<N>", N the creation ordinal (INV-001)
-  readonly name: string;      // stored verbatim (ASM-006)
-  readonly capacity: number;  // integer 1..100
+  readonly id: string;
+  readonly name: string;
+  readonly capacity: number;
 }
 ```
+covers: room-booking-api:INV-007, room-booking-api:CTR-001, room-booking-api:CTR-002, room-booking-api:CTR-006
 
+Booking object, exactly six keys; `start` and `end` are the UTC strings the requester supplied.
 ```ts
-// room-booking-api:CTR-003, room-booking-api:CTR-004, room-booking-api:INV-002, room-booking-api:INV-005
 export interface Booking {
-  readonly id: string;        // "b<N>", N the process-wide creation ordinal (INV-002)
+  readonly id: string;
   readonly roomId: string;
-  readonly title: string;     // stored verbatim (ASM-006)
-  readonly start: string;     // the submitted Time text, echoed as submitted (CTR-003)
-  readonly end: string;       // the submitted Time text, echoed as submitted (CTR-003)
+  readonly title: string;
+  readonly start: string;
+  readonly end: string;
   readonly attendees: number;
 }
 ```
+covers: room-booking-api:INV-007, room-booking-api:INV-008, room-booking-api:CTR-003, room-booking-api:CTR-004
 
+List bodies, each carrying exactly one array key.
 ```ts
-// room-booking-api:POL-001, room-booking-api:CTR-007, room-booking-api:INV-005
-export type ErrorCode =
-  | "invalid_json"
-  | "invalid_room"
-  | "room_name_taken"
-  | "invalid_query"
-  | "room_not_found"
-  | "invalid_booking"
-  | "over_capacity"
-  | "room_busy"
-  | "booking_not_found"
-  | "not_found"
-  | "method_not_allowed";
+export interface RoomListBody {
+  readonly rooms: Room[];
+}
+
+export interface BookingListBody {
+  readonly bookings: Booking[];
+}
+```
+covers: room-booking-api:INV-007, room-booking-api:CTR-002, room-booking-api:CTR-004, room-booking-api:CTR-006
+
+Error body, `conflictingBookingId` present only for `room_busy`; `ErrorCode` is the union exported by M-01.
+```ts
+import type { ErrorCode } from "../errors/index.js";
 
 export interface ErrorBody {
   readonly error: ErrorCode;
-  readonly conflictingBookingId?: string; // present only on room_busy
+  readonly conflictingBookingId?: string;
 }
 ```
+covers: room-booking-api:INV-004, room-booking-api:POL-001
 
+Half-open interval in epoch milliseconds, the only representation used for comparisons.
 ```ts
-// room-booking-api:BEH-019, room-booking-api:BEH-023, room-booking-api:INV-003, room-booking-api:INV-007
-export interface Store {
-  addRoom(input: { name: string; capacity: number }): Room;
-  rooms(): readonly Room[];
-  findRoom(roomId: string): Room | undefined;
-  roomNameTaken(name: string): boolean;
-  addBooking(input: {
-    roomId: string;
-    title: string;
-    start: string;
-    end: string;
-    startMs: number;
-    endMs: number;
-    attendees: number;
-  }): Booking;
-  findBooking(bookingId: string): Booking | undefined;
-  removeBooking(bookingId: string): boolean;
-  bookingsOf(roomId: string): readonly Booking[];
-  bookingsOverlapping(roomId: string, fromMs: number, toMs: number): readonly Booking[];
-  earliestConflict(roomId: string, startMs: number, endMs: number): Booking | undefined;
-  availableRooms(startMs: number, endMs: number, attendees: number): readonly Room[];
-  instantOf(booking: Booking): { startMs: number; endMs: number };
+export interface Interval {
+  readonly startMs: number;
+  readonly endMs: number;
 }
 ```
+covers: room-booking-api:INV-003, room-booking-api:BEH-011, room-booking-api:BEH-014, room-booking-api:BEH-018
 
+Result of parsing a request body once, at the server boundary, and handing it to a route.
 ```ts
-// room-booking-api:CTR-001, room-booking-api:CTR-003, room-booking-api:CTR-007, room-booking-api:CTR-006
-export interface HandlerRequest {
-  readonly params: Readonly<Record<string, string>>; // ":roomId", ":bookingId"
-  readonly query: URLSearchParams;                   // raw query, first value wins
-  readonly body: unknown;                            // undefined when the Route expects no body
-}
+export type ParsedBody =
+  | { readonly kind: "empty" }
+  | { readonly kind: "invalid" }
+  | { readonly kind: "value"; readonly value: unknown };
+```
+covers: room-booking-api:CTR-001, room-booking-api:CTR-003, room-booking-api:CTR-007, room-booking-api:BEH-009
 
-export interface HandlerResponse {
+Resolved response value object returned by every route function; this is the `ApiResponse` type exported by M-01, imported by every consumer.
+```ts
+export interface ApiResponse {
   readonly status: number;
-  readonly body?: unknown;                           // omitted on 204
-}
-
-export interface Route {
-  readonly method: "GET" | "POST" | "DELETE";
-  readonly path: string;                             // "/rooms/:roomId/bookings"
-  readonly expectsJsonBody: boolean;
-  readonly handle: (request: HandlerRequest) => HandlerResponse;
+  readonly body?: unknown;
 }
 ```
+covers: room-booking-api:INV-005, room-booking-api:INV-007
+
+Addition draft used to create a booking, carrying both the requester's strings and the parsed milliseconds.
+```ts
+export interface NewBooking {
+  readonly roomId: string;
+  readonly title: string;
+  readonly start: string;
+  readonly end: string;
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly attendees: number;
+}
+```
+covers: room-booking-api:INV-002, room-booking-api:INV-008, room-booking-api:BEH-007
 
 ## 4. Error mapping
 
-Every code below is listed by at least one approved Contract; no other code exists. The status and the body shape are fixed by the Contracts; `formatError` in M-01 is the single implementation.
-
-| Error code | Raising module | Status | Body |
+| error code | raising module(s) | HTTP status | body shape |
 |---|---|---|---|
-| invalid_json | M-05 (body read and parse) | 400 | `{"error":"invalid_json"}` |
-| invalid_room | M-02 (`POST /rooms`) | 400 | `{"error":"invalid_room"}` |
-| room_name_taken | M-02 (`POST /rooms`) | 409 | `{"error":"room_name_taken"}` |
-| invalid_query | M-02 (`GET /rooms`), M-04 (`GET /rooms/:roomId/bookings`, `GET /availability`) | 400 | `{"error":"invalid_query"}` |
-| room_not_found | M-03 (`POST /rooms/:roomId/bookings`), M-04 (`GET /rooms/:roomId/bookings`) | 404 | `{"error":"room_not_found"}` |
-| invalid_booking | M-03 (`POST /rooms/:roomId/bookings`) | 400 | `{"error":"invalid_booking"}` |
-| over_capacity | M-03 (`POST /rooms/:roomId/bookings`) | 422 | `{"error":"over_capacity"}` |
-| room_busy | M-03 (`POST /rooms/:roomId/bookings`) | 409 | `{"error":"room_busy","conflictingBookingId":"b<N>"}` |
-| booking_not_found | M-04 (`DELETE /bookings/:bookingId`) | 404 | `{"error":"booking_not_found"}` |
-| not_found | M-05 (no Route path matches) | 404 | `{"error":"not_found"}` |
-| method_not_allowed | M-05 (a Route path matches, the method does not) | 405 | `{"error":"method_not_allowed"}` |
+| invalid_json | M-03, M-04, M-05, M-06, M-07 | 400 | `{"error":"invalid_json"}` |
+| invalid_room | M-03 | 400 | `{"error":"invalid_room"}` |
+| room_name_taken | M-03 | 409 | `{"error":"room_name_taken"}` |
+| invalid_query | M-03, M-05, M-06 | 400 | `{"error":"invalid_query"}` |
+| room_not_found | M-04, M-05 | 404 | `{"error":"room_not_found"}` |
+| invalid_booking | M-04 | 400 | `{"error":"invalid_booking"}` |
+| over_capacity | M-04 | 422 | `{"error":"over_capacity"}` |
+| room_busy | M-04 | 409 | `{"error":"room_busy","conflictingBookingId":"<booking id>"}` |
+| booking_not_found | M-05 | 404 | `{"error":"booking_not_found"}` |
+| not_found | M-07 | 404 | `{"error":"not_found"}` |
+| method_not_allowed | M-07 | 405 | `{"error":"method_not_allowed"}` |
 
-Request handling produces no process exit code: every failure is one of the rows above. The process exits with code 1 only when the listen call fails (DD-13).
+Every one of these bodies is produced by `errorBody` in M-01, carries `Content-Type: application/json`, and holds no other key. No other status is returned: `201` for a created room, `201` for a created booking, `200` for every list, `204` with no body for a deleted booking. The eleven codes above are the closed set of `INV-004`; an error is never reported as free text. No code maps to a process exit; the only non-zero exit is the start-up failure described in section 5.
 
 ## 5. Process and IO boundaries
 
-Command: `npm run build` then `npm start`; the process takes no arguments, reads no stdin and consumes exactly one environment variable.
-
-| Boundary | Contract |
-|---|---|
-| env `PORT` | unset or empty string means `3000`; otherwise a decimal integer in 0..65535; `0` binds an ephemeral port (CN-002, CN-003) |
-| listen host | not set by the product: the runtime default of all interfaces |
-| stdout | nothing is written on a successful start |
-| stderr | the failure text, followed by exit code 1, when the listen call fails (DD-13) |
-| exit code | 1 on a listen failure; the process runs until it is signalled |
-| request encoding | UTF-8; bodies are read as text and parsed with `JSON.parse` |
-| body size | a body above 1048576 bytes answers 400 `invalid_json` (DD-09) |
-| response headers | `Content-Type: application/json` on every response with a body; a 204 carries no header and no body (INV-004) |
-| files | none read or written while running; rooms and bookings live in memory only (INV-006); `tsconfig.build.json` writes `dist/` at build time |
-| outbound network | none (CN-001) |
-
-| Method | Path | Module | Success status | Success body |
-|---|---|---|---|---|
-| POST | `/rooms` | M-02 | 201 | `{"id","name","capacity"}` |
-| GET | `/rooms` | M-02 | 200 | `{"rooms":[Room,...]}` |
-| POST | `/rooms/:roomId/bookings` | M-03 | 201 | `{"id","roomId","title","start","end","attendees"}` |
-| GET | `/rooms/:roomId/bookings` | M-04 | 200 | `{"bookings":[Booking,...]}` |
-| DELETE | `/bookings/:bookingId` | M-04 | 204 | none |
-| GET | `/availability` | M-04 | 200 | `{"rooms":[Room,...]}` |
-
-Any other path answers 404 `not_found`; a listed path with another method answers 405 `method_not_allowed` (ASM-001). Paths are matched segment by segment with no trailing-slash normalisation, so `GET /rooms/` and `DELETE /rooms/r1` answer `not_found` (DD-07).
+- **Process entry.** `src/index.ts`, built to `dist/index.js`, started by `npm start` (`node dist/index.js`) after `npm run build`. No command-line argument is read; argv beyond the script path is ignored.
+- **Environment.** One variable is read: `PORT`. Unset means `3000`. `PORT=0` means an ephemeral port chosen by the operating system, reported by `startServer`. A `PORT` value that is not a decimal string denoting an integer in `0..65535` makes the process exit with status `1` before listening. No other environment variable is read.
+- **Listen address.** `createServer(store).listen(port)` with no host argument, so the socket binds on the default interface set of the runtime; the port is the only configurable part of the address.
+- **Request reading.** The request target is split at `?`; the path is split at `/` into segments; the query is parsed with `new URLSearchParams(search)`; the raw body is the UTF-8 decoding of every request chunk, and a zero-length body is `empty`, every other body goes through `parseJsonBody`. No request header is read other than the request line's method and target.
+- **Response writing.** Status from `ApiResponse.status`; when `body` is defined, the body is `JSON.stringify(body)` and the header `Content-Type: application/json` is set together with a `Content-Length` in UTF-8 bytes; when `body` is `undefined` (the `204`) no `Content-Type` and no body are written.
+- **Files.** The process reads no file and writes no file at runtime; state exists only in process memory and is lost when the process stops. The build writes `dist/` through `tsconfig.build.json`.
+- **stdout / stderr.** The process writes nothing to stdout and nothing to stderr on a successful start; a start-up failure (invalid `PORT` or a listen error such as an occupied port) writes nothing and exits `1`.
+- **Exit.** The process exits when it is signalled or when the listening socket closes; the only self-initiated exit is the start-up failure with status `1`.
+- **Concurrency.** One actor per process, requests handled on the event loop with no interleaving inside a handler, strong read consistency from the shared store.
 
 ## 6. TD-TOOLING
 
@@ -337,151 +355,139 @@ TD-TOOLING:
   test_cmd: "npx vitest run"
   typecheck_cmd: "npx tsc --noEmit"
   dependencies: []
-  dev_dependencies: ["typescript@5.6.3", "vitest@2.1.8", "@types/node@22.9.0"]
-  tsconfig: { module: NodeNext, moduleResolution: NodeNext, target: ES2022, strict: true, noEmit: true }
+  dev_dependencies: ["typescript@7.0.2", "vitest@5.0.5", "@types/node@26.6.6"]
+  tsconfig:
+    module: "NodeNext"
+    moduleResolution: "NodeNext"
+    target: "ES2022"
+    strict: true
+    noEmit: true
 ```
 
 ## 7. Design decisions
 
-**DD-01 Node built-in HTTP server with a hand-written router**
-- evidence: [room-booking-api:CN-001, room-booking-api:CN-003, room-booking-api:POL-002]
-- decision: the surface is served by `node:http`; M-05 matches requests against the Route table and writes the response itself, and no runtime dependency is declared.
-- alternatives_rejected: an HTTP framework or router package, which would add a third-party runtime dependency that CN-001 forbids; reading raw sockets, which duplicates framing the runtime already provides.
-- consequence: body reading, JSON parsing, content type and routing all live in M-05 and are testable through `createHttpServer`.
+### DD-01 HTTP server from the Node.js standard library
+- evidence: [room-booking-api:CON-002, room-booking-api:CON-001, room-booking-api:IB-001, room-booking-api:ASM-002]
+- decision: The server is `node:http` `createServer`, with no runtime dependency in `package.json`; routing, body reading and JSON serialisation are written in the product.
+- alternatives_rejected: a web framework such as Express or Fastify (would declare a runtime dependency CON-002 forbids); a raw TCP line protocol (IB-001 requires an HTTP server on `PORT`).
+- consequence: M-07 owns routing and serialisation by hand; every route module returns a plain `ApiResponse` the server serialises.
 
-**DD-02 In-memory Store with monotonic counters and creation-ordered arrays**
-- evidence: [room-booking-api:INV-001, room-booking-api:INV-002, room-booking-api:INV-006, room-booking-api:INV-007]
-- decision: `createStore` returns a closure over two arrays and two counters; a new Room gets `r<roomsCreated+1>` and a new Booking `b<bookingsCreated+1>`; a rejected request increments nothing; deletion splices the array and frees no id.
-- alternatives_rejected: any file, database or external store (INV-006 forbids persistence); a `Map` keyed by id plus separate order arrays (redundant because insertion order already is id order under ASM-005).
-- consequence: listings already iterate in creation order, so an order by id needs no comparison (ASM-005), and a restart starts again from `r1` and `b1`.
+### DD-02 Error code to HTTP status table
+- evidence: [room-booking-api:POL-001, room-booking-api:INV-004, room-booking-api:CTR-003, room-booking-api:CTR-001]
+- decision: The status of each code is fixed once in M-01: `invalid_json` 400, `invalid_room` 400, `room_name_taken` 409, `invalid_query` 400, `room_not_found` 404, `invalid_booking` 400, `over_capacity` 422, `room_busy` 409, `booking_not_found` 404, `not_found` 404, `method_not_allowed` 405.
+- alternatives_rejected: deriving the status at each call site (drift between endpoints); mapping every 4xx to 400 (contradicts the statuses the contracts state).
+- consequence: `apiError` is the only place that pairs a code with a status, and the error mapping table of section 4 is exhaustive.
 
-**DD-03 Strict whole-minute UTC time parsing, submitted text echoed**
-- evidence: [room-booking-api:BEH-011, room-booking-api:BEH-012, room-booking-api:CTR-003, room-booking-api:ASM-004, room-booking-api:ASM-009]
-- decision: `parseTime` accepts a string matching `^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?Z$`, rejects a non-zero seconds or fractional part, validates the calendar fields by rebuilding the instant with `Date.UTC` and comparing the components, and returns whole-minute epoch milliseconds; anything else returns `undefined`. A Booking stores the submitted `start`/`end` text unchanged and keeps the millisecond instants beside it.
-- alternatives_rejected: `Date.parse` or `new Date(text)`, which accept offsets and out-of-range fields and silently normalise; a regex without a calendar round-trip, which accepts `2026-02-30T09:00:00Z`.
-- consequence: `2026-11-02T09:30Z`, `2026-11-02T09:30:00Z` and `2026-11-02T09:30:00.000Z` are one instant and all accepted, an offset time is rejected (ASM-009), and responses echo the client's own text (CTR-003).
+### DD-03 Time parsing accepts whole-minute UTC spellings only
+- evidence: [room-booking-api:INV-008, room-booking-api:BEH-008, room-booking-api:BEH-014, room-booking-api:A-002, room-booking-api:A-003]
+- decision: A time is accepted as `YYYY-MM-DDTHH:MMZ`, `YYYY-MM-DDTHH:MM:00Z` or `YYYY-MM-DDTHH:MM:00.000Z`, upper-case `Z` only, calendar-valid, and nothing else: a numeric offset, a lower-case `z`, a non-zero seconds field or a non-zero fraction is unparseable. An accepted string is stored and returned exactly as given.
+- alternatives_rejected: `Date.parse` on any ISO-8601 input (would accept `+01:00` offsets and second precision, which BEH-008 rejects); normalising every time to the `09:30:00Z` form on return (would contradict A-002, which is in force).
+- consequence: `parseTime` is a hand-written matcher with a round-trip calendar check; the echo of the requester's spelling is the store's responsibility, not the serialiser's.
 
-**DD-04 Half-open Overlap predicate, earliest-starting Conflict**
-- evidence: [room-booking-api:INV-003, room-booking-api:BEH-016, room-booking-api:BEH-017, room-booking-api:BEH-019, room-booking-api:SCN-004]
-- decision: two intervals overlap exactly when `startMs < otherEndMs && otherStartMs < endMs`. `earliestConflict` scans the room's bookings, keeps those that overlap, and returns the one with the smallest `startMs`, ties broken by creation order. The `from`/`to` filter of `GET /rooms/:roomId/bookings` uses the same predicate against `[from, to)`.
-- alternatives_rejected: closed-interval comparison, which reports adjacency as a Conflict and contradicts BEH-017; a sweep over a sorted index, which the store size does not warrant.
-- consequence: a booking starting at 10:00 after one ending at 10:00 is accepted, and one starting at 09:59 is rejected with `room_busy`.
+### DD-04 Precedence of simultaneous failures per endpoint
+- evidence: [room-booking-api:CTR-001, room-booking-api:CTR-002, room-booking-api:CTR-003, room-booking-api:CTR-004, room-booking-api:CTR-005, room-booking-api:CTR-006, room-booking-api:CTR-007, room-booking-api:BEH-009, room-booking-api:BEH-020]
+- decision: Each route function tests in the order its contract's `code_precedence` names: `POST /rooms` invalid_room then room_name_taken, with invalid_json as the body-level prerequisite; `GET /rooms` invalid_query then invalid_json; `POST /rooms/:roomId/bookings` room_not_found, invalid_json, invalid_booking, over_capacity, room_busy; `GET /rooms/:roomId/bookings` invalid_query, room_not_found, invalid_json; `DELETE /bookings/:bookingId` booking_not_found then invalid_json; `GET /availability` invalid_query then invalid_json; unmatched path or method invalid_json, not_found, method_not_allowed.
+- alternatives_rejected: one global order applied to every endpoint (contradicts CTR-003, where an unknown room precedes an invalid body, and CTR-004, where an invalid window precedes an unknown room).
+- consequence: body validity is a value (`ParsedBody`) handed to the route so each route decides where in its own order the body test belongs; the server tests it only where no route matches.
 
-**DD-05 Case-insensitive room-name uniqueness by lowercasing**
-- evidence: [room-booking-api:BEH-004, room-booking-api:SCN-001]
-- decision: `roomNameTaken` compares the submitted name against every stored name after `toLowerCase()` on both sides.
-- alternatives_rejected: locale-aware collation with `toLocaleLowerCase`, whose result depends on the host locale and is not stated by a record; storing a normalised name, which would break the verbatim echo (ASM-006).
-- consequence: `Aurora`, `aurora` and `AURORA` collide while the stored name stays as submitted.
+### DD-05 In-memory store with monotonic id counters
+- evidence: [room-booking-api:INV-001, room-booking-api:INV-002, room-booking-api:INV-006, room-booking-api:SCN-003, room-booking-api:A-001]
+- decision: The store keeps `Room[]` and `Booking[]` in insertion order plus two counters: a room counter and a booking high-water mark. Ids are `r<counter>` and `b<highWater>`; a deletion removes the record and leaves both counters untouched; a new process builds a fresh store, so ids restart at `r1` and `b1`.
+- alternatives_rejected: a `Map` with ids derived from the map size (would reuse a deleted booking id, contradicting A-001); persistence to a file (INV-006 forbids it).
+- consequence: the monotonic guarantee lives in one place, and `createStore()` per process satisfies SCN-003.
 
-**DD-06 Length counted in Unicode code points, no trimming**
-- evidence: [room-booking-api:BEH-002, room-booking-api:BEH-010, room-booking-api:ASM-006]
-- decision: a name or title is valid when it is a string whose `[...value].length` is above zero and at most 40 or 80 respectively; the value is stored and echoed without trimming.
-- alternatives_rejected: `.length`, which counts UTF-16 units and makes an emoji cost two characters; trimming before measuring, which a record does not state and which would change the echoed value.
-- consequence: a single space is a valid name and title; 40 and 80 code points are accepted and one more is rejected.
+### DD-06 Ordering by the numeric id suffix
+- evidence: [room-booking-api:BEH-005, room-booking-api:BEH-013, room-booking-api:BEH-018, room-booking-api:A-005]
+- decision: Two orders are defined in M-02: rooms by the integer in the id suffix ascending; bookings by `start` ascending then by the integer id suffix ascending. Availability sorts by capacity ascending then id suffix ascending.
+- alternatives_rejected: lexicographic id comparison (would place `r10` before `r2`, contradicting A-005); ordering by insertion time only (breaks the `start` ordering of BEH-013).
+- consequence: the comparison helper is internal to M-02 and every list response inherits the same rule.
 
-**DD-07 Router matches exact segments, 405 only for a matched path**
-- evidence: [room-booking-api:BEH-026, room-booking-api:BEH-027, room-booking-api:CTR-007, room-booking-api:ASM-001]
-- decision: a Route path is split on `/` and matched segment by segment, a `:name` segment capturing any single non-empty segment; the method must equal the Route method; a path matching some Route pattern under another method answers `method_not_allowed`, a path matching none answers `not_found`.
-- alternatives_rejected: a regular-expression router built from the paths (harder to keep 404 and 405 apart); normalising a trailing slash, which would contradict BEH-026's `GET /rooms/` case.
-- consequence: `DELETE /rooms/r1`, `GET /bookings` and `GET /rooms/` answer `not_found`, while `PUT /rooms` and `POST /availability` answer `method_not_allowed`.
+### DD-07 Booking endpoints split into two route modules
+- evidence: [room-booking-api:CTR-003, room-booking-api:CTR-004, room-booking-api:CTR-005, room-booking-api:BEH-007, room-booking-api:BEH-013]
+- decision: `POST /rooms/:roomId/bookings` lives in M-04, `GET /rooms/:roomId/bookings` and `DELETE /bookings/:bookingId` live in M-05. The split keeps each module within the ID and test bounds of one task: M-04 carries the six creation behaviours with their eleven body boundary classes each, M-05 carries the five list and delete behaviours.
+- alternatives_rejected: one booking module covering thirteen behaviours, three contracts and two scenarios (its boundary classes exceed the test budget of a single task); one module per endpoint (a delete endpoint alone would carry three IDs and no shared logic).
+- consequence: both modules depend on M-01 and M-02 only, so they are two parallel lanes.
 
-**DD-08 Query reading: first value, absent distinct from empty**
-- evidence: [room-booking-api:BEH-007, room-booking-api:BEH-020, room-booking-api:BEH-024]
-- decision: handlers read a parameter with `URLSearchParams.get`; `null` means absent, an empty string is present and fails validation, and a repeated parameter contributes its first value.
-- alternatives_rejected: collecting all values and rejecting a repeat, which no record asks for (BEH-007 puts repeats out of scope); treating an empty value as absent, which would make `minCapacity=` a missing filter.
-- consequence: `minCapacity=`, `minCapacity=0` and a missing `attendees` each fail with the endpoint's own code.
+### DD-08 Literal path matching without decoding
+- evidence: [room-booking-api:CTR-007, room-booking-api:BEH-020, room-booking-api:BEH-021]
+- decision: The path is matched on the segments produced by splitting at `/`: `/rooms`, `/availability`, `/rooms/<segment>/bookings`, `/bookings/<segment>`. A segment is used verbatim as a room or booking id, with no percent-decoding, and a trailing slash produces a final empty segment, which matches no declared path and is therefore `not_found`.
+- alternatives_rejected: decoding each segment before lookup (a decision no record states, and it would make two spellings name one id); treating a trailing slash as equal to the bare path (would make `/rooms/` a second path the records do not declare).
+- consequence: a room id is the raw segment text; the two route-error codes of CTR-007 are decided in M-07 before any route function is called.
 
-**DD-09 Request bodies capped at 1 MiB and requiring JSON text**
-- evidence: [room-booking-api:POL-002, room-booking-api:BEH-025]
-- decision: M-05 accumulates the body and answers 400 `invalid_json` as soon as more than 1048576 bytes arrive, destroying the request stream; an empty body and a body that `JSON.parse` rejects both answer `invalid_json`; a JSON value that is not an object is passed to the handler, which answers `invalid_room` or `invalid_booking`.
-- alternatives_rejected: unbounded buffering, which lets one request exhaust memory and hang the process (POL-002); a dedicated body-too-large code, which POL-001 does not list; inspecting the request `Content-Type`, which no record states.
-- consequence: no request can hold the process, and every rejection of a body carries a documented code.
+### DD-09 Route functions return a resolved response value
+- evidence: [room-booking-api:INV-005, room-booking-api:INV-007, room-booking-api:POL-002, room-booking-api:LOC-001]
+- decision: Every route function returns `ApiResponse` (`{ status, body? }`) and never throws for a documented failure; it builds error responses with `errorResponse` and success responses with `jsonResponse`. The server only writes the value and never appends or reshapes a body.
+- alternatives_rejected: route functions returning an error code the server maps (two places decide precedence and status); throwing exceptions caught by the server (precedence would be the catch order, not the contract order).
+- consequence: the response shape of INV-007 and the header rule of INV-005 have exactly one implementation site, and a route function is a pure function of store, path parameters, query and parsed body, which is directly testable.
 
-**DD-10 Response content type set unconditionally**
-- evidence: [room-booking-api:INV-004, room-booking-api:CTR-007]
-- decision: M-05 writes `Content-Type: application/json` on every response that has a body and writes no header and no body on 204.
-- alternatives_rejected: content negotiation on the request's `Accept`, which no record states; rejecting a request whose `Content-Type` is not JSON, which no code covers.
-- consequence: a 400 is never served as text, and `DELETE /bookings/b1` answers with an empty body.
+### DD-10 Query parameter parsing: first occurrence, integer spellings, ignored extras
+- evidence: [room-booking-api:BEH-006, room-booking-api:BEH-014, room-booking-api:BEH-018, room-booking-api:BEH-019, room-booking-api:A-006, room-booking-api:A-008]
+- decision: A documented parameter is read with `URLSearchParams.get`, so the first occurrence of a repeated parameter decides. Undocumented parameters are ignored. `minCapacity` must match `/^[1-9][0-9]*$/`; `attendees` of availability must match `/^-?[0-9]+(\.[0-9]+)?$/` and denote an integer, so `2.0` and `-1` and `0` are accepted while `1.5` and `abc` are not. Body fields an endpoint does not document are ignored.
+- alternatives_rejected: rejecting a repeated or undocumented parameter (A-006 states such a value never causes an error); `Number.parseInt` on the raw value (would accept `10abc` and `1.5`).
+- consequence: parameter validation is a regex test plus an integer check in each route module, with no shared parser to keep the modules independent.
 
-**DD-11 One error table, no free text, no additional code**
-- evidence: [room-booking-api:POL-001, room-booking-api:CTR-007, room-booking-api:INV-005]
-- decision: `formatError` maps each of the eleven codes to its status and body and adds `conflictingBookingId` only for `room_busy`; handlers return a code and never a message; the body carries exactly the documented members.
-- alternatives_rejected: a `message` member beside `error` (POL-001 makes it non-contractual and INV-005 forbids extra members); per-module status constants, which would let one code drift between endpoints (ASM-010).
-- consequence: `invalid_json`, `invalid_query` and `room_not_found` have one definition wherever they are emitted.
+### DD-11 String length measured in UTF-16 code units, case-insensitive comparison by simple lower-casing
+- evidence: [room-booking-api:BEH-002, room-booking-api:BEH-003, room-booking-api:BEH-008, room-booking-api:A-004]
+- decision: A name is valid when it is a string with `length` of 1..40 and a title when it is a string with `length` of 1..80, where `length` is the JavaScript string length. A name collides when `name.toLowerCase()` equals `existing.toLowerCase()`. No value is trimmed, so a name of spaces is accepted and stored as written.
+- alternatives_rejected: full Unicode case folding or normalisation (would collide names that differ in code points, which A-004 does not require); trimming before the length check (A-004 states spaces are a non-empty name).
+- consequence: room-name uniqueness is one `toLowerCase` comparison inside `store.roomNameTaken`.
 
-**DD-12 Two build configurations: shared type-check and an emitting build**
-- evidence: [room-booking-api:CN-003, room-booking-api:CN-002]
-- decision: the foreman's `tsconfig.json` type-checks `src` and `tests` with `noEmit`; `tsconfig.build.json`, owned by M-06, extends it with `outDir: "dist"` and includes `src` only; `npm run build` runs `tsc -p tsconfig.build.json` and `npm start` runs `node dist/index.js`.
-- alternatives_rejected: emitting from the shared `tsconfig.json`, which TD-TOOLING forbids because it breaks the verifier on the test files; running the TypeScript sources directly at start, which needs an extra runtime loader (a third-party dependency).
-- consequence: `npm run build` compiles cleanly, `npm test` type-checks `src` and `tests` together, and `npm start` serves the compiled output.
-
-**DD-13 Listen host, `PORT` parsing and the listen-failure exit code**
-- evidence: [room-booking-api:CN-002, room-booking-api:CN-003]
-- decision: `src/index.ts` reads `process.env.PORT`; an unset or empty value means `3000`; a value that is a decimal integer in 0..65535 is passed to `listen` with the host omitted, so the runtime binds all interfaces and port `0` picks an ephemeral port; a rejection of the listen call writes the error to stderr and exits with code 1.
-- alternatives_rejected: falling back to a hard-coded port on a malformed `PORT`, which would hide a misconfiguration; binding `127.0.0.1` explicitly, which no record states; exiting 0 on a listen failure, which reports success for a dead server.
-- consequence: `PORT=0` serves a test on a free port (CN-003) and an occupied port fails loudly.
-
-**DD-14 Availability filter and ordering**
-- evidence: [room-booking-api:BEH-023, room-booking-api:CTR-006, room-booking-api:BEH-006, room-booking-api:ASM-005]
-- decision: `availableRooms` keeps the rooms whose capacity is at least `attendees` and for which `earliestConflict` is `undefined`, copying the creation-ordered room array first and sorting by capacity ascending with a stable sort, so equal capacities keep creation order.
-- alternatives_rejected: sorting by id text, which would put `r10` before `r2` (ASM-005); filtering bookings per room outside the store, which would duplicate the Overlap predicate.
-- consequence: `GET /availability` returns r2 before r3 when both are free and r2 has the smaller capacity, and `GET /rooms?minCapacity=` inherits the same creation order from the store.
+### DD-12 Start-up port handling
+- evidence: [room-booking-api:IB-001, room-booking-api:A-007, room-booking-api:NFR-001]
+- decision: `src/index.ts` reads `process.env.PORT`: absent uses `3000`, a decimal string denoting an integer in `0..65535` is used as given, `0` asks for an ephemeral port, and any other value makes the process exit with status `1` without listening. A listen error exits `1` as well.
+- alternatives_rejected: falling back to `3000` on a malformed value (A-007 states the process exits non-zero); letting Node throw an unhandled rejection (a non-deterministic exit path).
+- consequence: tests never depend on the default port; they call `startServer(0)` and read `RunningServer.port`.
 
 ## 8. Traceability
 
-| Spec id | Module |
+| spec ID | module |
 |---|---|
-| room-booking-api:BEH-001 | M-02 |
-| room-booking-api:BEH-002 | M-02 |
-| room-booking-api:BEH-003 | M-02 |
-| room-booking-api:BEH-004 | M-02 |
-| room-booking-api:BEH-005 | M-02 |
-| room-booking-api:BEH-006 | M-02 |
-| room-booking-api:BEH-007 | M-02 |
-| room-booking-api:BEH-008 | M-03 |
-| room-booking-api:BEH-009 | M-03 |
-| room-booking-api:BEH-010 | M-03 |
-| room-booking-api:BEH-011 | M-01 |
-| room-booking-api:BEH-012 | M-01 |
-| room-booking-api:BEH-013 | M-03 |
-| room-booking-api:BEH-014 | M-03 |
-| room-booking-api:BEH-015 | M-03 |
-| room-booking-api:BEH-016 | M-03 |
-| room-booking-api:BEH-017 | M-03 |
-| room-booking-api:BEH-018 | M-04 |
-| room-booking-api:BEH-019 | M-04 |
-| room-booking-api:BEH-020 | M-04 |
-| room-booking-api:BEH-021 | M-04 |
-| room-booking-api:BEH-022 | M-04 |
-| room-booking-api:BEH-023 | M-04 |
-| room-booking-api:BEH-024 | M-04 |
-| room-booking-api:BEH-025 | M-05 |
-| room-booking-api:BEH-026 | M-05 |
-| room-booking-api:BEH-027 | M-05 |
-| room-booking-api:BEH-028 | M-03 |
-| room-booking-api:SCN-001 | M-02 |
-| room-booking-api:SCN-002 | M-03 |
-| room-booking-api:SCN-003 | M-04 |
-| room-booking-api:SCN-004 | M-03 |
-| room-booking-api:CTR-001 | M-02 |
-| room-booking-api:CTR-002 | M-02 |
-| room-booking-api:CTR-003 | M-03 |
-| room-booking-api:CTR-004 | M-04 |
-| room-booking-api:CTR-005 | M-04 |
-| room-booking-api:CTR-006 | M-04 |
-| room-booking-api:CTR-007 | M-05 |
-| room-booking-api:INV-001 | M-01 |
-| room-booking-api:INV-002 | M-01 |
-| room-booking-api:INV-003 | M-01 |
-| room-booking-api:INV-004 | M-05 |
+| room-booking-api:BEH-001 | M-03 |
+| room-booking-api:BEH-002 | M-03 |
+| room-booking-api:BEH-003 | M-03 |
+| room-booking-api:BEH-004 | M-03 |
+| room-booking-api:BEH-005 | M-03 |
+| room-booking-api:BEH-006 | M-03 |
+| room-booking-api:BEH-007 | M-04 |
+| room-booking-api:BEH-008 | M-04 |
+| room-booking-api:BEH-009 | M-04 |
+| room-booking-api:BEH-010 | M-04 |
+| room-booking-api:BEH-011 | M-04 |
+| room-booking-api:BEH-012 | M-04 |
+| room-booking-api:BEH-013 | M-05 |
+| room-booking-api:BEH-014 | M-05 |
+| room-booking-api:BEH-015 | M-05 |
+| room-booking-api:BEH-016 | M-05 |
+| room-booking-api:BEH-017 | M-05 |
+| room-booking-api:BEH-018 | M-06 |
+| room-booking-api:BEH-019 | M-06 |
+| room-booking-api:BEH-020 | M-07 |
+| room-booking-api:BEH-021 | M-07 |
+| room-booking-api:CTR-001 | M-03 |
+| room-booking-api:CTR-002 | M-03 |
+| room-booking-api:CTR-003 | M-04 |
+| room-booking-api:CTR-004 | M-05 |
+| room-booking-api:CTR-005 | M-05 |
+| room-booking-api:CTR-006 | M-06 |
+| room-booking-api:CTR-007 | M-07 |
+| room-booking-api:SCN-001 | M-05 |
+| room-booking-api:SCN-002 | M-04 |
+| room-booking-api:SCN-003 | M-02 |
+| room-booking-api:INV-001 | M-02 |
+| room-booking-api:INV-002 | M-02 |
+| room-booking-api:INV-003 | M-02 |
+| room-booking-api:INV-004 | M-01 |
 | room-booking-api:INV-005 | M-01 |
-| room-booking-api:INV-006 | M-01 |
-| room-booking-api:INV-007 | M-01 |
+| room-booking-api:INV-006 | M-02 |
+| room-booking-api:INV-007 | M-02 |
+| room-booking-api:INV-008 | M-02 |
+| room-booking-api:NFR-001 | M-07 |
+| room-booking-api:LOC-001 | M-07 |
 | room-booking-api:POL-001 | M-01 |
-| room-booking-api:POL-002 | M-05 |
-| room-booking-api:CN-001 | M-06 |
-| room-booking-api:CN-002 | M-06 |
-| room-booking-api:CN-003 | M-06 |
+| room-booking-api:POL-002 | M-07 |
+| room-booking-api:CON-001 | M-07 |
+| room-booking-api:CON-002 | M-07 |
+| room-booking-api:IB-001 | M-07 |
 
 ## 9. Revisions
 

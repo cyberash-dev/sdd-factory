@@ -1,311 +1,284 @@
-import { describe, it, expect } from "vitest";
-import { createStore, parseTime, formatError } from "../../src/core/index.js";
-import type { Booking, ErrorCode, Store } from "../../src/core/index.js";
+import { describe, expect, it } from "vitest";
+import { createStore, intervalsOverlap, parseTime } from "../../src/core/index.js";
+import type { NewBooking } from "../../src/core/index.js";
 
-const T0900 = 1793610000000;
-const T0930 = 1793611800000;
-const T1000 = 1793613600000;
-const T1030 = 1793615400000;
-const T1100 = 1793617200000;
+const MS_0900 = 1793610000000;
+const MS_0930 = 1793611800000;
+const MS_1000 = 1793613600000;
+const MS_1030 = 1793615400000;
+const MS_1100 = 1793617200000;
 
-function book(
-  store: Store,
-  roomId: string,
-  startMs: number,
-  endMs: number,
-  extra: { title?: string; attendees?: number } = {},
-): Booking {
-  return store.addBooking({
-    roomId,
-    title: extra.title ?? "Standup",
-    start: new Date(startMs).toISOString().replace(".000Z", "Z"),
-    end: new Date(endMs).toISOString().replace(".000Z", "Z"),
-    startMs,
-    endMs,
-    attendees: extra.attendees ?? 5,
-  });
+const S_0900 = "2026-11-02T09:00:00Z";
+const S_1000 = "2026-11-02T10:00:00Z";
+const S_1100 = "2026-11-02T11:00:00Z";
+
+function booking(roomId: string, start: string, end: string, startMs: number, endMs: number): NewBooking {
+  return { roomId, title: "Sync", start, end, startMs, endMs, attendees: 2 };
 }
 
-describe("Time parsing (BEH-011, BEH-012)", () => {
-  // @covers room-booking-api:BEH-011
-  it("parseTime rejects absent, non-string, unparseable, date-only and offset times", () => {
-    const rejected: unknown[] = [
-      undefined,
-      null,
-      1729,
-      {},
-      "tomorrow",
-      "2026-11-02",
-      "2026-11-02T09:00:00+02:00",
-      "2026-11-02T09:00:00",
-      "",
-    ];
-    for (const value of rejected) {
-      expect(parseTime(value), String(value)).toBeUndefined();
-    }
-  });
+const nine = (roomId: string): NewBooking => booking(roomId, S_0900, S_1000, MS_0900, MS_1000);
+const ten = (roomId: string): NewBooking => booking(roomId, S_1000, S_1100, MS_1000, MS_1100);
 
-  it("parseTime returns the epoch milliseconds of a UTC Z-suffixed whole minute", () => {
-    expect(parseTime("2026-11-02T09:00:00Z")).toBe(T0900);
-    expect(parseTime("2026-11-02T10:00:00Z")).toBe(T1000);
-  });
-
-  // @covers room-booking-api:BEH-012
-  it("parseTime rejects a non-zero seconds or fractional-second part", () => {
-    expect(parseTime("2026-11-02T09:00:30Z")).toBeUndefined();
-    expect(parseTime("2026-11-02T09:00:00.500Z")).toBeUndefined();
-    expect(parseTime("2026-11-02T09:00:00.001Z")).toBeUndefined();
-  });
-
-  it("parseTime accepts a zero fraction and a seconds-less writing as the same whole minute", () => {
-    expect(parseTime("2026-11-02T09:00:00.000Z")).toBe(T0900);
-    expect(parseTime("2026-11-02T09:30Z")).toBe(T0930);
-    expect(parseTime("2026-11-02T09:30:00Z")).toBe(T0930);
-  });
-
-  it("a Booking keeps the submitted start and end text and exposes its instants", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    const stored = store.addBooking({
-      roomId: "r1",
-      title: "Standup",
-      start: "2026-11-02T09:30Z",
-      end: "2026-11-02T10:30Z",
-      startMs: T0930,
-      endMs: T1030,
-      attendees: 5,
-    });
-    expect(stored.start).toBe("2026-11-02T09:30Z");
-    expect(stored.end).toBe("2026-11-02T10:30Z");
-    expect(store.instantOf(stored)).toEqual({ startMs: T0930, endMs: T1030 });
-  });
-});
-
-describe("Room ids (INV-001)", () => {
+describe("room ids (INV-001)", () => {
   // @covers room-booking-api:INV-001
-  it("the k-th created Room carries the id r<k>, first and tenth", () => {
+  it("hands out room ids r1..r10 in creation order and never r0", () => {
     const store = createStore();
-    expect(store.addRoom({ name: "Room 1", capacity: 4 }).id).toBe("r1");
-    expect(store.addRoom({ name: "Room 2", capacity: 4 }).id).toBe("r2");
-    for (let k = 3; k <= 9; k++) store.addRoom({ name: `Room ${k}`, capacity: 4 });
-    expect(store.addRoom({ name: "Room 10", capacity: 4 }).id).toBe("r10");
+    const ids: string[] = [];
+    for (let i = 0; i < 10; i++) ids.push(store.addRoom(`Room ${i}`, 10).id);
+    expect(ids).toEqual(["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10"]);
+    expect(store.listRooms(null).map((r) => r.id)).toEqual(ids);
   });
 
-  it("rooms() lists r1, r2 and r3 and findRoom resolves each id", () => {
+  it("lists no room on an empty store and finds none by id", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 4 });
-    store.addRoom({ name: "Borealis", capacity: 10 });
-    store.addRoom({ name: "Cirrus", capacity: 6 });
-    expect(store.rooms().map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
-    expect(store.findRoom("r2")?.name).toBe("Borealis");
-    expect(store.findRoom("r4")).toBeUndefined();
+    expect(store.listRooms(null)).toEqual([]);
+    expect(store.findRoom("r1")).toBeNull();
   });
 
-  it("roomNameTaken reports a created name and no other", () => {
+  it("keeps the first room when a second room is created", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 4 });
-    expect(store.roomNameTaken("Aurora")).toBe(true);
-    expect(store.roomNameTaken("Borealis")).toBe(false);
+    store.addRoom("Lab", 10);
+    store.addRoom("Studio", 4);
+    expect(store.findRoom("r1")).toEqual({ id: "r1", name: "Lab", capacity: 10 });
+    expect(store.findRoom("r2")).toEqual({ id: "r2", name: "Studio", capacity: 4 });
+  });
+
+  it("orders rooms by the integer suffix of the id, r10 after r9", () => {
+    const store = createStore();
+    for (let i = 0; i < 10; i++) store.addRoom(`Room ${i}`, 5);
+    const ids = store.listRooms(null).map((r) => r.id);
+    expect(ids[8]).toBe("r9");
+    expect(ids[9]).toBe("r10");
+  });
+
+  it("filters rooms by minimum capacity", () => {
+    const store = createStore();
+    store.addRoom("Small", 2);
+    store.addRoom("Big", 10);
+    expect(store.listRooms(5).map((r) => r.id)).toEqual(["r2"]);
+    expect(store.listRooms(10).map((r) => r.id)).toEqual(["r2"]);
+    expect(store.listRooms(11)).toEqual([]);
+  });
+
+  it("reports a taken room name", () => {
+    const store = createStore();
+    expect(store.roomNameTaken("Lab")).toBe(false);
+    store.addRoom("Lab", 10);
+    expect(store.roomNameTaken("Lab")).toBe(true);
   });
 });
 
-describe("Booking ids (INV-002)", () => {
+describe("booking ids (INV-002)", () => {
   // @covers room-booking-api:INV-002
-  it("booking ids count across all Rooms and a deleted id is never reused", () => {
+  it("hands out booking ids b1, b2 in room r1 and b3 in a second room", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    store.addRoom({ name: "Borealis", capacity: 10 });
-    expect(book(store, "r1", T0900, T1000).id).toBe("b1");
-    expect(book(store, "r2", T0900, T1000).id).toBe("b2");
-    expect(store.removeBooking("b1")).toBe(true);
-    expect(store.findBooking("b1")).toBeUndefined();
-    expect(book(store, "r1", T0900, T1000).id).toBe("b3");
+    store.addRoom("Lab", 10);
+    store.addRoom("Studio", 10);
+    expect(store.addBooking(nine("r1")).id).toBe("b1");
+    expect(store.addBooking(ten("r1")).id).toBe("b2");
+    expect(store.addBooking(nine("r2")).id).toBe("b3");
   });
 
-  it("removeBooking answers false for an unknown id", () => {
+  it("gives the first booking of a second room b2, never b1", () => {
     const store = createStore();
-    expect(store.removeBooking("b9")).toBe(false);
+    store.addRoom("Lab", 10);
+    store.addRoom("Studio", 10);
+    store.addBooking(nine("r1"));
+    expect(store.addBooking(nine("r2")).id).toBe("b2");
   });
 
-  it("the first Booking of a fresh Store is b1", () => {
+  it("never hands out b1 again after booking b1 is deleted", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    expect(book(store, "r1", T0900, T1000).id).toBe("b1");
-  });
-});
-
-describe("Overlap (INV-003)", () => {
-  // @covers room-booking-api:INV-003
-  it("earliestConflict returns the Booking that a partially overlapping interval meets", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    book(store, "r1", T0900, T1000);
-    expect(store.earliestConflict("r1", T0930, T1030)?.id).toBe("b1");
-    expect(store.bookingsOverlapping("r1", T0930, T1030).map((b) => b.id)).toEqual(["b1"]);
-  });
-
-  it("an identical interval conflicts with the stored Booking", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    book(store, "r1", T0900, T1000);
-    expect(store.earliestConflict("r1", T0900, T1000)?.id).toBe("b1");
-  });
-
-  it("adjacent intervals are not an Overlap in either direction", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    book(store, "r1", T0900, T1000);
-    expect(store.earliestConflict("r1", T1000, T1100)).toBeUndefined();
-    expect(store.bookingsOverlapping("r1", T1000, T1100)).toEqual([]);
-    expect(store.earliestConflict("r1", T0900 - 3600000, T0900)).toBeUndefined();
-  });
-
-  it("Bookings of different Rooms never conflict", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    store.addRoom({ name: "Borealis", capacity: 10 });
-    book(store, "r1", T0900, T1000);
-    expect(store.earliestConflict("r2", T0900, T1000)).toBeUndefined();
-  });
-
-  it("a deleted Booking no longer conflicts", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    book(store, "r1", T0900, T1000);
-    store.removeBooking("b1");
-    expect(store.earliestConflict("r1", T0900, T1000)).toBeUndefined();
-  });
-});
-
-describe("Response body members (INV-005)", () => {
-  // @covers room-booking-api:INV-005
-  it("a Room carries exactly id, name and capacity", () => {
-    const store = createStore();
-    const input = { name: "Aurora", capacity: 10, floor: 3 } as { name: string; capacity: number };
-    const room = store.addRoom(input);
-    expect(Object.keys(room).sort()).toEqual(["capacity", "id", "name"]);
-    expect(Object.keys(store.rooms()[0]!).sort()).toEqual(["capacity", "id", "name"]);
-  });
-
-  it("a Booking carries exactly id, roomId, title, start, end and attendees", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    const input = {
+    store.addRoom("Lab", 10);
+    store.addBooking(nine("r1"));
+    expect(store.deleteBooking("b1")).toEqual({
+      id: "b1",
       roomId: "r1",
-      title: "Standup",
-      start: "2026-11-02T09:00:00Z",
-      end: "2026-11-02T10:00:00Z",
-      startMs: T0900,
-      endMs: T1000,
-      attendees: 5,
-      notes: "x",
-    };
-    const stored = store.addBooking(input);
-    const keys = ["attendees", "end", "id", "roomId", "start", "title"];
-    expect(Object.keys(stored).sort()).toEqual(keys);
-    expect(Object.keys(store.bookingsOf("r1")[0]!).sort()).toEqual(keys);
-    expect(Object.keys(store.findBooking("b1")!).sort()).toEqual(keys);
+      title: "Sync",
+      start: S_0900,
+      end: S_1000,
+      attendees: 2,
+    });
+    expect(store.findBooking("b1")).toBeNull();
+    expect(store.addBooking(nine("r1")).id).toBe("b2");
   });
 
-  it("the room_busy body carries exactly error and conflictingBookingId, other errors only error", () => {
+  it("never hands out the id of the highest deleted booking again", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    const held = book(store, "r1", T0900, T1000);
-    expect(Object.keys(formatError("room_busy", held).body).sort()).toEqual(["conflictingBookingId", "error"]);
-    expect(Object.keys(formatError("invalid_room").body)).toEqual(["error"]);
-    expect(Object.keys(formatError("not_found").body)).toEqual(["error"]);
+    store.addRoom("Lab", 10);
+    store.addBooking(nine("r1"));
+    store.addBooking(ten("r1"));
+    store.deleteBooking("b2");
+    expect(store.addBooking(ten("r1")).id).toBe("b3");
+  });
+
+  it("returns null when deleting a booking that does not exist", () => {
+    const store = createStore();
+    expect(store.deleteBooking("b1")).toBeNull();
+  });
+
+  it("hands out b10 as the tenth booking across ten rooms", () => {
+    const store = createStore();
+    for (let i = 0; i < 10; i++) store.addRoom(`Room ${i}`, 10);
+    for (let i = 1; i <= 10; i++) store.addBooking(nine(`r${i}`));
+    const ids: string[] = [];
+    for (let i = 1; i <= 10; i++) ids.push(...store.listBookings(`r${i}`, null).map((b) => b.id));
+    expect(ids).toEqual(["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"]);
   });
 });
 
-describe("Store lifetime (INV-006)", () => {
-  // @covers room-booking-api:INV-006
-  it("a fresh Store is empty and assigns r1 and b1 again, independent of an earlier Store", () => {
-    const first = createStore();
-    first.addRoom({ name: "Aurora", capacity: 10 });
-    book(first, "r1", T0900, T1000);
+describe("overlap rule (INV-003)", () => {
+  // @covers room-booking-api:INV-003
+  it("stores a booking ending exactly at another start alongside it", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addBooking(nine("r1"));
+    expect(store.earliestConflict("r1", { startMs: MS_1000, endMs: MS_1100 })).toBeNull();
+    store.addBooking(ten("r1"));
+    expect(store.listBookings("r1", null).map((b) => b.id)).toEqual(["b1", "b2"]);
+  });
 
-    const second = createStore();
-    expect(second.rooms()).toEqual([]);
-    expect(second.findRoom("r1")).toBeUndefined();
-    expect(second.findBooking("b1")).toBeUndefined();
-    expect(second.addRoom({ name: "Aurora", capacity: 10 }).id).toBe("r1");
-    expect(book(second, "r1", T0900, T1000).id).toBe("b1");
+  it.each([
+    { name: "touching end to start", a: [MS_0900, MS_1000], b: [MS_1000, MS_1100], expected: false },
+    { name: "touching start to end", a: [MS_1000, MS_1100], b: [MS_0900, MS_1000], expected: false },
+    { name: "disjoint", a: [MS_0900, MS_0930], b: [MS_1000, MS_1100], expected: false },
+    { name: "nested", a: [MS_0900, MS_1100], b: [MS_0930, MS_1030], expected: true },
+    { name: "identical", a: [MS_0900, MS_1000], b: [MS_0900, MS_1000], expected: true },
+    { name: "partial overlap", a: [MS_0900, MS_1000], b: [MS_0930, MS_1030], expected: true },
+  ])("intervalsOverlap on half-open intervals: $name", ({ a, b, expected }) => {
+    expect(intervalsOverlap({ startMs: a[0]!, endMs: a[1]! }, { startMs: b[0]!, endMs: b[1]! })).toBe(expected);
+  });
+
+  it("reports the booking that a nested interval conflicts with", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addBooking(booking("r1", S_0900, S_1100, MS_0900, MS_1100));
+    const conflict = store.earliestConflict("r1", { startMs: MS_0930, endMs: MS_1030 });
+    expect(conflict?.id).toBe("b1");
+    expect(store.listBookings("r1", null)).toHaveLength(1);
+  });
+
+  it("stores the identical interval independently in two rooms", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addRoom("Studio", 10);
+    store.addBooking(nine("r1"));
+    expect(store.earliestConflict("r2", { startMs: MS_0900, endMs: MS_1000 })).toBeNull();
+    store.addBooking(nine("r2"));
+    expect(store.listBookings("r1", null)).toHaveLength(1);
+    expect(store.listBookings("r2", null)).toHaveLength(1);
+  });
+
+  it("lists no booking for a room that holds none", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    expect(store.listBookings("r1", null)).toEqual([]);
+  });
+
+  it("returns the conflict with the smallest start, then the smallest id suffix", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addBooking(ten("r1"));
+    store.addBooking(nine("r1"));
+    expect(store.earliestConflict("r1", { startMs: MS_0900, endMs: MS_1100 })?.id).toBe("b2");
+  });
+
+  it("orders bookings of a room by start ascending", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addBooking(ten("r1"));
+    store.addBooking(nine("r1"));
+    expect(store.listBookings("r1", null).map((b) => b.id)).toEqual(["b2", "b1"]);
+  });
+
+  it("keeps only bookings overlapping the half-open window", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addBooking(nine("r1"));
+    store.addBooking(ten("r1"));
+    expect(store.listBookings("r1", { startMs: MS_1000, endMs: MS_1100 }).map((b) => b.id)).toEqual(["b2"]);
+    expect(store.listBookings("r1", { startMs: MS_1100, endMs: MS_1100 + 60000 })).toEqual([]);
+  });
+
+  it("excludes a room with a conflicting booking from availability", () => {
+    const store = createStore();
+    store.addRoom("Lab", 10);
+    store.addRoom("Studio", 10);
+    store.addBooking(nine("r1"));
+    expect(store.availableRooms({ startMs: MS_0930, endMs: MS_1030 }, 5).map((r) => r.id)).toEqual(["r2"]);
+    expect(store.availableRooms({ startMs: MS_1000, endMs: MS_1100 }, 5).map((r) => r.id)).toEqual(["r1", "r2"]);
   });
 });
 
-describe("Listing order (INV-007)", () => {
+describe("response object key sets (INV-007)", () => {
   // @covers room-booking-api:INV-007
-  it("bookingsOf orders by start then by id", () => {
+  it("holds exactly id, name and capacity in a room and the six booking fields in a booking", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    book(store, "r1", T1100, T1100 + 3600000);
-    book(store, "r1", T0900, T1000);
-    book(store, "r1", T1100 + 3600000, T1100 + 7200000);
-    expect(store.bookingsOf("r1").map((b) => b.id)).toEqual(["b2", "b1", "b3"]);
+    const room = store.addRoom("Lab", 10);
+    expect(Object.keys(room).sort()).toEqual(["capacity", "id", "name"]);
+    const created = store.addBooking(nine("r1"));
+    expect(Object.keys(created).sort()).toEqual(["attendees", "end", "id", "roomId", "start", "title"]);
+    expect(Object.keys(store.listRooms(null)[0]!).sort()).toEqual(["capacity", "id", "name"]);
+    expect(Object.keys(store.listBookings("r1", null)[0]!).sort()).toEqual([
+      "attendees",
+      "end",
+      "id",
+      "roomId",
+      "start",
+      "title",
+    ]);
   });
 
-  it("bookingsOf breaks equal starts by ascending id", () => {
+  it("carries attendees and roomId on a booking found by id", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    book(store, "r1", T1100, T1100 + 3600000);
-    book(store, "r1", T0900, T1000);
-    book(store, "r1", T0900, T0930);
-    expect(store.bookingsOf("r1").map((b) => b.id)).toEqual(["b2", "b3", "b1"]);
-  });
-
-  it("bookingsOf of a Room without Bookings is empty", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    expect(store.bookingsOf("r1")).toEqual([]);
-  });
-
-  it("availableRooms orders by capacity ascending then by id", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    store.addRoom({ name: "Borealis", capacity: 4 });
-    store.addRoom({ name: "Cirrus", capacity: 10 });
-    expect(store.availableRooms(T0900, T1000, 1).map((r) => r.id)).toEqual(["r2", "r1", "r3"]);
-  });
-
-  it("availableRooms drops busy Rooms and Rooms smaller than the attendees", () => {
-    const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    store.addRoom({ name: "Borealis", capacity: 4 });
-    store.addRoom({ name: "Cirrus", capacity: 10 });
-    book(store, "r1", T0930, T1030);
-    expect(store.availableRooms(T0900, T1000, 5).map((r) => r.id)).toEqual(["r3"]);
-    expect(store.availableRooms(T1030, T1100, 10).map((r) => r.id)).toEqual(["r1", "r3"]);
+    store.addRoom("Lab", 10);
+    store.addBooking(nine("r1"));
+    expect(store.findBooking("b1")).toEqual({
+      id: "b1",
+      roomId: "r1",
+      title: "Sync",
+      start: S_0900,
+      end: S_1000,
+      attendees: 2,
+    });
   });
 });
 
-describe("Error codes (POL-001)", () => {
-  const table: Array<[ErrorCode, number]> = [
-    ["invalid_json", 400],
-    ["invalid_room", 400],
-    ["room_name_taken", 409],
-    ["invalid_query", 400],
-    ["room_not_found", 404],
-    ["invalid_booking", 400],
-    ["over_capacity", 422],
-    ["booking_not_found", 404],
-    ["not_found", 404],
-    ["method_not_allowed", 405],
-  ];
-
-  // @covers room-booking-api:POL-001
-  it("formatError maps every code without a conflict to its status and a body holding only the code", () => {
-    for (const [code, status] of table) {
-      expect(formatError(code), code).toEqual({ status, body: { error: code } });
-    }
+describe("UTC whole-minute times (INV-008)", () => {
+  // @covers room-booking-api:INV-008
+  it("parseTime accepts the three whole-minute forms of 09:30 and returns epoch milliseconds", () => {
+    expect(parseTime("2026-11-02T09:30:00Z")).toBe(MS_0930);
+    expect(parseTime("2026-11-02T09:30Z")).toBe(MS_0930);
+    expect(parseTime("2026-11-02T09:30:00.000Z")).toBe(MS_0930);
   });
 
-  it("formatError maps room_busy to 409 with the conflicting Booking id", () => {
+  it("parseTime rejects off-minute, offset, lower-case, non-calendar and malformed spellings", () => {
+    const rejected = [
+      "2026-11-02T09:30:45Z",
+      "2026-11-02T10:30:00+01:00",
+      "2026-11-02T09:30:00z",
+      "2026-11-02T09:30:00.500Z",
+      "2026-11-02T09:30:00",
+      "2026-11-02T09:30:00.0Z",
+      "2026-02-30T09:30:00Z",
+      "2026-13-02T09:30:00Z",
+      "2026-11-02T24:00:00Z",
+      "2026-11-02",
+      "",
+      "not a time",
+    ];
+    for (const value of rejected) expect(parseTime(value), value).toBeNull();
+  });
+
+  it("returns the start and end spelling the requester sent", () => {
     const store = createStore();
-    store.addRoom({ name: "Aurora", capacity: 10 });
-    const held = book(store, "r1", T0900, T1000);
-    expect(formatError("room_busy", held)).toEqual({
-      status: 409,
-      body: { error: "room_busy", conflictingBookingId: "b1" },
+    store.addRoom("Lab", 10);
+    const created = store.addBooking(booking("r1", "2026-11-02T09:30Z", "2026-11-02T10:00:00.000Z", MS_0930, MS_1000));
+    expect(created.start).toBe("2026-11-02T09:30Z");
+    expect(created.end).toBe("2026-11-02T10:00:00.000Z");
+    expect(store.listBookings("r1", null)[0]).toMatchObject({
+      start: "2026-11-02T09:30Z",
+      end: "2026-11-02T10:00:00.000Z",
     });
   });
 });
