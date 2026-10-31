@@ -1,7 +1,8 @@
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import type { EffectHandler, SliceContext } from "../../shared/slice.js";
-import { copyTraceTo } from "../../trace/index.js";
+import { CHAIN_DIR, copyTraceTo, earlierTraceDirs, TRACE_FILE_NAMES } from "../../trace/index.js";
 import type { PublishedEntry } from "../domain/ledger.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { errorText } from "./evidence.js";
@@ -21,6 +22,17 @@ async function copyIntegrationTree(productGit: GitRunner, productDir: string, ou
   for (const file of tracked) {
     await mkdir(dirname(join(outputDir, file)), { recursive: true });
     await copyFile(join(productDir, file), join(outputDir, file));
+  }
+}
+
+/* The chain's traces are for transparency: an earlier run's missing file is skipped, never a reason to fail publication. */
+async function copyChainTraces(runDir: string, traceOutputDir: string): Promise<void> {
+  for (const earlier of earlierTraceDirs(runDir)) {
+    const destination = join(traceOutputDir, CHAIN_DIR, earlier.runId);
+    for (const name of Object.values(TRACE_FILE_NAMES).filter((file) => existsSync(join(earlier.traceDir, file)))) {
+      await mkdir(destination, { recursive: true });
+      await copyFile(join(earlier.traceDir, name), join(destination, name));
+    }
   }
 }
 
@@ -54,7 +66,9 @@ async function publishTree(slice: SliceContext, runner: CommandRunner, identity:
     throw new Error("integration working tree has uncommitted changes");
   }
   await copyIntegrationTree(productGit, slice.paths.productDir, slice.paths.outputDir);
-  await copyTraceTo(slice.paths.traceDir, join(slice.paths.outputDir, "trace"));
+  const traceOutputDir = join(slice.paths.outputDir, "trace");
+  await copyTraceTo(slice.paths.traceDir, traceOutputDir);
+  await copyChainTraces(slice.paths.runDir, traceOutputDir);
   const outputRelative = relative(slice.paths.repoRoot, slice.paths.outputDir);
   await teamGit.output(["add", "-A", "--", outputRelative]);
   await teamGit.output(["commit", "-m", `factory: ${slice.slug} ${slice.runId}`, "--", outputRelative]);
