@@ -111,9 +111,28 @@ Cost caveat: API roles are priced from token usage with the `pricing` table in `
 
 ## Results
 
-<!-- numbers from the first published run go here -->
+First end-to-end publication: `specs/url-shortener-api.md`, run `url-shortener-api-20261031-004751` on the shipped cheap profile, published to [`hidden/url-shortener-api/`](hidden/url-shortener-api/) with its full trace in [`hidden/url-shortener-api/trace/`](hidden/url-shortener-api/trace/trace.md). Zero human interventions after launch.
 
-TODO
+| stage | duration | cost (USD) |
+|---|---|---|
+| workspace (bootstrap, `npm install`) | 2 min 17 s | 0.00 |
+| spec (analyst, critic: 3 rounds, approval) | 7 min 41 s | 0.66 |
+| design (architect ∥ verification-designer, planner) | 4 min 10 s | 0.72 |
+| build (5 tasks, 4 concurrent lanes) | 16 min 55 s | 2.08 |
+| assembly (`npm ci`, `tsc`, `vitest`, `sdd ready`, round 1 green) | 6 s | 0.00 |
+| **total** | **31 min 9 s** | **3.47** |
+
+| task | what | duration | cost (USD) | notes |
+|---|---|---|---|---|
+| T-001 | error bodies and JSON responses | 2 min 30 s | 0.22 | ran in parallel with T-002 |
+| T-002 | in-memory store and code issuing | 6 min 27 s | 0.32 | |
+| T-003 | link creation, statistics, deletion | 3 min 57 s | 0.54 | in parallel with T-004; 1 simple-fixer repair |
+| T-004 | redirects | 1 min 57 s | 0.37 | 1 simple-fixer repair |
+| T-005 | server composition and port | 6 min 31 s | 0.64 | root task, depends on all |
+
+Of the 3.47 USD, 1.75 is real API spend (OpenRouter: DeepSeek V4.1 Flash, GLM-5.3 Flash) and 1.71 is the API-equivalent figure the Claude Code lanes report (test-writer 0.91, implementer 0.62, simple-fixer 0.18; billed to a subscription, not per run). The published product passes `npm ci && npm run build && npm test` (78 tests) from a clean checkout, and a black-box pass with curl over every endpoint of the spec matches the expected statuses, bodies and headers.
+
+What the factory repaired on its own in that run: two stubs whose interface imports pointed one directory level short (fixed by the simple-fixer before the red check, now prevented at stub generation, `build-stage:DLT-009`), and 15 Behaviours missing from the Surface's members, completed at approval (`spec-stage:DLT-007`).
 
 ## Operating the factory
 
