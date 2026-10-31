@@ -2819,6 +2819,66 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-014
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:30:58.522Z
+    change_request: resume grant for lane-level design caps; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: factory
+title: resume also grants a design repair when a lane's task failed on the architect or planner cap
+target_ids:
+  - factory:DLT-012
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  factory:DLT-012 grants one more attempt when the cut failure chain
+  starts with task.failed{reason: cap_exhausted, detail: test-writer |
+  implementer} or design.blocked{reason: planner_cap | architect_cap}.
+  In the build stage the architect and planner caps are hit inside a
+  lane: the build-stage rules emit task.failed{reason: cap_exhausted,
+  detail: architect | planner} (run 22: "T-003: cap_exhausted:
+  architect"), which DLT-012 does not name, so the resumed run 23 redid
+  T-003's implementer straight into the same cap. Change: a failure
+  chain starting with task.failed{reason: cap_exhausted, detail:
+  architect} or {detail: planner} also lowers the run-level
+  architectRepairs or plannerRecuts by one, exactly as
+  design.blocked{architect_cap | planner_cap} does, and the
+  fix_between_runs note names the grant ("one more architect repair for
+  T-003"). Other details (critic) still seed the counters unchanged.
+tests_old_behavior:
+  - task.failed cap_exhausted test-writer and implementer still lower the task's attempt counter by one
+  - task.failed cap_exhausted critic grants nothing
+tests_new_behavior:
+  - to:factory:DLT-012
+test_obligation:
+  predicate: |
+    Given a run whose trace ends with task.failed{taskId: T-003, reason:
+    cap_exhausted, detail: architect} then run.failed, a resume seeds
+    architectRepairs one lower than the replayed value, its
+    fix_between_runs note names one more architect repair for T-003, and
+    redoing the entry event lets the architect repair run instead of
+    failing T-003 again; the same with detail planner lowers
+    plannerRecuts; detail critic changes no counter.
+  test_template: integration
+  boundary_classes:
+    - architect cap inside a lane
+    - planner cap inside a lane
+    - critic cap inside a lane
+  failure_scenarios:
+    - a resumed run hitting the same design cap at once
+    - a grant for a cap DLT-012 does not name
+---
+```
+
 ---
 
 ## 16. Implementation bindings

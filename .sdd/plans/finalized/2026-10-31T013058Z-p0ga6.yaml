@@ -1,0 +1,10 @@
+plan_id: 2026-10-31T013058Z-p0ga6
+created_at: 2026-10-31T01:30:58.523Z
+pending_attestations:
+  - id: factory:DLT-014
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:30:58.522Z
+    change_request: "resume grant for lane-level design caps; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved
