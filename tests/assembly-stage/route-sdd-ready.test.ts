@@ -78,10 +78,43 @@ describe("assembly.route-sdd-ready", () => {
     expect([context.published, triaged]).toEqual([[], [{ kind: "assembly.triage", round: 1, step: "sdd_ready", evidencePath }]]);
   });
 
+  // @covers assembly-stage:DLT-003
   // @covers assembly-stage:BEH-006
-  it("sends an uncovered id that no task covers to triage", async () => {
-    const { context, triaged } = await route([{ kind: "uncovered", id: "todo:SUR-001", file: "spec/spec.md" }]);
+  it("sends every uncovered id that no task covers to one planner re-cut and invokes no triage", async () => {
+    const { context, triaged } = await route([
+      { kind: "uncovered", id: "todo:SUR-002", file: "spec/spec.md" },
+      { kind: "uncovered", id: "todo:SUR-001", file: "spec/spec.md" },
+    ]);
 
-    expect([context.published, triaged.map((effect) => effect.kind)]).toEqual([[], ["assembly.triage"]]);
+    expect([context.published, triaged]).toEqual([
+      [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason: "uncovered without owner: todo:SUR-001, todo:SUR-002", attempt: 1, originTaskId: null } }],
+      [],
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-003
+  // @covers assembly-stage:BEH-006
+  it("routes an owned uncovered id to its test-writer and an ownerless one to the planner in the same round", async () => {
+    const { context, triaged } = await route([
+      { kind: "uncovered", id: "todo:BEH-001", file: "spec/spec.md" },
+      { kind: "uncovered", id: "todo:SUR-001", file: "spec/spec.md" },
+    ]);
+
+    expect([context.published.map((event) => [event.type, event.payload["taskId"] ?? null, event.payload["target"]]), triaged]).toEqual([
+      [
+        ["assembly.rework", "T-001", "test-writer"],
+        ["task.rework", "T-001", "test-writer"],
+        ["design.rework", null, "planner"],
+      ],
+      [],
+    ]);
+  });
+
+  // @covers assembly-stage:DLT-003
+  // @covers assembly-stage:BEH-005
+  it("still sends an aggregated lint violation to triage next to an ownerless uncovered id", async () => {
+    const { context, triaged, evidencePath } = await route([{ kind: "uncovered", id: "todo:SUR-001", file: "spec/spec.md" }, { kind: "aggregated_lint" }]);
+
+    expect([context.published.map((event) => event.type), triaged]).toEqual([["design.rework"], [{ kind: "assembly.triage", round: 1, step: "sdd_ready", evidencePath }]]);
   });
 });

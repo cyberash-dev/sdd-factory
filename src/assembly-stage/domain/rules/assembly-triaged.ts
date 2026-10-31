@@ -1,10 +1,9 @@
-import type { RunState } from "../../../bus/domain/run-state.js";
 import type { TransitionRule } from "../../../bus/domain/transition.js";
 import { PayloadShapeError, nullableStringField, stringField } from "../payload.js";
 import { TRIAGE, WRITE_SET_CONFLICT } from "../rework-reasons.js";
 import type { AssemblyRuleDeps } from "./deps.js";
 import { isReworkTarget } from "../ledger.js";
-import { failedRun, recordEffect, reworkEvents } from "./emit.js";
+import { failedRun, plannerRecutEvent, recordEffect, reworkEvents } from "./emit.js";
 
 export function assemblyTriagedRule(deps: AssemblyRuleDeps): TransitionRule {
   return {
@@ -26,7 +25,7 @@ export function assemblyTriagedRule(deps: AssemblyRuleDeps): TransitionRule {
       if (taskId === null) {
         return {
           state: { ...state, status: "building" },
-          emits: [{ type: "design.rework", producer: "foreman", payload: { target: "planner", reason, attempt: designReworkAttempt(state), originTaskId: null } }],
+          emits: [plannerRecutEvent(state, reason)],
           effects: [recordEffect({ triage })],
         };
       }
@@ -38,9 +37,4 @@ export function assemblyTriagedRule(deps: AssemblyRuleDeps): TransitionRule {
       };
     },
   };
-}
-
-/* Mirrors build-stage designReworkAttempt: bus:CTR-004 dedupes design.rework on attempt alone, so the ordinal spans both design roles. */
-function designReworkAttempt(state: RunState): number {
-  return state.stageAttempts.plannerRecuts + state.stageAttempts.architectRepairs + 1;
 }

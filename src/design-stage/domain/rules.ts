@@ -93,6 +93,11 @@ function mergeTasks(state: RunState, summaries: readonly TaskSummary[], changedI
   return { tasks, emits };
 }
 
+/* assembly-stage:DLT-003: a re-cut that restarts no lane leaves no task.approved to fire the barrier, so the assembler re-checks it. */
+function barrierRecheck(restarts: readonly PendingEvent[]): readonly Effect[] {
+  return restarts.length === 0 ? [{ kind: "assembly.start" }] : [];
+}
+
 function tasksReadyRule(deps: DesignRuleDeps): TransitionRule {
   return {
     name: "design.tasks.ready -> building",
@@ -105,7 +110,11 @@ function tasksReadyRule(deps: DesignRuleDeps): TransitionRule {
       if (state.status === "building") {
         const merged = mergeTasks(state, summaries, stringListOf(event.payload, "changedTaskIds"), deps.worktreesDir);
         const removedTaskIds = Object.keys(state.tasks).filter((taskId) => merged.tasks[taskId] === undefined);
-        return { state: { ...base, design: { ...state.design, tasksPath: path }, tasks: merged.tasks }, emits: merged.emits, effects: [{ kind: "build.schedule", tasksPath: path, removedTaskIds }] };
+        return {
+          state: { ...base, design: { ...state.design, tasksPath: path }, tasks: merged.tasks },
+          emits: merged.emits,
+          effects: [{ kind: "build.schedule", tasksPath: path, removedTaskIds }, ...barrierRecheck(merged.emits)],
+        };
       }
       const tasks = Object.fromEntries(summaries.map((summary) => [summary.id, taskStateFrom(summary, deps.worktreesDir)]));
       return { state: { ...base, status: "building", design: { ...state.design, tasksPath: path }, tasks }, emits: [], effects: [{ kind: "build.schedule", tasksPath: path }] };

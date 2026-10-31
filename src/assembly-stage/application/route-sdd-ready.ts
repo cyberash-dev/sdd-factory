@@ -1,11 +1,11 @@
 import type { TaskState } from "../../bus/domain/run-state.js";
 import { readTextOrNull } from "../../shared/fs/text.js";
 import type { EffectHandler } from "../../shared/slice.js";
-import { tasksCovering, tasksWriting } from "../domain/attribution.js";
+import { tasksCovering, tasksWriting, uniqueSorted } from "../domain/attribution.js";
 import { ASSEMBLY_EFFECT } from "../domain/effects.js";
 import { integerField, stringField } from "../domain/payload.js";
-import { sddReadyReason } from "../domain/rework-reasons.js";
-import { reworkEvents } from "../domain/rules/emit.js";
+import { sddReadyReason, uncoveredWithoutOwnerReason } from "../domain/rework-reasons.js";
+import { plannerRecutEvent, reworkEvents } from "../domain/rules/emit.js";
 import { parseReadyEnvelope, SddEnvelopeError, type ReadyEnvelope, type ReadyViolation } from "../../shared/sdd/envelope.js";
 import { ROUTED_BY_FILE_KINDS, ROUTED_BY_ID_KINDS, SPEC_GATE_KINDS } from "../domain/sdd-ready-routing.js";
 import { updateLedger, writeFailedReport } from "./ledger-store.js";
@@ -39,6 +39,7 @@ export function routeSddReadyEffect(triage: EffectHandler): EffectHandler {
     const summary = envelopeOf((await readTextOrNull(evidencePath)) ?? "");
     const tasks = context.state.tasks;
     const reasonsByTask = new Map<string, string[]>();
+    const unownedIds: string[] = [];
     let needsTriage = summary === null;
     for (const violation of summary?.violations ?? []) {
       if (SPEC_GATE_KINDS.includes(violation.kind)) {
@@ -49,7 +50,11 @@ export function routeSddReadyEffect(triage: EffectHandler): EffectHandler {
       }
       const owners = ownersOf(tasks, violation);
       if (owners.length === 0) {
-        needsTriage = true;
+        if (violation.kind === "uncovered" && violation.id !== null) {
+          unownedIds.push(violation.id);
+        } else {
+          needsTriage = true;
+        }
         continue;
       }
       for (const owner of owners) {
@@ -64,6 +69,9 @@ export function routeSddReadyEffect(triage: EffectHandler): EffectHandler {
     }
     if (routed.length > 0) {
       await updateLedger(identity, (ledger) => ({ ...ledger, reworks: [...ledger.reworks, ...routed.map(([task_id]) => ({ round, task_id, target: "test-writer" as const, source: "sdd_ready" as const }))] }));
+    }
+    if (unownedIds.length > 0) {
+      context.publish(plannerRecutEvent(context.state, uncoveredWithoutOwnerReason(uniqueSorted(unownedIds))));
     }
     if (needsTriage) {
       await triage({ kind: ASSEMBLY_EFFECT.triage, round, step: "sdd_ready", evidencePath }, context, slice);

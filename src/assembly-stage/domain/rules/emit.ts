@@ -32,6 +32,15 @@ export function nextAttempt(state: RunState, task: TaskState, target: ReworkTarg
   }
 }
 
+/* Mirrors build-stage designReworkAttempt: bus:CTR-004 dedupes design.rework on attempt alone, so the ordinal spans both design roles. */
+function designReworkAttempt(state: RunState): number {
+  return state.stageAttempts.plannerRecuts + state.stageAttempts.architectRepairs + 1;
+}
+
+export function plannerRecutEvent(state: RunState, reason: string): PendingEvent {
+  return { type: "design.rework", producer: "foreman", payload: { target: "planner", reason, attempt: designReworkAttempt(state), originTaskId: null } };
+}
+
 export function reworkEvents(input: {
   readonly state: RunState;
   readonly round: number;
