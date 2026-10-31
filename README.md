@@ -51,9 +51,9 @@ Its run trace is next to it in `hidden/<slug>/trace/trace.md`.
 | design | architect | DeepSeek V4.1 Flash, effort medium | Mozaik agent | in parallel with verification-designer |
 | design | verification-designer | DeepSeek V4.1 Flash, effort high | Mozaik agent | in parallel with architect |
 | design | planner | DeepSeek V4.1 Flash, effort medium | Mozaik agent | at the barrier after both |
-| build | test-writer | `claude-sonnet-5-5`, effort medium | lane: Mozaik participant around `claude --print --safe-mode` | one lane per task, up to 4 lanes at once |
+| build | test-writer | `claude-opus-5-5`, effort medium | lane: Mozaik participant around `claude --print --safe-mode` | one lane per task, up to 4 lanes at once |
 | build | Verifier (red / green check) | none | deterministic, foreman effect | per lane |
-| build | implementer | `claude-sonnet-5-5`, effort medium | lane, fresh context | per lane |
+| build | implementer | `claude-opus-5-5`, effort medium | lane, fresh context | per lane |
 | build | reviewer | `openai/gpt-6.1-terra` | Mozaik agent, another vendor than the Claude lanes | per lane, while other lanes code |
 | assembly | assembler | none | deterministic Mozaik participant | once every task is approved |
 | assembly | triage | DeepSeek V4.1 Flash, effort medium | Mozaik agent | on failures no lane owns |

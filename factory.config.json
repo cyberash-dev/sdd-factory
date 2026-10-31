@@ -29,8 +29,8 @@
     "reviewer": "openai/gpt-6.1-terra",
     "lane": null,
     "lanes": {
-      "test-writer": "claude-sonnet-5-5",
-      "implementer": "claude-sonnet-5-5",
+      "test-writer": "claude-opus-5-5",
+      "implementer": "claude-opus-5-5",
       "simple-fixer": "claude-opus-5-5"
     },
     "effort": {
