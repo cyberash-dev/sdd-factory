@@ -26,7 +26,7 @@
     "default": "deepseek/deepseek-v4.1-flash-1017",
     "critic": "openai/gpt-6.1-terra",
     "triage": "deepseek/deepseek-v4.1-flash-1017",
-    "reviewer": "deepseek/deepseek-v4.1-flash-1017",
+    "reviewer": "openai/gpt-6.1-terra",
     "lane": null,
     "lanes": {
       "test-writer": "claude-sonnet-5-5",
