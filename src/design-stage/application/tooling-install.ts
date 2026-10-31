@@ -29,6 +29,15 @@ async function npmInstall(request: ToolingInstallRequest, flags: readonly string
   return request.commands.run({ file: "npm", args: ["install", "--no-audit", "--no-fund", ...flags, ...packages], cwd: request.productDir, timeoutMs: request.timeoutMs });
 }
 
+function hasNodeTypes(tooling: TechTooling): boolean {
+  return tooling.devDependencies.some((dependency) => dependency.slice(0, dependency.lastIndexOf("@")) === "@types/node");
+}
+
+function typesWithNode(architectTypes: unknown): readonly unknown[] {
+  const kept: readonly unknown[] = Array.isArray(architectTypes) ? architectTypes : [];
+  return kept.includes("node") ? kept : [...kept, "node"];
+}
+
 async function overwriteCompilerOptions(request: ToolingInstallRequest, compilerOptions: Readonly<Record<string, unknown>>): Promise<void> {
   const path = join(request.productDir, "tsconfig.json");
   const current: unknown = JSON.parse((await readTextOrNull(path)) ?? "{}");
@@ -39,8 +48,10 @@ async function overwriteCompilerOptions(request: ToolingInstallRequest, compiler
     request.log("design-stage: tsconfig rootDir dropped");
   }
   /* design-stage:DLT-006: the product is nested in the factory repo; without these, ancestor node_modules/@types leak into its typecheck. */
-  const pinned = { ...applied, skipLibCheck: true, typeRoots: ["./node_modules/@types"] };
-  request.log("design-stage: tsconfig skipLibCheck and typeRoots pinned");
+  /* design-stage:DLT-011: the shipped TypeScript no longer includes @types packages by default, and tsconfig.build.json has no test file pulling node types in. */
+  const types = hasNodeTypes(request.tooling) ? typesWithNode(applied["types"]) : null;
+  const pinned = { ...applied, skipLibCheck: true, typeRoots: ["./node_modules/@types"], ...(types === null ? {} : { types }) };
+  request.log(types === null ? "design-stage: tsconfig skipLibCheck and typeRoots pinned" : `design-stage: tsconfig skipLibCheck, typeRoots and types ${types.join(",")} pinned`);
   await writeTextAtomic(path, `${JSON.stringify({ ...base, compilerOptions: pinned }, null, 2)}\n`);
 }
 
