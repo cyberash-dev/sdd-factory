@@ -13,7 +13,7 @@ import { invokeRole, promptBody, type HandoffVerdict } from "./role-invocation.j
 import { outputTail, type StageDeps } from "./stage-deps.js";
 import { lintProductSpecWithFix } from "./spec-lint.js";
 
-const ASSUME_MESSAGE = `Assumption mode for product "{{slug}}", task {{task_id}}.
+const ASSUME_MESSAGE = `Assumption mode for product "{{slug}}", task {{task_id}}. This is not a review round: write no spec/review/ga.md.
 A lane finding needs a decision on approved records that can no longer change: {{spec_ids}}.
 Finding:
 {{finding}}
