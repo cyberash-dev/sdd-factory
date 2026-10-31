@@ -1716,6 +1716,78 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-015
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T21:11:45.332Z
+    change_request: "operator decision 2026-10-31 22:10: the spec-analyst moves to Claude Code on Opus"
+    scope: first-time-approval
+partition_id: spec-stage
+title: the spec-analyst runs as a Claude Code lane when a lane model is configured for it
+target_ids:
+  - spec-stage:BEH-001
+  - spec-stage:BEH-003
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The spec-analyst runs as a Mozaik API agent on models.default with the
+  factory's own file and lint tools. On the hidden spec its drafts
+  carried readings the source does not state (an unserved method answered
+  405 where the source says an unknown route is 404, a waitlist entry for
+  a tier of no event accepted), and the operator wants the analyst on the
+  same Claude Code subscription lane as the test-writer and implementer.
+  Change: when models.lanes names a model for "spec-analyst"
+  (factory:DLT-010, factory:DLT-016), every analyst invocation of BEH-001,
+  BEH-003 and the gate rework runs as one Claude Code CLI subprocess with
+  the lane argv of build-stage:EXT-001 (--safe-mode, bypassPermissions,
+  that model, the reasoning effort models.effort["spec-analyst"]) in the
+  product dir, while a Mozaik lane participant named spec-analyst is
+  joined (bus:BEH-007). Its prompt is the analyst's role prompt plus a
+  note that file access uses Claude Code's own tools, that lint is
+  `npx sdd lint` run in the product dir, and that it may write only
+  spec/spec.md, spec/assumptions.md and its handoff file. After the
+  subprocess exits the foreman reverts every changed or new file in the
+  product dir outside those paths and logs their names. The handoff is
+  read, verified and re-run exactly as for the API role, and the
+  foreman's own lint of the product spec stays the gate; the lint-cycle
+  cap counts only the API role's lint tool. Without a lane model for
+  "spec-analyst" the API role runs as before.
+tests_old_behavior:
+  - without a lane model for spec-analyst the analyst runs as the API role
+tests_new_behavior:
+  - to:spec-stage:BEH-001
+  - to:spec-stage:BEH-003
+test_obligation:
+  predicate: |
+    With models.lanes {"spec-analyst": "claude-opus-5-5"}, a draft effect
+    starts one Claude Code subprocess in the product dir with --model
+    claude-opus-5-5 and the configured effort, whose prompt contains the
+    analyst prompt and the CLI note, makes no API role call, and on a
+    complete handoff with lint_exit 0 over a spec the foreman's lint
+    passes publishes spec.drafted; a file the subprocess wrote outside
+    spec/spec.md, spec/assumptions.md and the handoff is removed; a
+    handoff missing a required key re-runs the subprocess with the
+    rejection note; without the lane model the API role is called.
+  test_template: integration
+  boundary_classes:
+    - lane model configured, complete handoff
+    - write outside the allowed paths
+    - rejected handoff re-run
+    - no lane model
+  failure_scenarios:
+    - the analyst lane edits files outside the spec
+    - the API role still called with a lane model configured
+---
+```
+
 ---
 
 ## 16. Implementation bindings
