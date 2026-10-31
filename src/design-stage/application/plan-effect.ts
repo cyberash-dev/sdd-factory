@@ -11,7 +11,7 @@ import type { RoleUsage } from "../domain/payloads.js";
 import { describeViolations, validateTasks, type TasksViolation } from "../domain/tasks-validator.js";
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { createDesignFileFixer, UNWIRED_FIX_DEPS, type DesignFileFixer } from "./design-file-fix.js";
-import { designReworkAttempt, effectInteger, pending, publishBlocked, reworkFindingText, TASKS_JSON, TECH_MD, VERIFICATION_MD } from "./effect-support.js";
+import { designReworkAttempt, effectInteger, pending, publishBlocked, reworkFindingText, reworkFindingWithFile, TASKS_JSON, TECH_MD, VERIFICATION_MD } from "./effect-support.js";
 import { taskCoverIds } from "./eligible-ids.js";
 import { PLANNER_MESSAGE } from "./messages.js";
 import { productPaths } from "./product-paths.js";
@@ -160,7 +160,7 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     tasks_json: TASKS_JSON,
     handoff_path: handoffPathOf(slice, "planner"),
     attempt: String(attempt),
-    rework_finding: finding,
+    rework_finding: await reworkFindingWithFile(effect),
     graph_depth: String(slice.config.caps.graphDepth),
     min_covers_per_task: String(slice.config.caps.minCoversPerTask),
     eligible_ids: eligibleIds.join(", "),

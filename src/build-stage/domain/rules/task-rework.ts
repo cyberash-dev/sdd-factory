@@ -53,9 +53,8 @@ export function taskReworkRule(deps: RuleDeps): TransitionRule {
         case "test-writer":
           return laneRestart(state, task, taskId, deps.caps, reworkFinding, event.type);
         case "planner":
-          return { state: stamped, emits: [foreman("design.rework", { target: "planner", reason, attempt: designReworkAttempt(state), originTaskId: taskId })], effects: [] };
         case "architect":
-          return { state: stamped, emits: [foreman("design.rework", { target: "architect", reason, attempt: designReworkAttempt(state), originTaskId: taskId, specIds: specIdsOf(event.payload) })], effects: [] };
+          return { state: stamped, emits: [foreman("design.rework", { target, reason, attempt: designReworkAttempt(state), originTaskId: taskId, specIds: specIdsOf(event.payload), findingPath })], effects: [] };
         case "critic":
           return criticRoute(stamped, taskId, specIdsOf(event.payload), findingTextOf(event.payload, "finding", `${reason}; see ${findingPath ?? "the review report"}`), findingPath);
         default:

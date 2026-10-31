@@ -6,7 +6,7 @@ import { readTextOrNull } from "../../shared/fs/text.js";
 import type { SimpleFixDeps } from "../../shared/fixer/index.js";
 import type { SliceContext } from "../../shared/slice.js";
 import { createDesignFileFixer, UNWIRED_FIX_DEPS } from "./design-file-fix.js";
-import { designReworkAttempt, effectInteger, effectStrings, pending, publishBlocked, reworkFindingText, TECH_MD } from "./effect-support.js";
+import { designReworkAttempt, effectInteger, effectStrings, pending, publishBlocked, reworkFindingWithFile, TECH_MD } from "./effect-support.js";
 import { ARCHITECT_MESSAGE } from "./messages.js";
 import { handoffPathOf, runStageRole } from "./stage-role.js";
 
@@ -42,7 +42,7 @@ async function techMdErrorAfterFix(slice: SliceContext, fix: SimpleFixDeps, cont
 export async function runArchitectEffect(effect: Effect, context: EffectContext, slice: SliceContext, fix: SimpleFixDeps = UNWIRED_FIX_DEPS): Promise<void> {
   const attempt = effectInteger(effect, "attempt", 1);
   const specIds = effectStrings(effect, "specIds");
-  const reworkFinding = reworkFindingText(effect);
+  const reworkFinding = await reworkFindingWithFile(effect);
   const message = slice.prompts.render(ARCHITECT_MESSAGE, {
     slug: slice.slug,
     product_dir: slice.paths.productDir,

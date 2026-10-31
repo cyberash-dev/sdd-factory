@@ -36,12 +36,17 @@ function withRoleAccounting(state: RunState, event: { readonly payload: EventPay
   return { ...state, costLedger: ledgerWithUsage(state.costLedger, event.payload, role), stageHandoffReruns: withStageReruns(state, role, reruns) };
 }
 
-function planEffect(attempt: number, reworkFinding: string, originTaskId: string | null = null): Effect {
-  return originTaskId === null ? { kind: "design.plan", attempt, reworkFinding } : { kind: "design.plan", attempt, reworkFinding, originTaskId };
+function findingPathField(findingPath: string | null): { readonly findingPath?: string } {
+  return findingPath === null ? {} : { findingPath };
 }
 
-function originTaskIdOf(payload: EventPayload): string | null {
-  const value = payload["originTaskId"];
+function planEffect(attempt: number, reworkFinding: string, originTaskId: string | null = null, findingPath: string | null = null): Effect {
+  const origin = originTaskId === null ? {} : { originTaskId };
+  return { kind: "design.plan", attempt, reworkFinding, ...origin, ...findingPathField(findingPath) };
+}
+
+function nullableStringOf(payload: EventPayload, field: string): string | null {
+  const value = payload[field];
   return typeof value === "string" ? value : null;
 }
 
@@ -122,16 +127,16 @@ function tasksReadyRule(deps: DesignRuleDeps): TransitionRule {
   };
 }
 
-function plannerRework(deps: DesignRuleDeps, state: RunState, reason: string, originTaskId: string | null): TransitionResult {
+function plannerRework(deps: DesignRuleDeps, state: RunState, reason: string, originTaskId: string | null, findingPath: string | null): TransitionResult {
   const recuts = state.stageAttempts.plannerRecuts + 1;
   if (recuts > deps.caps.plannerRecuts) {
     return { state, emits: [designBlocked("planner_cap")], effects: [] };
   }
   const next: RunState = { ...state, status: state.status === "building" ? "building" : "planning", stageAttempts: { ...state.stageAttempts, plannerRecuts: recuts } };
-  return { state: next, emits: [], effects: [planEffect(recuts + 1, reason, originTaskId)] };
+  return { state: next, emits: [], effects: [planEffect(recuts + 1, reason, originTaskId, findingPath)] };
 }
 
-function architectRework(deps: DesignRuleDeps, state: RunState, reason: string, specIds: readonly string[]): TransitionResult {
+function architectRework(deps: DesignRuleDeps, state: RunState, reason: string, specIds: readonly string[], findingPath: string | null): TransitionResult {
   const repairs = state.stageAttempts.architectRepairs + 1;
   if (repairs > deps.caps.architectRepairs) {
     const detail = `architect repairs cap ${deps.caps.architectRepairs} exceeded: ${reason}`;
@@ -139,7 +144,7 @@ function architectRework(deps: DesignRuleDeps, state: RunState, reason: string, 
   }
   const design = PRE_PLANNING_STATUSES.includes(state.status) ? { ...state.design, techReady: false } : state.design;
   const next: RunState = { ...state, design, stageAttempts: { ...state.stageAttempts, architectRepairs: repairs } };
-  return { state: next, emits: [], effects: [{ kind: "design.architect", attempt: repairs + 1, reworkFinding: reason, specIds }] };
+  return { state: next, emits: [], effects: [{ kind: "design.architect", attempt: repairs + 1, reworkFinding: reason, specIds, ...findingPathField(findingPath) }] };
 }
 
 function reworkRule(deps: DesignRuleDeps): TransitionRule {
@@ -152,7 +157,8 @@ function reworkRule(deps: DesignRuleDeps): TransitionRule {
       const reason = stringOf(event.payload, "reason");
       const role = target === "architect" ? "architect" : "planner";
       const base = withRoleAccounting(state, event, role);
-      return target === "architect" ? architectRework(deps, base, reason, stringListOf(event.payload, "specIds")) : plannerRework(deps, base, reason, originTaskIdOf(event.payload));
+      const findingPath = nullableStringOf(event.payload, "findingPath");
+      return target === "architect" ? architectRework(deps, base, reason, stringListOf(event.payload, "specIds"), findingPath) : plannerRework(deps, base, reason, nullableStringOf(event.payload, "originTaskId"), findingPath);
     },
   };
 }

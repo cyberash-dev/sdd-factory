@@ -1,6 +1,8 @@
+import { isAbsolute } from "node:path";
 import type { RunState } from "../../bus/domain/run-state.js";
 import type { Effect, PendingEvent } from "../../bus/domain/transition.js";
 import type { EffectContext } from "../../bus/ports/outbound/effect-runner.js";
+import { readTextOrNull } from "../../shared/fs/text.js";
 import type { RoleUsage } from "../domain/payloads.js";
 
 export const TECH_MD = "design/tech.md";
@@ -29,6 +31,24 @@ export function reworkFindingText(effect: Effect): string {
     }
   }
   return "";
+}
+
+/* design-stage:DLT-010: a lane finding's handoff path is absolute; a review report path is worktree-relative and unreadable from here. */
+async function findingFileText(effect: Effect): Promise<string | null> {
+  const findingPath = effect["findingPath"];
+  return typeof findingPath === "string" && isAbsolute(findingPath) ? readTextOrNull(findingPath) : null;
+}
+
+/* design-stage:DLT-010: a repair routed from a lane finding hands the role the finding itself, not only the routing reason. */
+export async function reworkFindingWithFile(effect: Effect): Promise<string> {
+  const reason = reworkFindingText(effect);
+  const findingFile = await findingFileText(effect);
+  if (findingFile === null) {
+    return reason;
+  }
+  const specIds = effectStrings(effect, "specIds");
+  const specIdsLine = specIds.length === 0 ? [] : [`spec_ids: ${specIds.join(", ")}`];
+  return [reason, ...specIdsLine, "", findingFile.trimEnd()].join("\n");
 }
 
 /* bus:CTR-004 keys design.rework on attempt alone, so the attempt is the design-stage-wide rework ordinal. */
