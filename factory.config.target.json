@@ -2,8 +2,8 @@
   "caps": {
     "lintCycles": 8,
     "criticRounds": 2,
-    "implementerAttempts": 3,
-    "testWriterRework": 2,
+    "implementerAttempts": 4,
+    "testWriterRework": 3,
     "plannerRecuts": 2,
     "architectRepairs": 3,
     "criticAssumptionsPerId": 1,
