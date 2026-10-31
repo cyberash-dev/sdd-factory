@@ -1225,6 +1225,62 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: spec-stage:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:27.480Z
+    change_request: run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: spec-stage
+title: the approval repair adds every record whose surface_ref names the Surface to its members
+target_ids:
+  - spec-stage:CTR-001
+  - spec-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  spec-stage:DLT-004 appends to the single Surface's members only the
+  Contract ids it lacks. `sdd ready` also reports surface_member_drift
+  for every approved record whose surface_ref names a Surface that does
+  not list it; `sdd lint` does not, so the product spec of run 18 was
+  approved with 14 Behavior and Scenario records outside SUR-001 and
+  could never pass `sdd ready` at assembly. Change: before the
+  pre-authorised approval the repair appends, in record order and
+  without duplicates, every record id absent from members that is a
+  Contract or whose surface_ref equals the Surface id; the log line and
+  the lint re-run are unchanged.
+tests_old_behavior:
+  - a Contract missing from members is still appended
+  - zero or two Surface records still block with spec_integrity
+tests_new_behavior:
+  - to:spec-stage:CTR-001
+  - to:spec-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given a lint-clean spec whose single Surface lists its Contracts
+    while two Behaviors and a Scenario declare surface_ref equal to it,
+    the approve effect appends those three ids in record order and emits
+    spec.approved, and `sdd ready` on the result reports no
+    surface_member_drift; a Behavior without surface_ref is not added.
+  test_template: integration
+  boundary_classes:
+    - records with surface_ref missing from members
+    - record without surface_ref
+    - members already complete
+  failure_scenarios:
+    - an id added twice
+    - a record without surface_ref added
+---
+```
+
 ---
 
 ## 16. Implementation bindings

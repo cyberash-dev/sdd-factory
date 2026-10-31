@@ -1,0 +1,38 @@
+plan_id: 2026-10-31T002226Z-wepsy
+created_at: 2026-10-31T00:22:26.816Z
+pending_attestations:
+  - id: factory:DLT-013
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:26.815Z
+    change_request: "run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved
+  - id: design-stage:DLT-008
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:27.148Z
+    change_request: "run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved
+  - id: spec-stage:DLT-007
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:27.480Z
+    change_request: "run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved
+  - id: assembly-stage:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:27.813Z
+    change_request: "run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved
+  - id: assembly-stage:DLT-004
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:28.143Z
+    change_request: "run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31"
+    scope: first-time-approval
+    target_status: approved

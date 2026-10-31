@@ -1254,6 +1254,68 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-008
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:27.148Z
+    change_request: run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: design-stage
+title: the task graph covers every approved record sdd ready requires a test for
+target_ids:
+  - design-stage:INV-001
+  - design-stage:CTR-003
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  design-stage:INV-001 asks the task graph to cover every approved
+  normative id except Surface and Partition, but the eligible ids the
+  planner and the tasks.json validator use are limited to Behavior,
+  Contract, Invariant, Scenario, NFR, Constraint and Policy. A product
+  spec with a GeneratedArtifact (todo-cli:GA-001 in run 18) or a
+  LocalizationContract (run 15) then gets a graph without an owner for
+  that record; the record has a test obligation, `sdd ready` reports it
+  uncovered at assembly, and no lane can be routed to it. Change: the
+  eligible ids are exactly the approved records `sdd ready` requires a
+  `@covers` marker for, i.e. every record of a normative template
+  (Behavior, Invariant, Contract, Scenario, NFR, Constraint, Policy,
+  Migration, Delta, GeneratedArtifact, ExternalDependency,
+  LocalizationContract) except Surface, minus records whose
+  test_obligation is not_applicable. The planner is told these ids, the
+  validator requires each exactly once and accepts no other id.
+tests_old_behavior:
+  - a spec with only Behavior, Contract, Invariant, Scenario, NFR, Constraint and Policy records yields the same eligible ids as before
+tests_new_behavior:
+  - to:design-stage:INV-001
+  - to:design-stage:CTR-003
+test_obligation:
+  predicate: |
+    Given an approved product spec with a Behavior, a GeneratedArtifact,
+    a LocalizationContract, an ExternalDependency whose test_obligation
+    is not_applicable, a Surface and an Open-Q, the eligible ids are the
+    Behavior, the GeneratedArtifact and the LocalizationContract; a
+    tasks.json that omits the GeneratedArtifact is rejected as a coverage
+    gap and one that covers the ExternalDependency is rejected as an
+    unknown cover.
+  test_template: unit
+  boundary_classes:
+    - newly eligible templates
+    - not_applicable obligation
+    - non-normative templates
+  failure_scenarios:
+    - a record sdd ready requires left without a task
+    - a not_applicable record forced onto a task
+---
+```
+
 ---
 
 ## 16. Implementation bindings

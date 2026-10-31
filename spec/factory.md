@@ -2751,6 +2751,74 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: factory:DLT-013
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:26.815Z
+    change_request: run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: factory
+title: a failed or empty inference of an API role ends its loop as an answer without a handoff instead of failing the run
+target_ids:
+  - factory:BEH-011
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  Run 20 ended with run.failed{reason: runtime_error, detail: "No
+  transition rule found after \"inference\""}: one DeepSeek inference of
+  the reviewer returned neither a function call nor an assistant
+  message, the Mozaik loop threw, and since `runLoop` drops the promise
+  of its agent loop the rejection reached the process as an unhandled
+  rejection, which the composition root turns into run.failed. A provider
+  error (HTTP 5xx, reset connection) of any API role takes the same path.
+  Changes to factory:BEH-011 (all seven API roles; lanes unchanged):
+  - every inference of an API role goes through the factory's inference
+    runner; an inference that throws is retried up to 2 more times,
+    5 s and then 15 s later; an inference whose output holds neither a
+    function call nor an assistant message is retried once
+  - when its retries are exhausted the inference yields one assistant
+    message instead of throwing: "inference failed: <error text>" or
+    "the model returned neither a tool call nor a message"; the loop
+    ends with model.answer, and the role's invocation ends like an
+    invocation that wrote no handoff: the same handoff re-run counter
+    and the same terminal outcomes BEH-011 lists for a timeout
+  - the run never ends with run.failed{reason: runtime_error} because
+    of an inference failure of an API role
+tests_old_behavior:
+  - an inference that returns a tool call or a message is passed through unchanged, once
+tests_new_behavior:
+  - to:factory:BEH-011
+test_obligation:
+  predicate: |
+    Given an API role runner over an inference runner that throws on the
+    first call and then returns a message, the role resolves with that
+    message after one retry; given an inference runner whose every
+    output has neither a function call nor a message, the role resolves
+    with the answer "the model returned neither a tool call nor a
+    message" after exactly two inference calls and no unhandled
+    rejection is emitted; given an inference runner that throws on every
+    call, the role resolves after three calls with an answer starting
+    "inference failed:".
+  test_template: integration
+  boundary_classes:
+    - transient provider error then success
+    - empty inference twice
+    - provider error on every call
+  failure_scenarios:
+    - an unhandled rejection reaching the process
+    - an endless retry loop
+    - a successful inference called twice
+---
+```
+
 ---
 
 ## 16. Implementation bindings

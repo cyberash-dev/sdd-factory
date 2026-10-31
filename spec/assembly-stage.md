@@ -1434,6 +1434,138 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: assembly-stage:DLT-003
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:27.813Z
+    change_request: run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: assembly-stage
+title: sdd ready failures without a lane owner are repaired or re-planned instead of ending in triage
+target_ids:
+  - assembly-stage:BEH-003
+  - assembly-stage:BEH-005
+  - assembly-stage:BEH-006
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The first real assembly (audited on runs 18 and 15 before it ran) has
+  two sdd ready failures no lane owns: surface_member_drift (approved
+  records whose surface_ref names a Surface that does not list them) and
+  an uncovered record that no task covers. Both went to triage, whose
+  only possible route is a planner re-cut; a re-cut that changes no task
+  then left every task approved with nothing to restart the assembly
+  barrier, and the stalled watchdog failed the run. Changes:
+  - assembly-stage:BEH-003: before `sdd ready` in every round the
+    assembler applies the Surface membership repair of spec-stage:DLT-007
+    to spec/spec.md on the integration branch (specs approved before that
+    Delta, resumed runs) and commits it when it changed anything
+  - assembly-stage:BEH-006: uncovered <id> where no task's covers
+    contains <id> => design.rework{target: planner, originTaskId: null,
+    reason: "uncovered without owner: <ids>"} (build-stage BEH-009
+    re-cut path) instead of triage; violations with an owner still route
+    to that task's test-writer in the same round
+  - assembly-stage:BEH-005: when a planner re-cut requested from the
+    assembly (triage route or the uncovered route) ends with every task
+    approved, the barrier of BEH-001 starts round + 1 at once; the round
+    cap of CST-001 still bounds the loop
+tests_old_behavior:
+  - an uncovered id with an owning task still routes to that task's test-writer
+  - aggregated_lint or aggregated_check still goes to triage
+tests_new_behavior:
+  - to:assembly-stage:BEH-003
+  - to:assembly-stage:BEH-005
+  - to:assembly-stage:BEH-006
+test_obligation:
+  predicate: |
+    Given an integration branch whose spec/spec.md has a Behavior with
+    surface_ref SUR-001 absent from its members, the round adds the id to
+    members and commits before `sdd ready` runs; given a ready envelope
+    with uncovered X where no task covers X, the routing publishes
+    design.rework{target: planner} whose reason names X and invokes no
+    triage; given a re-cut tasks-ready event after which every task is
+    approved, assembly.started for round + 1 is emitted, and at the round
+    cap the run fails with cap_exhausted instead of stalling.
+  test_template: integration
+  boundary_classes:
+    - drift on the integration branch
+    - uncovered id without owner
+    - re-cut leaving every task approved
+    - round cap after a re-cut
+  failure_scenarios:
+    - the run ending as stalled
+    - triage invoked for an ownerless uncovered id
+    - the repair committed after sdd ready ran
+---
+```
+
+```yaml
+---
+id: assembly-stage:DLT-004
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T00:22:28.143Z
+    change_request: run 20 and assembly audit fixes; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: assembly-stage
+title: role-written design and spec files are committed before verification and publication commits only its own tree
+target_ids:
+  - assembly-stage:BEH-003
+  - assembly-stage:BEH-008
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  An architect repair or a planner re-cut while the run is building
+  writes design/ files in the product root, and only the scheduling of
+  a further lane commits them; a repair after the last lane started
+  leaves the tree dirty (seen in run 15's product), and publication
+  refuses a dirty tree after an otherwise green assembly. Publication
+  also runs `git commit` in the team repository without a pathspec, so
+  whatever else is staged there joins the factory's commit. Changes:
+  - assembly-stage:BEH-003: before the verification sequence of a round
+    the assembler commits pending changes under design/ and spec/ of the
+    product root, with the message "assembly: role-written design and
+    spec files"; any other uncommitted path still fails the round as
+    before
+  - assembly-stage:BEH-008: the publication commit names
+    `hidden/<slug>/` (or the --out directory) as its pathspec; files
+    staged elsewhere in the team repository stay staged and uncommitted
+tests_old_behavior:
+  - a clean product tree verifies and publishes as before
+tests_new_behavior:
+  - to:assembly-stage:BEH-003
+  - to:assembly-stage:BEH-008
+test_obligation:
+  predicate: |
+    Given a product root on the integration branch with an uncommitted
+    edit of design/tech.md, the round commits it and the verification
+    sequence and publication succeed; given a team repository with an
+    unrelated staged file, the publication commit contains only paths
+    under hidden/<slug>/ and the unrelated file is still staged.
+  test_template: integration
+  boundary_classes:
+    - dirty design file
+    - unrelated staged file in the team repository
+  failure_scenarios:
+    - publish_failed after a green assembly over a role-written file
+    - an operator's staged file inside the factory's commit
+---
+```
+
 ---
 
 ## 16. Implementation bindings
