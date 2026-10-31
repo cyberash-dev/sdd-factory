@@ -188,11 +188,17 @@ describe("reviewer decision routing", () => {
   it.each([
     ["implementer", "task.rework", "implementer", 2, "review_changes"],
     ["test-writer", "task.rework", "test-writer", 2, "review_changes"],
-    ["architect", "task.rework", "architect", 1, "design_repair"],
   ])("routes request_changes with target %s", (target, type, reworkTarget, attempt, reason) => {
     const result = run(reviewState(), "task.reviewed", reviewed("request_changes", target));
 
     expect(result.emits.map((event) => [event.type, event.payload["target"], event.payload["attempt"], event.payload["reason"], event.payload["findingPath"]])).toEqual([[type, reworkTarget, attempt, reason, "reviews/T-001.md"]]);
+  });
+
+  // @covers design-stage:DLT-010
+  it("routes request_changes with target architect with the review report path anchored at the task worktree", () => {
+    const result = run(reviewState(), "task.reviewed", reviewed("request_changes", "architect"));
+
+    expect(result.emits.map((event) => [event.type, event.payload["target"], event.payload["attempt"], event.payload["reason"], event.payload["findingPath"]])).toEqual([["task.rework", "architect", 1, "design_repair", "/run/worktrees/T-001/reviews/T-001.md"]]);
   });
 
   it("forwards the blocking spec ids to the architect route", () => {

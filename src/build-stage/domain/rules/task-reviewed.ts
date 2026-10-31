@@ -1,3 +1,4 @@
+import { isAbsolute, join } from "node:path";
 import type { TaskState } from "../../../bus/domain/run-state.js";
 import { withCostEntry } from "../../../bus/domain/run-state.js";
 import type { PendingEvent, TransitionRule } from "../../../bus/domain/transition.js";
@@ -21,6 +22,11 @@ function malformedTarget(taskId: string): PendingEvent {
   return foreman("task.failed", { taskId, reason: "unparseable_handoff", detail: "reviewer: request_changes without target" });
 }
 
+/* design-stage:DLT-010: the design stage reads the finding outside the worktree, so the review report path must be absolute. */
+function worktreeAnchored(task: TaskState, reportPath: string): string {
+  return isAbsolute(reportPath) ? reportPath : join(task.worktree, reportPath);
+}
+
 function routeTarget(input: Decision, caps: RuleDeps["caps"], implementerReason: string, testWriterReason: string): PendingEvent {
   const { state, task, taskId, target, reportPath, specIds, findingText } = input;
   switch (target) {
@@ -29,7 +35,7 @@ function routeTarget(input: Decision, caps: RuleDeps["caps"], implementerReason:
     case "test-writer":
       return testWriterRework(task, taskId, testWriterReason, reportPath);
     case "architect":
-      return architectRework(state, taskId, caps, "design_repair", reportPath, specIds);
+      return architectRework(state, taskId, caps, "design_repair", worktreeAnchored(task, reportPath), specIds);
     case "contract":
       return criticRework(state, taskId, caps, specIds, reportPath, findingText);
     case "none":
