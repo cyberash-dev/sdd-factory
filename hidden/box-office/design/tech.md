@@ -139,6 +139,7 @@ box-office is one HTTP JSON API served by a single Node.js process; every accoun
     readonly netCents: number;
   }
   export interface Store {
+    now(): number;
     reconcile(nowMs?: number): void;
 
     createAccount(input: { email: string; password: string; name: string; role: Role }): Account;
@@ -200,7 +201,7 @@ box-office is one HTTP JSON API served by a single Node.js process; every accoun
   }
   export function createStore(options: { holdSeconds: number; now?: () => number }): Store;
   ```
-- notes: raises no error code and imports no other module; every precondition is checked by the calling route module before the mutation is made (DD-07). `available` is derived on every read from `quantity` minus tickets in held orders minus tickets in paid orders, so INV-005 holds by construction; `reconcile` moves held orders past `expiresAt` to `"expired"` and then serves the affected tiers' waitlists. `cancelEvent` sets the event `"cancelled"`, moves its paid orders to `"refunded"`, its held orders to `"cancelled"` and drops its waitlist entries. `holdOrder` prices items at the tier's `priceCents`, applies an optional code, sets `expiresAt` to `createdAt` plus `holdSeconds` and counts the code's use; `releaseOrder` gives the code's use back and serves the freed tickets. `createStore` defaults the clock to `Date.now`. Ids are minted from one counter as `<prefix>_<n>` with prefixes `usr`, `evt`, `tir`, `ord`, `wat` (DD-21); tokens are `tok_` plus `randomUUID()` from `node:crypto`.
+- notes: raises no error code and imports no other module; every precondition is checked by the calling route module before the mutation is made (DD-07). `now()` returns the store clock's current instant in milliseconds, the same clock `createStore` receives as `now` (default `Date.now`); every route module reads time through it and never through `Date.now` (DD-23). `available` is derived on every read from `quantity` minus tickets in held orders minus tickets in paid orders, so INV-005 holds by construction; `reconcile` moves held orders past `expiresAt` to `"expired"` and then serves the affected tiers' waitlists. `cancelEvent` sets the event `"cancelled"`, moves its paid orders to `"refunded"`, its held orders to `"cancelled"` and drops its waitlist entries. `holdOrder` prices items at the tier's `priceCents`, applies an optional code, sets `expiresAt` to `createdAt` plus `holdSeconds` and counts the code's use; `releaseOrder` gives the code's use back and serves the freed tickets. `createStore` defaults the clock to `Date.now`. Ids are minted from one counter as `<prefix>_<n>` with prefixes `usr`, `evt`, `tir`, `ord`, `wat` (DD-21); tokens are `tok_` plus `randomUUID()` from `node:crypto`.
 
 ### M-03 accounts
 - responsibility: Serves registration, session issue and the caller's own account.
@@ -234,7 +235,7 @@ box-office is one HTTP JSON API served by a single Node.js process; every accoun
   export function cancelEvent(req: HttpRequest, store: Store): ApiResponse;
   export function getEventReport(req: HttpRequest, store: Store): ApiResponse;
   ```
-- notes: raises E_INVALID_INPUT (title or venue outside 1-100, startsAt not in the future or unreadable, tier count outside 1-5, repeated tier name at the same case, priceCents not an integer at least 0, quantity not an integer in 1-10000), E_INVALID_QUERY (from or to unreadable, page not an integer at least 1, pageSize not an integer in 1-50), E_NOT_FOUND (unknown id), E_FORBIDDEN (an organizer who did not create the event), E_EVENT_CANCELLED (second cancel). Order of checks per INV-011: input 400, resource 404, ownership 403, state 409.
+- notes: raises E_INVALID_INPUT (title or venue outside 1-100, startsAt not in the future or unreadable, tier count outside 1-5, repeated tier name at the same case, priceCents not an integer at least 0, quantity not an integer in 1-10000), E_INVALID_QUERY (from or to unreadable, page not an integer at least 1, pageSize not an integer in 1-50), E_NOT_FOUND (unknown id), E_FORBIDDEN (an organizer who did not create the event), E_EVENT_CANCELLED (second cancel). Order of checks per INV-011: input 400, resource 404, ownership 403, state 409. The startsAt-in-the-future rule of `createEvent` compares the parsed instant with `store.now()`, never with `Date.now()` (DD-23).
 
 ### M-05 orders
 - responsibility: Serves checkout, payment, cancellation, single-order reads and the caller's order list.
@@ -252,7 +253,7 @@ box-office is one HTTP JSON API served by a single Node.js process; every accoun
   export function getOrder(req: HttpRequest, store: Store): ApiResponse;
   export function listMyOrders(req: HttpRequest, store: Store): ApiResponse;
   ```
-- notes: raises E_INVALID_INPUT (items absent or empty, repeated tierId, quantity not an integer at least 1, eventId or items missing), E_NOT_FOUND (unknown event; unknown order; an order of another customer; an order the caller may not read), E_INVALID_TIER (a tierId outside the event), E_EVENT_NOT_ON_SALE (cancelled or already started), E_TICKETS_UNAVAILABLE (one tier short), E_TICKET_LIMIT (would pass 6 tickets for the event over held and paid orders), E_DISCOUNT_UNUSABLE (code unknown for the event, expired or used up), E_ORDER_STATE (paying anything but a held order; cancelling an expired, cancelled or refunded order; refunding inside the 24 hour window). Checkout order per INV-011: input 400, event 404, tier 400, event state 409, availability 409, ticket limit 422, discount 422 (DD-08, DD-09).
+- notes: raises E_INVALID_INPUT (items absent or empty, repeated tierId, quantity not an integer at least 1, eventId or items missing), E_NOT_FOUND (unknown event; unknown order; an order of another customer; an order the caller may not read), E_INVALID_TIER (a tierId outside the event), E_EVENT_NOT_ON_SALE (cancelled or already started), E_TICKETS_UNAVAILABLE (one tier short), E_TICKET_LIMIT (would pass 6 tickets for the event over held and paid orders), E_DISCOUNT_UNUSABLE (code unknown for the event, expired or used up), E_ORDER_STATE (paying anything but a held order; cancelling an expired, cancelled or refunded order; refunding inside the 24 hour window). Checkout order per INV-011: input 400, event 404, tier 400, event state 409, availability 409, ticket limit 422, discount 422 (DD-08, DD-09). Every time comparison in this module takes its current instant from `store.now()`, never from `Date.now()`: the event-started check of E_EVENT_NOT_ON_SALE compares `event.startsAt` with `store.now()`, the discount expiry compares `expiresAt` with `store.now()`, and the 24 hour refund window compares `event.startsAt - store.now()` (DD-23).
 
 ### M-06 discounts
 - responsibility: Serves discount code creation for an event.
@@ -618,7 +619,7 @@ TD-TOOLING:
 
 ### DD-14 HOLD_SECONDS parsing and the 24 hour refund window
 - evidence: [box-office:CST-004, box-office:BEH-014, box-office:BEH-020, box-office:CTR-010]
-- decision: `HOLD_SECONDS` is an integer of at least 0, default 600, and anything else reads as 600; `expiresAt` is `createdAt` plus that many seconds. A paid order is refundable only while `startsAt - now > 86_400_000`; at exactly 24 hours the answer is 409 E_ORDER_STATE.
+- decision: `HOLD_SECONDS` is an integer of at least 0, default 600, and anything else reads as 600; `expiresAt` is `createdAt` plus that many seconds. A paid order is refundable only while `startsAt - store.now() > 86_400_000`; at exactly 24 hours the answer is 409 E_ORDER_STATE, and the comparison uses the store clock's instant, not `Date.now()` (DD-23).
 - alternatives_rejected: treating `HOLD_SECONDS 0` as unset, which `CST-004` boundary-classes as a real value; a `>=` comparison on the refund window, which contradicts `CTR-010`'s "24 hours or fewer".
 - consequence: both boundaries are pinned and testable through the environment variable and the event start.
 
@@ -669,6 +670,12 @@ TD-TOOLING:
 - decision: An internal routine runs after every transition that frees tickets (`reconcile` on expiry, `releaseOrder`, and the request-start `reconcile`) and per tier walks the queue from the head: while the head's quantity fits the tier's availability, either create a held order for that customer and tier with no discount code and an expiry from `HOLD_SECONDS`, or, when that order would take the customer past 6 tickets for the event, remove the entry and continue; stop at the first head that does not fit.
 - alternatives_rejected: serving the first entry that fits, which `INV-010` and `ASM-014` reject; leaving expiry to a timer, which would make a read return stale availability and break `INV-007`.
 - consequence: every observable response reflects expiry and serving, and the queue keeps its order because only the head is ever served or dropped.
+
+### DD-23 Every time decision reads the store clock
+- evidence: [box-office:INV-011, box-office:BEH-014, box-office:BEH-016, box-office:BEH-020, box-office:CTR-008, box-office:CTR-013, box-office:CST-004, box-office:BEH-018]
+- decision: `Store` exports `now(): number`, which returns the clock instant of the `now` function `createStore` received, defaulting to `Date.now`. Every module that compares an instant reads the current instant from `store.now()` and never from `Date.now()`: `createEvent`'s startsAt-in-the-future rule (M-04), `createOrder`'s event-started check, discount expiry comparison and `createdAt`/`expiresAt` computation, and the 24 hour refund window of `cancelOrder` (M-05), plus `reconcile` inside M-02. `holdOrder` and `reconcile` already stamp from that same clock, so created, expired and compared instants are one timeline.
+- alternatives_rejected: an ambient `Date.now()` in the route modules, which makes every time-sensitive status unreachable for a test that drives a fake clock through `createStore({ now })` and left `POST /orders` answering 422 instead of 409 past the sale start; a store method `isEventStarted(eventId)` instead of `now()`, which would need one accessor per comparison and cannot serve the 24 hour window without an event-specific signature.
+- consequence: a test or the composition root sets one clock and every endpoint observes it; `store.now()` is the only time source in the product, and no module imports a clock of its own.
 
 ## 8. Traceability
 
@@ -745,4 +752,10 @@ TD-TOOLING:
 
 ## 9. Revisions
 
-none
+### Revision 1 — attempt 2
+- trigger: `VD-INFEASIBLE` finding routed to architect: `tests/app/app.test.ts:139` (check-order test) drives the store clock through `createStore({ now })`, moves it forward 2 hours and expects 409 E_EVENT_NOT_ON_SALE from `POST /orders`, while `src/orders/index.ts` judged on-sale and expiry with `Date.now()` and the `Store` interface exposed no clock accessor.
+- spec_ids: [box-office:INV-011]
+- module: M-02 store (interface), M-04 events and M-05 orders (their time comparisons); M-01, M-03, M-06, M-07 and M-08 unchanged, and TD-TOOLING unchanged.
+- change: `Store` gains `now(): number` returning the instant of the clock `createStore` receives; the notes of M-02, M-04 and M-05 state that every module reads the current instant from `store.now()` and never from `Date.now()`; DD-14's refund-window wording now names `store.now()`; new DD-23 records the decision and its evidence. No `owns` area, other exported symbol or traceability row changed.
+- rationale: the obligation of `box-office:INV-011` must be observable at the public interface, so the time source a test or the composition root sets is the only clock the endpoints observe; an injected-clock test can then reach the 409 that a `Date.now()` comparison made unreachable.
+

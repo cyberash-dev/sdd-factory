@@ -10,6 +10,11 @@ import { joinWaitlist, listMyWaitlist } from "../waitlist/index.js";
 import type { Role, Store } from "../store/index.js";
 import { createStore } from "../store/index.js";
 
+const DEFAULT_PORT = 3000;
+const DEFAULT_HOLD_SECONDS = 600;
+const MAX_PORT = 65535;
+const MAX_BODY_BYTES = 1048576;
+
 type Handler = (req: HttpRequest, store: Store) => ApiResponse;
 
 interface Route {
@@ -20,9 +25,9 @@ interface Route {
   readonly handler: Handler;
 }
 
-const ANY_ROLE: readonly Role[] = ["organizer", "customer"];
-const ORGANIZER: readonly Role[] = ["organizer"];
+const BOTH: readonly Role[] = ["organizer", "customer"];
 const CUSTOMER: readonly Role[] = ["customer"];
+const ORGANIZER: readonly Role[] = ["organizer"];
 
 function route(
   method: string,
@@ -31,17 +36,13 @@ function route(
   readsBody: boolean,
   handler: Handler,
 ): Route {
-  return { method, segments: splitPath(path), roles, readsBody, handler };
-}
-
-function splitPath(path: string): string[] {
-  return path.split("/").filter((segment) => segment !== "");
+  return { method, segments: path.split("/").filter((s) => s.length > 0), roles, readsBody, handler };
 }
 
 const ROUTES: readonly Route[] = [
   route("POST", "/users", "public", true, createAccount),
   route("POST", "/sessions", "public", true, createSession),
-  route("GET", "/me", ANY_ROLE, false, getMe),
+  route("GET", "/me", BOTH, false, getMe),
   route("GET", "/me/orders", CUSTOMER, false, listMyOrders),
   route("GET", "/me/waitlist", CUSTOMER, false, listMyWaitlist),
   route("POST", "/events", ORGANIZER, true, createEvent),
@@ -54,15 +55,27 @@ const ROUTES: readonly Route[] = [
   route("POST", "/orders", CUSTOMER, true, createOrder),
   route("POST", "/orders/:id/pay", CUSTOMER, false, payOrder),
   route("POST", "/orders/:id/cancel", CUSTOMER, false, cancelOrder),
-  route("GET", "/orders/:id", ANY_ROLE, false, getOrder),
+  route("GET", "/orders/:id", BOTH, false, getOrder),
 ];
 
-const MAX_BODY_BYTES = 1_048_576;
-const DEFAULT_PORT = 3000;
-const MAX_PORT = 65535;
-const DEFAULT_HOLD_SECONDS = 600;
+function matchSegments(pattern: readonly string[], actual: readonly string[]): Record<string, string> | undefined {
+  if (pattern.length !== actual.length) {
+    return undefined;
+  }
+  const params: Record<string, string> = {};
+  for (let i = 0; i < pattern.length; i += 1) {
+    const expected = pattern[i] ?? "";
+    const value = actual[i] ?? "";
+    if (expected.startsWith(":")) {
+      params[expected.slice(1)] = value;
+    } else if (expected !== value) {
+      return undefined;
+    }
+  }
+  return params;
+}
 
-function decodeSegment(segment: string): string {
+function safeDecode(segment: string): string {
   try {
     return decodeURIComponent(segment);
   } catch {
@@ -70,204 +83,158 @@ function decodeSegment(segment: string): string {
   }
 }
 
-function matchSegments(
-  pattern: readonly string[],
-  actual: readonly string[],
-): Record<string, string> | undefined {
-  if (pattern.length !== actual.length) {
+function bearerToken(header: string | undefined): string | undefined {
+  if (header === undefined || !header.startsWith("Bearer ")) {
     return undefined;
   }
-  const params: Record<string, string> = {};
-  for (let i = 0; i < pattern.length; i += 1) {
-    const expected = pattern[i] ?? "";
-    const given = actual[i] ?? "";
-    if (expected.startsWith(":")) {
-      params[expected.slice(1)] = given;
-    } else if (expected !== given) {
-      return undefined;
-    }
-  }
-  return params;
+  const token = header.slice("Bearer ".length);
+  return token.length === 0 ? undefined : token;
 }
 
-function readBody(req: IncomingMessage): Promise<string | undefined> {
+function readBody(incoming: IncomingMessage): Promise<string | undefined> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    let oversize = false;
-    req.on("data", (chunk: Buffer) => {
-      if (oversize) {
-        return;
-      }
+    let tooLarge = false;
+    incoming.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        oversize = true;
-        chunks.length = 0;
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on("end", () => resolve(oversize ? undefined : Buffer.concat(chunks).toString("utf8")));
-    req.on("error", () => resolve(undefined));
-  });
-}
-
-function discardBody(req: IncomingMessage): Promise<void> {
-  return new Promise((resolve) => {
-    req.on("end", () => resolve());
-    req.on("error", () => resolve());
-    req.resume();
-  });
-}
-
-function parseBody(text: string | undefined): unknown {
-  if (text === undefined) {
-    throw new ApiError("E_MALFORMED_JSON", "the body is too large or unreadable");
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new ApiError("E_MALFORMED_JSON", "the body is not valid JSON");
-  }
-  if (!isPlainObject(parsed)) {
-    throw new ApiError("E_INVALID_INPUT", "body must be a JSON object");
-  }
-  return parsed;
-}
-
-function bearerToken(header: string | undefined): string | undefined {
-  const prefix = "Bearer ";
-  if (header === undefined || !header.startsWith(prefix)) {
-    return undefined;
-  }
-  const token = header.slice(prefix.length);
-  return token === "" ? undefined : token;
-}
-
-async function dispatch(req: IncomingMessage, store: Store): Promise<ApiResponse> {
-  const target = req.url ?? "/";
-  const queryStart = target.indexOf("?");
-  const pathPart = queryStart < 0 ? target : target.slice(0, queryStart);
-  const segments = splitPath(pathPart).map(decodeSegment);
-  const method = req.method ?? "GET";
-
-  let pathMatched = false;
-  let chosen: Route | undefined;
-  let params: Record<string, string> = {};
-  for (const candidate of ROUTES) {
-    const found = matchSegments(candidate.segments, segments);
-    if (found === undefined) {
-      continue;
-    }
-    pathMatched = true;
-    if (candidate.method === method) {
-      chosen = candidate;
-      params = found;
-      break;
-    }
-  }
-  if (chosen === undefined) {
-    await discardBody(req);
-    throw new ApiError("E_NOT_FOUND", pathMatched ? "the method is not served on this path" : "no such route");
-  }
-
-  let body: unknown = null;
-  let bodyError: ApiError | undefined;
-  if (chosen.readsBody) {
-    const text = await readBody(req);
-    try {
-      body = parseBody(text);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        bodyError = error;
+        tooLarge = true;
       } else {
-        throw error;
+        chunks.push(chunk);
       }
-    }
-  } else {
-    await discardBody(req);
-  }
-  if (bodyError !== undefined && bodyError.code === "E_MALFORMED_JSON") {
-    throw bodyError;
-  }
-
-  let caller: HttpRequest["caller"] = null;
-  if (chosen.roles !== "public") {
-    const token = bearerToken(req.headers.authorization);
-    const account = token === undefined ? undefined : store.resolveToken(token);
-    if (account === undefined) {
-      throw new ApiError("E_UNAUTHENTICATED", "a valid token is required");
-    }
-    if (!chosen.roles.includes(account.role)) {
-      throw new ApiError("E_FORBIDDEN", "the caller's role is not accepted by this endpoint");
-    }
-    caller = { id: account.id };
-  }
-  if (bodyError !== undefined) {
-    throw bodyError;
-  }
-
-  return chosen.handler(
-    {
-      method,
-      path: pathPart,
-      params,
-      query: new URLSearchParams(queryStart < 0 ? "" : target.slice(queryStart + 1)),
-      body,
-      caller,
-    },
-    store,
-  );
+    });
+    incoming.on("end", () => resolve(tooLarge ? undefined : Buffer.concat(chunks).toString("utf8")));
+    incoming.on("error", () => resolve(undefined));
+  });
 }
 
-function render(res: ServerResponse, response: ApiResponse): void {
-  const payload = Buffer.from(JSON.stringify(response.body), "utf8");
-  res.writeHead(response.status, {
+function send(res: ServerResponse, status: number, body: unknown): void {
+  const payload = Buffer.from(JSON.stringify(body), "utf8");
+  res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": payload.length,
   });
   res.end(payload);
 }
 
-function renderError(error: unknown): ApiResponse {
-  if (error instanceof ApiError) {
-    return { status: error.status, body: { error: error.message } };
+function sendError(res: ServerResponse, error: ApiError): void {
+  send(res, error.status, { error: error.message });
+}
+
+function handle(
+  store: Store,
+  method: string,
+  target: string,
+  authorization: string | undefined,
+  rawBody: string | undefined,
+): ApiResponse {
+  const queryStart = target.indexOf("?");
+  const pathPart = queryStart < 0 ? target : target.slice(0, queryStart);
+  const query = new URLSearchParams(target.slice(target.indexOf("?") + 1));
+  const actual = pathPart.split("/").filter((s) => s.length > 0).map(safeDecode);
+
+  const matched = ROUTES.filter((r) => matchSegments(r.segments, actual) !== undefined);
+  const selected = matched.find((r) => r.method === method);
+  if (selected === undefined) {
+    throw new ApiError("E_NOT_FOUND", "no such route");
   }
-  console.error(error);
-  return { status: 500, body: { error: "internal error" } };
+  const params = matchSegments(selected.segments, actual) ?? {};
+
+  let body: unknown = undefined;
+  if (selected.readsBody) {
+    if (rawBody === undefined) {
+      throw new ApiError("E_MALFORMED_JSON", "request body is not valid JSON");
+    }
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      throw new ApiError("E_MALFORMED_JSON", "request body is not valid JSON");
+    }
+    if (!isPlainObject(body)) {
+      throw new ApiError("E_INVALID_INPUT", "body must be a JSON object");
+    }
+  }
+
+  let caller: HttpRequest["caller"] = null;
+  if (selected.roles !== "public") {
+    const token = bearerToken(authorization);
+    const account = token === undefined ? undefined : store.resolveToken(token);
+    if (account === undefined) {
+      throw new ApiError("E_UNAUTHENTICATED", "a valid token is required");
+    }
+    if (!selected.roles.includes(account.role)) {
+      throw new ApiError("E_FORBIDDEN", "the caller's role may not use this endpoint");
+    }
+    caller = { id: account.id };
+  }
+
+  return selected.handler({ method, path: pathPart, params, query, body, caller }, store);
 }
 
 export function createApp(store: Store): Server {
-  return createServer((req, res) => {
-    dispatch(req, store).then(
-      (response) => render(res, response),
-      (error: unknown) => render(res, renderError(error)),
-    );
+  return createServer((incoming, res) => {
+    const method = incoming.method ?? "GET";
+    const target = incoming.url ?? "/";
+    const authorization = incoming.headers.authorization;
+    const queryStart = target.indexOf("?");
+    const segments = (queryStart < 0 ? target : target.slice(0, queryStart)).split("/").filter((s) => s.length > 0);
+    const candidates = ROUTES.filter((r) => r.method === method && matchSegments(r.segments, segments) !== undefined);
+    const needsBody = candidates.some((r) => r.readsBody);
+    const bodyPromise = needsBody ? readBody(incoming) : Promise.resolve("");
+    if (!needsBody) {
+      incoming.resume();
+    }
+    void bodyPromise.then((rawBody) => {
+      try {
+        const result = handle(store, method, target, authorization, needsBody ? rawBody : undefined);
+        send(res, result.status, result.body);
+      } catch (error) {
+        if (error instanceof ApiError) {
+          sendError(res, error);
+        } else {
+          console.error(error);
+          send(res, 500, { error: "internal error" });
+        }
+      }
+    });
   });
+}
+
+function parseNonNegativeInteger(value: string | undefined): number | undefined {
+  if (value === undefined || !/^\d+$/.test(value)) {
+    return undefined;
+  }
+  return Number(value);
 }
 
 export function readConfig(env: Readonly<Record<string, string | undefined>>): {
   port: number;
   holdSeconds: number;
 } {
-  const rawPort = env["PORT"];
-  const port = rawPort !== undefined && /^\d+$/.test(rawPort) ? Number(rawPort) : DEFAULT_PORT;
-  const rawHold = env["HOLD_SECONDS"];
-  const holdSeconds =
-    rawHold !== undefined && /^\d+$/.test(rawHold) ? Number(rawHold) : DEFAULT_HOLD_SECONDS;
-  return { port: port > MAX_PORT ? DEFAULT_PORT : port, holdSeconds };
+  const port = parseNonNegativeInteger(env["PORT"]);
+  const holdSeconds = parseNonNegativeInteger(env["HOLD_SECONDS"]);
+  return {
+    port: port === undefined || port > MAX_PORT ? DEFAULT_PORT : port,
+    holdSeconds: holdSeconds === undefined ? DEFAULT_HOLD_SECONDS : holdSeconds,
+  };
 }
 
 export function startServer(): Server {
   const config = readConfig(process.env);
-  process.on("uncaughtException", (error) => console.error(error));
-  process.on("unhandledRejection", (reason) => console.error(reason));
-  const server = createApp(createStore({ holdSeconds: config.holdSeconds }));
+  const store = createStore({ holdSeconds: config.holdSeconds });
+  const server = createApp(store);
+  process.on("uncaughtException", (error) => {
+    console.error(error);
+  });
+  process.on("unhandledRejection", (reason) => {
+    console.error(reason);
+  });
   server.listen(config.port, () => {
     const address = server.address();
-    const bound = address !== null && typeof address === "object" ? address.port : config.port;
-    process.stdout.write(`box-office listening on ${bound}\n`);
+    if (address !== null && typeof address === "object") {
+      process.stdout.write(`box-office listening on ${address.port}\n`);
+    }
   });
   return server;
 }

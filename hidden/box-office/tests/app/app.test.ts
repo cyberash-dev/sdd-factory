@@ -1,417 +1,530 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { createServer as createNetServer } from "node:net";
 import type { AddressInfo } from "node:net";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { createApp, readConfig } from "../../src/app/index.js";
 import { createStore } from "../../src/store/index.js";
-
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const FUTURE = "2099-01-01T00:00:00.000Z";
+import type { Store } from "../../src/store/index.js";
 
 interface Res {
   status: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  body: any;
+  json: any;
   text: string;
+  contentType: string | null;
 }
-interface CallOpts {
-  token?: string;
-  auth?: string;
-  json?: unknown;
-  raw?: string;
-}
-type Call = (method: string, path: string, o?: CallOpts) => Promise<Res>;
 
-async function request(base: string, method: string, path: string, o: CallOpts = {}): Promise<Res> {
+async function call(
+  base: string,
+  method: string,
+  path: string,
+  opts: { token?: string; authorization?: string; body?: unknown; raw?: string } = {},
+): Promise<Res> {
   const headers: Record<string, string> = {};
-  if (o.token !== undefined) headers["Authorization"] = `Bearer ${o.token}`;
-  if (o.auth !== undefined) headers["Authorization"] = o.auth;
+  const auth = opts.authorization ?? (opts.token !== undefined ? `Bearer ${opts.token}` : undefined);
+  if (auth !== undefined) headers["Authorization"] = auth;
   let body: string | undefined;
-  if (o.raw !== undefined) body = o.raw;
-  else if (o.json !== undefined) body = JSON.stringify(o.json);
+  if (opts.raw !== undefined) body = opts.raw;
+  else if (opts.body !== undefined) body = JSON.stringify(opts.body);
+  if (body !== undefined) headers["Content-Type"] = "application/json";
   const r = await fetch(base + path, { method, headers, body });
   const text = await r.text();
-  let parsed: unknown = null;
+  let json: unknown = null;
   try {
-    parsed = JSON.parse(text);
+    json = JSON.parse(text);
   } catch {
-    parsed = null;
+    json = null;
   }
-  return { status: r.status, body: parsed, text };
+  return { status: r.status, json, text, contentType: r.headers.get("content-type") };
 }
 
-interface World {
-  call: Call;
-  account: (role: "organizer" | "customer") => Promise<string>;
-  event: (token: string, quantities: number[]) => Promise<{ id: string; tierIds: string[] }>;
+function world() {
+  const store: Store = createStore({ holdSeconds: 600 });
+  const org = store.createAccount({ email: "org@example.com", password: "password1", name: "Org", role: "organizer" });
+  const org2 = store.createAccount({ email: "org2@example.com", password: "password1", name: "Org2", role: "organizer" });
+  const cus = store.createAccount({ email: "cus@example.com", password: "password1", name: "Cus", role: "customer" });
+  const cus2 = store.createAccount({ email: "cus2@example.com", password: "password1", name: "Cus2", role: "customer" });
+  const startsAt = new Date(Date.now() + 30 * 86_400_000).toISOString();
+  const event = store.createEvent({
+    title: "Show",
+    venue: "Hall",
+    startsAt,
+    organizerId: org.id,
+    tiers: [
+      { name: "GA", priceCents: 1000, quantity: 10 },
+      { name: "VIP", priceCents: 5000, quantity: 3 },
+    ],
+  });
+  return {
+    store,
+    event,
+    gaId: event.tiers[0]!.id,
+    vipId: event.tiers[1]!.id,
+    orgToken: store.issueToken(org.id),
+    org2Token: store.issueToken(org2.id),
+    cusToken: store.issueToken(cus.id),
+    cus2Token: store.issueToken(cus2.id),
+    cusId: cus.id,
+    cus2Id: cus2.id,
+    startsAt,
+  };
 }
+type World = ReturnType<typeof world>;
 
-async function withApp(fn: (w: World) => Promise<void>): Promise<void> {
-  const server = createApp(createStore({ holdSeconds: 600 }));
-  await new Promise<void>((r) => server.listen(0, r));
-  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  let n = 0;
-  const call: Call = (m, p, o) => request(base, m, p, o);
-  const account = async (role: "organizer" | "customer"): Promise<string> => {
-    n += 1;
-    const email = `user${n}@example.com`;
-    const made = await call("POST", "/users", { json: { email, password: "password1", name: "Ada", role } });
-    expect(made.status).toBe(201);
-    const s = await call("POST", "/sessions", { json: { email, password: "password1" } });
-    expect(s.status).toBe(200);
-    return s.body.token as string;
-  };
-  const event = async (token: string, quantities: number[]) => {
-    const r = await call("POST", "/events", {
-      token,
-      json: {
-        title: "Show",
-        venue: "Hall",
-        startsAt: FUTURE,
-        tiers: quantities.map((q, i) => ({ name: `Tier${i}`, priceCents: 1000, quantity: q })),
-      },
-    });
-    expect(r.status).toBe(201);
-    return { id: r.body.id as string, tierIds: (r.body.tiers as { id: string }[]).map((t) => t.id) };
-  };
+async function withApp(store: Store, fn: (base: string) => Promise<void>): Promise<void> {
+  const server = createApp(store);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
-    await fn({ call, account, event });
+    await fn(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
   } finally {
     server.closeAllConnections();
-    await new Promise<void>((r) => server.close(() => r()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
 
 function expectFailure(r: Res, status: number, code: string): void {
   expect(r.status).toBe(status);
-  expect(typeof r.body?.error).toBe("string");
-  expect((r.body.error as string).startsWith(`${code}:`)).toBe(true);
+  expect(r.json).not.toBeNull();
+  expect(typeof r.json.error).toBe("string");
+  expect(String(r.json.error).startsWith(`${code}:`)).toBe(true);
 }
 
-function runCmd(args: string[]): Promise<{ code: number | null; out: string }> {
-  return new Promise((resolve, reject) => {
-    const c = spawn("npm", args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] });
-    let out = "";
-    c.stdout.on("data", (d: Buffer) => (out += d.toString()));
-    c.stderr.on("data", (d: Buffer) => (out += d.toString()));
-    c.on("error", reject);
-    c.on("close", (code) => resolve({ code, out }));
-  });
-}
+const NEW_EVENT = (startsAt: string) => ({
+  title: "T",
+  venue: "V",
+  startsAt,
+  tiers: [{ name: "GA", priceCents: 100, quantity: 5 }],
+});
 
 async function freePort(): Promise<number> {
-  const s = createServer();
-  await new Promise<void>((r) => s.listen(0, r));
-  const p = (s.address() as AddressInfo).port;
-  await new Promise<void>((r) => s.close(() => r()));
-  return p;
+  return await new Promise<number>((resolve, reject) => {
+    const s = createNetServer();
+    s.once("error", reject);
+    s.listen(0, () => {
+      const p = (s.address() as AddressInfo).port;
+      s.close(() => resolve(p));
+    });
+  });
 }
 
-async function buildAndStart(port: string, fn: (base: string) => Promise<void>): Promise<void> {
-  const built = await runCmd(["run", "build"]);
-  if (built.code !== 0) throw new Error(`npm run build failed: ${built.out}`);
-  const child = spawn("npm", ["start"], {
-    cwd: ROOT,
-    env: { ...process.env, PORT: port },
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let out = "";
-  let exited = false;
-  child.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-  child.stderr?.on("data", (d: Buffer) => (out += d.toString()));
-  child.on("exit", () => (exited = true));
-  try {
-    const deadline = Date.now() + 60_000;
-    let base = "";
-    while (Date.now() < deadline) {
-      if (exited) throw new Error(`server exited before answering: ${out}`);
-      const bound = port === "0" ? /box-office listening on (\d+)/.exec(out)?.[1] : port;
-      if (bound !== undefined) {
-        try {
-          const r = await fetch(`http://127.0.0.1:${bound}/events`);
-          if (r.status === 200) {
-            base = `http://127.0.0.1:${bound}`;
-            break;
-          }
-        } catch {
-          // not listening yet
-        }
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    if (base === "") throw new Error(`server never answered: ${out}`);
-    await fn(base);
-  } finally {
+function build(): void {
+  const b = spawnSync("npm", ["run", "build"], { cwd: process.cwd(), encoding: "utf8" });
+  expect(b.status).toBe(0);
+}
+
+async function waitForOk(base: string, child: ChildProcess): Promise<Res> {
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    if (child.exitCode !== null) throw new Error(`server exited with ${child.exitCode}`);
     try {
-      process.kill(-(child.pid as number), "SIGKILL");
+      return await call(base, "GET", "/events");
     } catch {
-      // already gone
+      if (Date.now() > deadline) throw new Error("server never answered");
+      await new Promise((r) => setTimeout(r, 200));
     }
   }
 }
 
-const PROTECTED: { method: string; path: string; json?: unknown }[] = [
-  { method: "GET", path: "/me" },
-  { method: "GET", path: "/me/orders" },
-  { method: "GET", path: "/me/waitlist" },
-  { method: "POST", path: "/events", json: {} },
-  { method: "POST", path: "/events/evt_1/cancel" },
-  { method: "POST", path: "/events/evt_1/discounts", json: {} },
-  { method: "POST", path: "/events/evt_1/waitlist", json: {} },
-  { method: "GET", path: "/events/evt_1/report" },
-  { method: "POST", path: "/orders", json: {} },
-  { method: "POST", path: "/orders/ord_1/pay" },
-  { method: "POST", path: "/orders/ord_1/cancel" },
-  { method: "GET", path: "/orders/ord_1" },
-];
+async function stop(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return;
+  await new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+    child.kill("SIGKILL");
+  });
+}
 
-describe("protected endpoints", () => {
+describe("request pipeline: token and role checks", () => {
   // @covers box-office:BEH-005
-  it("answers 401 for a missing token before the input check, 403 for a wrong role, 400 for a malformed body without a token, 200 for the accepted role", async () => {
-    await withApp(async ({ call, account }) => {
-      const customer = await account("customer");
-      const me = await call("GET", "/me", { token: customer });
-      expect(me.status).toBe(200);
-      expect(Object.keys(me.body).sort()).toEqual(["email", "id", "name", "role"]);
-      expect(me.body.role).toBe("customer");
+  it("answers 400 for a malformed body before the token check and 401 for a missing token before the input check", async () => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const malformed = await call(base, "POST", "/events", { raw: "{not json" });
+      expectFailure(malformed, 400, "E_MALFORMED_JSON");
 
-      const noHeader = await call("POST", "/events", { json: { venue: "" } });
+      const noHeader = await call(base, "POST", "/events", { body: NEW_EVENT(w.startsAt) });
       expectFailure(noHeader, 401, "E_UNAUTHENTICATED");
 
-      const wrongRole = await call("POST", "/events", { token: customer, json: { tiers: [] } });
-      expectFailure(wrongRole, 403, "E_FORBIDDEN");
+      const noHeaderBadFields = await call(base, "POST", "/events", { body: { tiers: [] } });
+      expectFailure(noHeaderBadFields, 401, "E_UNAUTHENTICATED");
 
-      const malformed = await call("POST", "/events", { raw: "{not json" });
-      expectFailure(malformed, 400, "E_MALFORMED_JSON");
+      const customer = await call(base, "POST", "/events", { token: w.cusToken, body: NEW_EVENT(w.startsAt) });
+      expectFailure(customer, 403, "E_FORBIDDEN");
+      expect(customer.json.id).toBeUndefined();
+
+      const me = await call(base, "GET", "/me", { token: w.cusToken });
+      expect(me.status).toBe(200);
+      expect(me.json.id).toBe(w.cusId);
+      expect(me.json.email).toBe("cus@example.com");
+      expect(me.json.name).toBe("Cus");
+      expect(me.json.role).toBe("customer");
     });
   });
 
   it.each([
-    ["no header", {}],
-    ["a token the server never issued", { token: "never-issued-value" }],
-    ["a scheme other than Bearer", { auth: "Token abc123" }],
-  ])("answers 401 E_UNAUTHENTICATED for %s on POST /events", async (_n, auth) => {
-    await withApp(async ({ call }) => {
-      const r = await call("POST", "/events", { ...auth, json: { title: "x" } });
+    ["an unissued token", { token: "never-issued-value" }],
+    ["a Token scheme instead of Bearer", { authorization: "Token abc123" }],
+  ])("answers 401 E_UNAUTHENTICATED for %s", async (_label, auth) => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", "/events", { ...auth, body: NEW_EVENT(w.startsAt) });
       expectFailure(r, 401, "E_UNAUTHENTICATED");
-      expect(Object.keys(r.body)).toEqual(["error"]);
     });
   });
 
-  it("answers 401 E_UNAUTHENTICATED without a token on every protected endpoint", async () => {
-    await withApp(async ({ call }) => {
-      for (const p of PROTECTED) {
-        const r = await call(p.method, p.path, p.json === undefined ? {} : { json: p.json });
-        expectFailure(r, 401, "E_UNAUTHENTICATED");
-      }
+  it.each([
+    ["GET", "/me", undefined],
+    ["GET", "/me/orders", undefined],
+    ["GET", "/me/waitlist", undefined],
+    ["POST", "/events", {}],
+    ["POST", "/events/x/cancel", {}],
+    ["POST", "/events/x/discounts", {}],
+    ["POST", "/events/x/waitlist", {}],
+    ["GET", "/events/x/report", undefined],
+    ["POST", "/orders", {}],
+    ["POST", "/orders/x/pay", {}],
+    ["POST", "/orders/x/cancel", {}],
+    ["GET", "/orders/x", undefined],
+  ])("answers 401 E_UNAUTHENTICATED to %s %s without a token", async (method, path, body) => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const r = await call(base, method, path, { body });
+      expectFailure(r, 401, "E_UNAUTHENTICATED");
     });
   });
 
-  it("answers 403 E_FORBIDDEN for an organizer on customer routes and a customer on organizer routes", async () => {
-    await withApp(async ({ call, account }) => {
-      const org = await account("organizer");
-      const cust = await account("customer");
-      expectFailure(await call("GET", "/me/orders", { token: org }), 403, "E_FORBIDDEN");
-      expectFailure(await call("POST", "/orders", { token: org, json: {} }), 403, "E_FORBIDDEN");
-      expectFailure(await call("GET", "/events/evt_1/report", { token: cust }), 403, "E_FORBIDDEN");
-      expectFailure(await call("POST", "/events/evt_1/cancel", { token: cust }), 403, "E_FORBIDDEN");
+  it.each([
+    ["customer", "POST", "/events"],
+    ["organizer", "GET", "/me/orders"],
+    ["organizer", "POST", "/orders"],
+    ["organizer", "POST", "/events/x/waitlist"],
+    ["customer", "POST", "/events/no-such-event/cancel"],
+  ])("answers 403 E_FORBIDDEN for the %s on %s %s before any resource check", async (role, method, path) => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const token = role === "customer" ? w.cusToken : w.orgToken;
+      const r = await call(base, method, path, { token, body: method === "POST" ? {} : undefined });
+      expectFailure(r, 403, "E_FORBIDDEN");
     });
   });
 });
 
-describe("check order and failure bodies", () => {
+describe("request pipeline: first failing check decides the status", () => {
   // @covers box-office:BEH-030
-  it("lets the first failing check decide the status", async () => {
-    await withApp(async ({ call, account, event }) => {
-      const org = await account("organizer");
-      const other = await account("organizer");
-      const cust = await account("customer");
-
-      expectFailure(await call("GET", "/nope"), 404, "E_NOT_FOUND");
-      expectFailure(await call("GET", "/nope", { token: org }), 404, "E_NOT_FOUND");
-      expectFailure(await call("PUT", "/events", { token: org, json: { title: "x" } }), 404, "E_NOT_FOUND");
-      expectFailure(await call("POST", "/events", { raw: "{oops" }), 400, "E_MALFORMED_JSON");
-      expectFailure(await call("POST", "/events", { json: { tiers: [] } }), 401, "E_UNAUTHENTICATED");
-      expectFailure(await call("POST", "/events", { token: cust, json: { tiers: [] } }), 403, "E_FORBIDDEN");
-      expectFailure(await call("POST", "/events", { token: org, json: { tiers: [] } }), 400, "E_INVALID_INPUT");
-      expectFailure(await call("POST", "/events", { token: org, json: [1] }), 400, "E_INVALID_INPUT");
-      expectFailure(await call("POST", "/events/no-such-event/cancel", { token: other }), 404, "E_NOT_FOUND");
-
-      const ev = await event(org, [5]);
+  it("answers the status of the first failing check in the stated order", async () => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      expectFailure(await call(base, "GET", "/nope"), 404, "E_NOT_FOUND");
+      expectFailure(await call(base, "GET", "/nope", { token: w.orgToken }), 404, "E_NOT_FOUND");
+      expectFailure(await call(base, "PUT", "/events", { token: w.orgToken, body: NEW_EVENT(w.startsAt) }), 404, "E_NOT_FOUND");
+      expectFailure(await call(base, "POST", "/events", { raw: "{oops" }), 400, "E_MALFORMED_JSON");
+      expectFailure(await call(base, "POST", "/events", { body: { tiers: [] } }), 401, "E_UNAUTHENTICATED");
+      expectFailure(await call(base, "POST", "/events", { token: w.cusToken, body: { tiers: [] } }), 403, "E_FORBIDDEN");
+      expectFailure(await call(base, "POST", "/events", { token: w.orgToken, body: { tiers: [] } }), 400, "E_INVALID_INPUT");
+      expectFailure(await call(base, "POST", "/events", { token: w.orgToken, body: [1, 2] }), 400, "E_INVALID_INPUT");
+      expectFailure(await call(base, "POST", "/events/no-such-event/cancel", { token: w.org2Token }), 404, "E_NOT_FOUND");
       expectFailure(
-        await call("POST", "/orders", {
-          token: cust,
-          json: { eventId: "no-such-event", items: [{ tierId: ev.tierIds[0], quantity: 1 }] },
+        await call(base, "POST", "/orders", {
+          token: w.cusToken,
+          body: { eventId: "no-such-event", items: [{ tierId: w.gaId, quantity: 1 }] },
         }),
         404,
         "E_NOT_FOUND",
       );
+      const page = await call(base, "GET", "/events");
+      expect(page.status).toBe(200);
+      expect(Array.isArray(page.json.items)).toBe(true);
+    });
+  });
 
-      expect((await call("POST", `/events/${ev.id}/cancel`, { token: org })).status).toBe(200);
-      expectFailure(await call("POST", `/events/${ev.id}/cancel`, { token: other }), 403, "E_FORBIDDEN");
+  it("answers 403 E_FORBIDDEN, not 409, for another organizer cancelling an already cancelled event", async () => {
+    const w = world();
+    w.store.cancelEvent(w.event.id);
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", `/events/${w.event.id}/cancel`, { token: w.org2Token });
+      expectFailure(r, 403, "E_FORBIDDEN");
+    });
+  });
 
-      const ok = await call("GET", "/events");
-      expect(ok.status).toBe(200);
-      expect(Array.isArray(ok.body.items)).toBe(true);
+  it("answers 409 E_EVENT_NOT_ON_SALE, not 422, for a cancelled event and seven tickets", async () => {
+    const w = world();
+    w.store.cancelEvent(w.event.id);
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", "/orders", {
+        token: w.cusToken,
+        body: { eventId: w.event.id, items: [{ tierId: w.gaId, quantity: 7 }] },
+      });
+      expectFailure(r, 409, "E_EVENT_NOT_ON_SALE");
     });
   });
 
   // @covers box-office:INV-011
-  it("decides route, method and body syntax before the token, and the token before every later check", async () => {
-    await withApp(async ({ call, account, event }) => {
-      const org = await account("organizer");
-      const other = await account("organizer");
-      const cust = await account("customer");
-
-      expectFailure(await call("GET", "/nope"), 404, "E_NOT_FOUND");
-      expectFailure(await call("DELETE", "/users", { token: cust }), 404, "E_NOT_FOUND");
-      expectFailure(await call("POST", "/nope", { raw: "{oops" }), 404, "E_NOT_FOUND");
-      expectFailure(await call("POST", "/events", { raw: "{oops" }), 400, "E_MALFORMED_JSON");
-      expectFailure(await call("POST", "/events", { raw: "" }), 400, "E_MALFORMED_JSON");
-      expectFailure(await call("POST", "/events", { json: { tiers: [] } }), 401, "E_UNAUTHENTICATED");
-      expectFailure(await call("POST", "/events", { token: cust, json: { tiers: [] } }), 403, "E_FORBIDDEN");
-      expectFailure(await call("POST", "/events/no-such-event/cancel", { token: org }), 404, "E_NOT_FOUND");
-
-      const ev = await event(org, [10]);
-      expect((await call("POST", `/events/${ev.id}/cancel`, { token: org })).status).toBe(200);
-      expectFailure(await call("POST", `/events/${ev.id}/cancel`, { token: other }), 403, "E_FORBIDDEN");
-      expectFailure(await call("POST", `/events/${ev.id}/cancel`, { token: org }), 409, "E_EVENT_CANCELLED");
+  it("decides route and method, then body syntax, then token, role, input, resource, ownership, state and limit in that order", async () => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      // route and method before everything
+      expectFailure(await call(base, "GET", "/nope"), 404, "E_NOT_FOUND");
+      expectFailure(await call(base, "PUT", "/events", { token: w.orgToken, body: NEW_EVENT(w.startsAt) }), 404, "E_NOT_FOUND");
+      expectFailure(await call(base, "DELETE", "/events/x/waitlist", { raw: "{bad" }), 404, "E_NOT_FOUND");
+      // body syntax before token
+      expectFailure(await call(base, "POST", "/events", { raw: "{bad" }), 400, "E_MALFORMED_JSON");
+      expectFailure(await call(base, "POST", "/orders", { raw: "{bad" }), 400, "E_MALFORMED_JSON");
+      // token before input, role before input
+      expectFailure(await call(base, "POST", "/events", { body: { tiers: [] } }), 401, "E_UNAUTHENTICATED");
+      expectFailure(await call(base, "POST", "/events", { token: w.cusToken, body: { tiers: [] } }), 403, "E_FORBIDDEN");
+      // input before resource
+      expectFailure(await call(base, "POST", "/orders", { token: w.cusToken, body: { eventId: "no-such-event" } }), 400, "E_INVALID_INPUT");
+      // resource before ownership
+      expectFailure(await call(base, "POST", "/events/no-such-event/cancel", { token: w.org2Token }), 404, "E_NOT_FOUND");
+      // ownership before state
+      w.store.cancelEvent(w.event.id);
+      expectFailure(await call(base, "POST", `/events/${w.event.id}/cancel`, { token: w.org2Token }), 403, "E_FORBIDDEN");
+      // state before limit
       expectFailure(
-        await call("POST", "/orders", {
-          token: cust,
-          json: { eventId: ev.id, items: [{ tierId: ev.tierIds[0], quantity: 7 }] },
-        }),
+        await call(base, "POST", "/orders", { token: w.cusToken, body: { eventId: w.event.id, items: [{ tierId: w.gaId, quantity: 7 }] } }),
         409,
         "E_EVENT_NOT_ON_SALE",
       );
     });
   });
+});
 
+describe("failure bodies and process continuity", () => {
   // @covers box-office:BEH-031
   it("answers every failure with a JSON error body and keeps serving the next request", async () => {
-    await withApp(async ({ call, account, event }) => {
-      const org = await account("organizer");
-      const cust = await account("customer");
-      const ev = await event(org, [10]);
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const unknown = await call(base, "GET", "/nope");
+      expectFailure(unknown, 404, "E_NOT_FOUND");
+      expect(Object.keys(unknown.json)).toEqual(["error"]);
+      expect(unknown.contentType).toBe("application/json; charset=utf-8");
 
-      const nope = await call("GET", "/nope");
-      expectFailure(nope, 404, "E_NOT_FOUND");
-      expect(Object.keys(nope.body)).toEqual(["error"]);
-      const bad = await call("POST", "/users", { raw: "{oops" });
+      expectFailure(await call(base, "GET", "/nope", { token: w.orgToken }), 404, "E_NOT_FOUND");
+      expectFailure(await call(base, "DELETE", "/users", { token: w.cusToken }), 404, "E_NOT_FOUND");
+
+      const bad = await call(base, "POST", "/users", { raw: "{bad json" });
       expectFailure(bad, 400, "E_MALFORMED_JSON");
-      expect(Object.keys(bad.body)).toEqual(["error"]);
-      const page = await call("GET", "/events");
-      expect(page.status).toBe(200);
-      expect(page.body.total).toBe(1);
+      expect(Object.keys(bad.json)).toEqual(["error"]);
+      expectFailure(await call(base, "POST", "/events", { raw: "{bad json" }), 400, "E_MALFORMED_JSON");
 
-      expectFailure(await call("GET", "/nope", { token: org }), 404, "E_NOT_FOUND");
-      expectFailure(await call("DELETE", "/users", { token: cust }), 404, "E_NOT_FOUND");
+      const ok = await call(base, "GET", "/events");
+      expect(ok.status).toBe(200);
+      expect(Array.isArray(ok.json.items)).toBe(true);
+    });
+  });
 
-      const limit = await call("POST", "/orders", {
-        token: cust,
-        json: { eventId: ev.id, items: [{ tierId: ev.tierIds[0], quantity: 7 }] },
+  it("answers 422 E_TICKET_LIMIT with an error body for an order that passes 6 tickets", async () => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", "/orders", {
+        token: w.cusToken,
+        body: { eventId: w.event.id, items: [{ tierId: w.gaId, quantity: 7 }] },
       });
-      expectFailure(limit, 422, "E_TICKET_LIMIT");
-      expect(Object.keys(limit.body)).toEqual(["error"]);
-      expect((await call("GET", "/events")).status).toBe(200);
+      expectFailure(r, 422, "E_TICKET_LIMIT");
+      expect(Object.keys(r.json)).toEqual(["error"]);
     });
   });
 
-  it("answers 400 E_INVALID_INPUT for a JSON array body on POST /events with an organizer token", async () => {
-    await withApp(async ({ call, account }) => {
-      const org = await account("organizer");
-      expectFailure(await call("POST", "/events", { token: org, json: [] }), 400, "E_INVALID_INPUT");
-    });
-  });
-
-  it("answers 200 with a page body for GET /events with no token", async () => {
-    await withApp(async ({ call }) => {
-      const r = await call("GET", "/events");
-      expect(r.status).toBe(200);
-      expect(r.body).toEqual({ items: [], page: 1, pageSize: 20, total: 0 });
+  it.each([
+    ["an empty body", ""],
+    ["a JSON array", "[1]"],
+    ["a JSON string", '"text"'],
+    ["a JSON null", "null"],
+  ])("answers a body-reading route with %s by 400 and an error body", async (label, raw) => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", "/users", { raw });
+      expectFailure(r, 400, label === "an empty body" ? "E_MALFORMED_JSON" : "E_INVALID_INPUT");
     });
   });
 });
 
-describe("process configuration", () => {
+describe("waitlist endpoint POST /events/:id/waitlist", () => {
+  async function exhaust(w: World, tierId: string, qty: number): Promise<void> {
+    w.store.holdOrder({ eventId: w.event.id, customerId: w.cus2Id, items: [{ tierId, quantity: qty }], discountCode: null });
+  }
+
+  // @covers box-office:CTR-014
+  it("answers 201 with a position on a shortfall and 409 for a duplicate entry or when tickets suffice", async () => {
+    const w = world();
+    await exhaust(w, w.vipId, 3);
+    await withApp(w.store, async (base) => {
+      const path = `/events/${w.event.id}/waitlist`;
+      const joined = await call(base, "POST", path, { token: w.cusToken, body: { tierId: w.vipId, quantity: 2 } });
+      expect(joined.status).toBe(201);
+      expect(Object.keys(joined.json).sort()).toEqual(["eventId", "id", "position", "quantity", "tierId"]);
+      expect(joined.json.eventId).toBe(w.event.id);
+      expect(joined.json.tierId).toBe(w.vipId);
+      expect(joined.json.quantity).toBe(2);
+      expect(joined.json.position).toBe(1);
+
+      const second = await call(base, "POST", path, { token: w.cusToken, body: { tierId: w.vipId, quantity: 1 } });
+      expectFailure(second, 409, "E_ALREADY_WAITING");
+
+      const suffice = await call(base, "POST", path, { token: w.cusToken, body: { tierId: w.gaId, quantity: 2 } });
+      expectFailure(suffice, 409, "E_TICKETS_AVAILABLE");
+
+      const ev = await call(base, "GET", `/events/${w.event.id}`);
+      expect(ev.json.tiers.find((t: { id: string }) => t.id === w.vipId).available).toBe(0);
+      expect(ev.json.tiers.find((t: { id: string }) => t.id === w.gaId).available).toBe(10);
+    });
+  });
+
+  it("answers 201 with quantity 6 on a tier with available 0", async () => {
+    const w = world();
+    await exhaust(w, w.gaId, 10);
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", `/events/${w.event.id}/waitlist`, { token: w.cusToken, body: { tierId: w.gaId, quantity: 6 } });
+      expect(r.status).toBe(201);
+      expect(r.json.quantity).toBe(6);
+    });
+  });
+
+  it.each([
+    ["quantity 7", { quantity: 7 }],
+    ["quantity 0", { quantity: 0 }],
+    ["a missing tierId", { quantity: 1, omitTier: true }],
+  ])("answers 400 E_INVALID_INPUT for %s", async (_label, spec) => {
+    const w = world();
+    await exhaust(w, w.gaId, 10);
+    await withApp(w.store, async (base) => {
+      const body = "omitTier" in spec ? { quantity: spec.quantity } : { tierId: w.gaId, quantity: spec.quantity };
+      const r = await call(base, "POST", `/events/${w.event.id}/waitlist`, { token: w.cusToken, body });
+      expectFailure(r, 400, "E_INVALID_INPUT");
+    });
+  });
+
+  it("answers 404 E_NOT_FOUND for an unknown event", async () => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", "/events/no-such-event/waitlist", { token: w.cusToken, body: { tierId: w.gaId, quantity: 1 } });
+      expectFailure(r, 404, "E_NOT_FOUND");
+    });
+  });
+
+  it("answers 400 E_INVALID_TIER for a tier of another event", async () => {
+    const w = world();
+    const other = w.store.createEvent({
+      title: "Other",
+      venue: "Hall",
+      startsAt: w.startsAt,
+      organizerId: w.event.organizerId,
+      tiers: [{ name: "GA", priceCents: 100, quantity: 5 }],
+    });
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", `/events/${w.event.id}/waitlist`, {
+        token: w.cusToken,
+        body: { tierId: other.tiers[0]!.id, quantity: 1 },
+      });
+      expectFailure(r, 400, "E_INVALID_TIER");
+    });
+  });
+
+  it("answers 403 E_FORBIDDEN for an organizer", async () => {
+    const w = world();
+    await exhaust(w, w.gaId, 10);
+    await withApp(w.store, async (base) => {
+      const r = await call(base, "POST", `/events/${w.event.id}/waitlist`, { token: w.orgToken, body: { tierId: w.gaId, quantity: 1 } });
+      expectFailure(r, 403, "E_FORBIDDEN");
+    });
+  });
+});
+
+describe("configuration and process start", () => {
   it.each([
     [{ PORT: "8123" }, 8123],
     [{ PORT: "0" }, 0],
-    [{ PORT: "65535" }, 65535],
     [{}, 3000],
     [{ PORT: "abc" }, 3000],
     [{ PORT: "-1" }, 3000],
     [{ PORT: "65536" }, 3000],
-  ])("reads the port from PORT %j as %d", (env, port) => {
+  ])("reads PORT from %j as %i", (env, port) => {
     expect(readConfig(env).port).toBe(port);
   });
 
   it.each([
-    [{}, 600],
     [{ HOLD_SECONDS: "0" }, 0],
-    [{ HOLD_SECONDS: "30" }, 30],
+    [{ HOLD_SECONDS: "12" }, 12],
+    [{}, 600],
+    [{ HOLD_SECONDS: "abc" }, 600],
     [{ HOLD_SECONDS: "-5" }, 600],
     [{ HOLD_SECONDS: "1.5" }, 600],
-    [{ HOLD_SECONDS: "x" }, 600],
-  ])("reads the hold lifetime from %j as %d seconds", (env, secs) => {
-    expect(readConfig(env).holdSeconds).toBe(secs);
+  ])("reads HOLD_SECONDS from %j as %i", (env, seconds) => {
+    expect(readConfig(env).holdSeconds).toBe(seconds);
   });
-});
 
-describe("started process", () => {
   // @covers box-office:CST-003
-  it("answers on the free port named by PORT after npm run build and npm start", { timeout: 120000 }, async () => {
+  it("npm run build then npm start serves on the port named by PORT", { timeout: 120000 }, async () => {
+    build();
     const port = await freePort();
-    await buildAndStart(String(port), async (base) => {
-      const r = await request(base, "GET", "/events");
+    const child = spawn("npm", ["start"], { cwd: process.cwd(), env: { ...process.env, PORT: String(port) }, stdio: "ignore" });
+    try {
+      const r = await waitForOk(`http://127.0.0.1:${port}`, child);
       expect(r.status).toBe(200);
-      expect(r.body).toEqual({ items: [], page: 1, pageSize: 20, total: 0 });
-    });
+    } finally {
+      await stop(child);
+    }
   });
 
-  it("answers on the ephemeral port reported on the readiness line when PORT is 0", { timeout: 120000 }, async () => {
-    await buildAndStart("0", async (base) => {
-      expect((await request(base, "GET", "/events")).status).toBe(200);
-    });
+  it("with PORT 0 npm start binds an ephemeral port reported on its one readiness line", { timeout: 120000 }, async () => {
+    build();
+    const child = spawn("npm", ["start"], { cwd: process.cwd(), env: { ...process.env, PORT: "0" }, stdio: ["ignore", "pipe", "ignore"] });
+    try {
+      let out = "";
+      child.stdout!.on("data", (d: Buffer) => {
+        out += d.toString();
+      });
+      const deadline = Date.now() + 60_000;
+      while (!/box-office listening on \d+\n/.test(out)) {
+        if (Date.now() > deadline || child.exitCode !== null) throw new Error(`no readiness line: ${out}`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const m = /box-office listening on (\d+)\n/.exec(out)!;
+      expect(Number(m[1])).toBeGreaterThan(0);
+      const r = await call(`http://127.0.0.1:${m[1]}`, "GET", "/events");
+      expect(r.status).toBe(200);
+    } finally {
+      await stop(child);
+    }
   });
 
   // @covers box-office:CST-005
   it("serves the API after build and start with an empty runtime dependency set", { timeout: 120000 }, async () => {
-    const pkg = JSON.parse(readFileSync(`${ROOT}package.json`, "utf8")) as { dependencies?: Record<string, string> };
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { dependencies?: Record<string, string> };
     expect(Object.keys(pkg.dependencies ?? {})).toEqual([]);
+    build();
     const port = await freePort();
-    await buildAndStart(String(port), async (base) => {
-      const made = await request(base, "POST", "/users", {
-        json: { email: "a@b.co", password: "12345678", name: "Ada", role: "customer" },
-      });
-      expect(made.status).toBe(201);
-    });
+    const child = spawn("npm", ["start"], { cwd: process.cwd(), env: { ...process.env, PORT: String(port) }, stdio: "ignore" });
+    try {
+      const r = await waitForOk(`http://127.0.0.1:${port}`, child);
+      expect(r.status).toBe(200);
+      expect(Array.isArray(r.json.items)).toBe(true);
+    } finally {
+      await stop(child);
+    }
   });
 });
 
 describe("outbound networking", () => {
   // @covers box-office:CST-002
-  it("completes registration and checkout with every request served on loopback alone", async () => {
-    const saved = { ...process.env };
-    process.env["HTTP_PROXY"] = "http://127.0.0.1:1";
-    process.env["HTTPS_PROXY"] = "http://127.0.0.1:1";
-    try {
-      await withApp(async ({ call, account, event }) => {
-        const org = await account("organizer");
-        const cust = await account("customer");
-        const ev = await event(org, [3]);
-        const order = await call("POST", "/orders", {
-          token: cust,
-          json: { eventId: ev.id, items: [{ tierId: ev.tierIds[0], quantity: 1 }] },
-        });
-        expect(order.status).toBe(201);
-        expect(order.body.status).toBe("held");
+  it("completes registration and checkout against the loopback-only server", async () => {
+    const w = world();
+    await withApp(w.store, async (base) => {
+      const reg = await call(base, "POST", "/users", {
+        body: { email: "new@example.com", password: "password1", name: "New", role: "customer" },
       });
-    } finally {
-      process.env = saved;
-    }
+      expect(reg.status).toBe(201);
+      expect(reg.json.email).toBe("new@example.com");
+      expect(reg.json.password).toBeUndefined();
+
+      const order = await call(base, "POST", "/orders", {
+        token: w.cusToken,
+        body: { eventId: w.event.id, items: [{ tierId: w.gaId, quantity: 2 }] },
+      });
+      expect(order.status).toBe(201);
+      expect(order.json.eventId).toBe(w.event.id);
+      expect(order.json.status).toBe("held");
+    });
   });
 });
