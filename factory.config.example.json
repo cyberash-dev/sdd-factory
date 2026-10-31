@@ -12,7 +12,7 @@
     "specGateReworks": 1
   },
   "timeouts": {
-    "specStageMs": 2400000,
+    "specStageMs": 3600000,
     "apiRoleMs": 1800000,
     "cliRoleMs": 1500000,
     "verifierMs": 300000,
