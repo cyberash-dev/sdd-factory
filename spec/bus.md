@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.6.0"
+version: "0.7.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -2210,6 +2210,60 @@ test_obligation:
   failure_scenarios:
     - stalled published while an effect runs
     - a quiescent run left hanging
+---
+```
+
+```yaml
+---
+id: bus:DLT-008
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:37:46.372Z
+    change_request: blind architect repairs in runs 21-25; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.6.0 -> 0.7.0 - design.rework carries the finding path and spec ids of a lane finding
+target_ids:
+  - bus:SUR-001
+  - bus:CTR-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.7.0"
+description: |
+  bus:CTR-004 lists design.rework{target, reason, attempt}. The build
+  stage already adds originTaskId (catalogue) and specIds (emitted for
+  an architect repair), and design-stage:DLT-010 needs the lane's
+  finding to reach the repairing role. design.rework gains two optional
+  fields: `specIds: string[]` (the finding's spec ids) and
+  `findingPath: string | null` (the handoff file that holds the lane's
+  finding, as on task.rework); producers that have neither omit them or
+  send null. Adding optional fields is a minor bump per the contract's
+  own compatibility rule.
+tests_old_behavior:
+  - design.rework without the new fields still validates
+tests_new_behavior:
+  - to:bus:CTR-004
+test_obligation:
+  predicate: |
+    design.rework{target: architect, reason, attempt, originTaskId,
+    specIds: [X], findingPath: F} passes payload validation; the same
+    event with findingPath null or without both fields passes; a
+    findingPath that is a number is rejected; bus:SUR-001 is at 0.7.0
+    after finalize.
+  test_template: contract
+  boundary_classes:
+    - new fields present
+    - new fields absent or null
+    - wrong field type
+  failure_scenarios:
+    - the fields accepted with any type
 ---
 ```
 

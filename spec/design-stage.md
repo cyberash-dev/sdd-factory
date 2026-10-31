@@ -1362,6 +1362,65 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-010
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:37:46.705Z
+    change_request: blind architect repairs in runs 21-25; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: design-stage
+title: a design repair routed from a lane finding hands the finding itself to the repairing role
+target_ids:
+  - design-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  A lane's VD-INFEASIBLE or TASK-OVERFLOW finding reaches the design
+  stage as task.rework{target: architect | planner, reason, findingPath}
+  and then design.rework{target, reason, ...}; the design rules build
+  the role's effect with reworkFinding = reason, so the architect's
+  `{{rework_finding}}` was the literal "design_repair". In runs 21, 22
+  and 25 the architect repaired T-003 three times without the
+  implementer's detail, which quoted the landed code it had to match,
+  and each repair invented new texts. Change: the build stage copies
+  task.rework's findingPath and specIds onto design.rework (bus:DLT-008);
+  the architect's and the planner's effect pass as rework_finding the
+  reason, the spec ids and the full text of the file at findingPath
+  when it exists, and the reason alone when findingPath is null or the
+  file is missing. Repairs requested by the assembly (triage, uncovered
+  without owner) keep passing their reason, which already carries the
+  finding.
+tests_old_behavior:
+  - a planner re-cut requested with a reason and no findingPath gets that reason as its finding
+tests_new_behavior:
+  - to:design-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given task.rework{taskId: T-003, target: architect, reason:
+    design_repair, findingPath: F, specIds: [X]} where F is an
+    implementer handoff whose finding detail is "src/cli/index.ts emits
+    usage: todo [arguments]", the architect role is invoked with a
+    message whose rework_finding contains that detail and X; the same for
+    target planner with a TASK-OVERFLOW detail; with findingPath null the
+    rework_finding equals the reason.
+  test_template: integration
+  boundary_classes:
+    - architect repair with a finding file
+    - planner re-cut with a finding file
+    - no finding file
+  failure_scenarios:
+    - the repairing role seeing only the reason
+---
+```
+
 ---
 
 ## 16. Implementation bindings
