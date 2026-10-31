@@ -1,0 +1,17 @@
+plan_id: 2026-10-31T012551Z-zw1h6
+created_at: 2026-10-31T01:25:51.863Z
+pending_attestations:
+  - id: room-booking-api:*
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:25:51.862Z
+    change_request: "room-booking-api-20261031-012036: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved
+  - id: room-booking-api:BL-001
+    owner_role: product-owner
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:25:52.217Z
+    change_request: "room-booking-api-20261031-012036: pre-authorised at launch"
+    scope: first-time-approval
+    target_status: approved

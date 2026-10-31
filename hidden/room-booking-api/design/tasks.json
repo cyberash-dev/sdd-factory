@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "partition": "room-booking-api",
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "Provide the error catalogue, in-memory store and time rules",
+      "covers": [
+        "room-booking-api:INV-001",
+        "room-booking-api:INV-003",
+        "room-booking-api:INV-004",
+        "room-booking-api:INV-005",
+        "room-booking-api:INV-006",
+        "room-booking-api:POL-001"
+      ],
+      "writes": [
+        "src/errors/**",
+        "src/store/**",
+        "src/time/**",
+        "tests/errors/**",
+        "tests/store/**",
+        "tests/time/**"
+      ],
+      "dependsOn": [],
+      "designRefs": ["M-01", "M-02", "M-03"],
+      "testBudget": { "maxTests": 56 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-002",
+      "title": "Create and list rooms with field and name validation",
+      "covers": [
+        "room-booking-api:BEH-001",
+        "room-booking-api:BEH-002",
+        "room-booking-api:BEH-003",
+        "room-booking-api:BEH-004",
+        "room-booking-api:BEH-005",
+        "room-booking-api:CTR-001",
+        "room-booking-api:CTR-002"
+      ],
+      "writes": ["src/rooms/**", "tests/rooms/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-04"],
+      "testBudget": { "maxTests": 78 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-003",
+      "title": "Create and delete bookings with capacity and overlap checks",
+      "covers": [
+        "room-booking-api:BEH-006",
+        "room-booking-api:BEH-007",
+        "room-booking-api:BEH-008",
+        "room-booking-api:BEH-009",
+        "room-booking-api:BEH-010",
+        "room-booking-api:BEH-014",
+        "room-booking-api:BEH-015",
+        "room-booking-api:CTR-003",
+        "room-booking-api:CTR-005",
+        "room-booking-api:SCN-001"
+      ],
+      "writes": ["src/bookings/**", "tests/bookings/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-05"],
+      "testBudget": { "maxTests": 80 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-004",
+      "title": "List room bookings in start order with the interval filter",
+      "covers": [
+        "room-booking-api:BEH-011",
+        "room-booking-api:BEH-012",
+        "room-booking-api:BEH-013",
+        "room-booking-api:BEH-020",
+        "room-booking-api:CTR-004"
+      ],
+      "writes": ["src/booking-list/**", "tests/booking-list/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-06"],
+      "testBudget": { "maxTests": 44 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-005",
+      "title": "Query the rooms available for a requested interval",
+      "covers": [
+        "room-booking-api:BEH-016",
+        "room-booking-api:BEH-017",
+        "room-booking-api:CTR-006",
+        "room-booking-api:SCN-002"
+      ],
+      "writes": ["src/availability/**", "tests/availability/**"],
+      "dependsOn": ["T-001"],
+      "designRefs": ["M-07"],
+      "testBudget": { "maxTests": 33 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    },
+    {
+      "id": "T-006",
+      "title": "Compose the HTTP server, routing and JSON error envelope",
+      "covers": [
+        "room-booking-api:BEH-018",
+        "room-booking-api:BEH-019",
+        "room-booking-api:BEH-021",
+        "room-booking-api:CON-001",
+        "room-booking-api:CON-002",
+        "room-booking-api:CON-003",
+        "room-booking-api:CON-004",
+        "room-booking-api:CON-005",
+        "room-booking-api:CTR-007",
+        "room-booking-api:EXT-001",
+        "room-booking-api:INV-002",
+        "room-booking-api:NFR-001",
+        "room-booking-api:POL-002"
+      ],
+      "writes": [
+        "src/index.ts",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "vitest.config.ts",
+        "tests/server/**"
+      ],
+      "dependsOn": ["T-001", "T-002", "T-003", "T-004", "T-005"],
+      "designRefs": ["M-08"],
+      "testBudget": { "maxTests": 80 },
+      "reworkRoute": { "onImplementationFailure": "implementer", "onTestContractConflict": "reviewer" }
+    }
+  ]
+}
