@@ -12,7 +12,7 @@ import { describeViolations, validateTasks, type TasksViolation } from "../domai
 import type { CommandRunner } from "../ports/outbound/command-runner.js";
 import { createDesignFileFixer, UNWIRED_FIX_DEPS, type DesignFileFixer } from "./design-file-fix.js";
 import { designReworkAttempt, effectInteger, pending, publishBlocked, reworkFindingText, TASKS_JSON, TECH_MD, VERIFICATION_MD } from "./effect-support.js";
-import { approvedRecordIds, TASK_COVER_TYPES } from "./eligible-ids.js";
+import { taskCoverIds } from "./eligible-ids.js";
 import { PLANNER_MESSAGE } from "./messages.js";
 import { productPaths } from "./product-paths.js";
 import { handoffPathOf, runStageRole } from "./stage-role.js";
@@ -84,7 +84,7 @@ async function readTasksText(slice: SliceContext, fixer: DesignFileFixer): Promi
   return readTextOrNull(path);
 }
 
-async function judgeTasks(slice: SliceContext, commands: CommandRunner, tech: TechDesign, previous: TasksFile | null, finding: string, fixer: DesignFileFixer): Promise<Verdict> {
+async function judgeTasks(slice: SliceContext, eligibleIds: readonly string[], tech: TechDesign, previous: TasksFile | null, finding: string, fixer: DesignFileFixer): Promise<Verdict> {
   const text = await readTasksText(slice, fixer);
   if (text === null) {
     return { kind: "invalid", reason: `schema: ${TASKS_JSON} was not written` };
@@ -100,7 +100,7 @@ async function judgeTasks(slice: SliceContext, commands: CommandRunner, tech: Te
   }
   const violations = validateTasks({
     tasks,
-    eligibleIds: await approvedRecordIds(commands, slice.paths.productDir, slice.config.timeouts.verifierMs, TASK_COVER_TYPES),
+    eligibleIds,
     moduleIds: tech.modules.map((module) => module.id),
     modulePaths: tech.modules.flatMap((module) => [...module.owns, module.entry]),
     existingPaths: await productPaths(slice.paths.productDir),
@@ -151,6 +151,7 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
   const finding = reworkFindingText(effect);
   const tech = await readTechDesign(slice);
   const previous = await readPreviousTasks(slice, context.state.status === "building");
+  const eligibleIds = await taskCoverIds(commands, slice.paths.productDir, slice.config.timeouts.verifierMs);
   const message = slice.prompts.render(PLANNER_MESSAGE, {
     slug: slice.slug,
     product_dir: slice.paths.productDir,
@@ -162,6 +163,7 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     rework_finding: finding,
     graph_depth: String(slice.config.caps.graphDepth),
     min_covers_per_task: String(slice.config.caps.minCoversPerTask),
+    eligible_ids: eligibleIds.join(", "),
   });
   const outcome = await runStageRole(slice, { role: "planner", message });
   if (outcome.kind === "blocked") {
@@ -173,7 +175,7 @@ export async function runPlanEffect(effect: Effect, context: EffectContext, slic
     publishRework(context, `uncovered_ids: ${uncovered.join(", ")}`, outcome.usage, outcome.reruns, originTaskIdOf(effect));
     return;
   }
-  const verdict = await judgeTasks(slice, commands, tech, previous, finding, createDesignFileFixer(slice, fix, context));
+  const verdict = await judgeTasks(slice, eligibleIds, tech, previous, finding, createDesignFileFixer(slice, fix, context));
   if (verdict.kind === "invalid") {
     publishRework(context, verdict.reason, outcome.usage, outcome.reruns, originTaskIdOf(effect));
     return;

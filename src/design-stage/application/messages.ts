@@ -32,6 +32,7 @@ export const PLANNER_MESSAGE = `Invocation inputs:
 - rework_finding: {{rework_finding}}
 - graph_depth: {{graph_depth}}
 - min_covers_per_task: {{min_covers_per_task}}
+- eligible_ids: {{eligible_ids}}
 
 Relative paths you pass to read_file, write_file and list_dir resolve against product_dir; handoff_path is absolute, pass it as given.
 Write tasks_json, design/plan.md, then handoff_path, then stop.`;
