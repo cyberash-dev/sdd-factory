@@ -113,7 +113,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: bus
 name: factory-events
-version: "0.7.0"
+version: "0.8.0"
 boundary_type: event_bus
 members:
   - bus:CTR-001
@@ -2264,6 +2264,51 @@ test_obligation:
     - wrong field type
   failure_scenarios:
     - the fields accepted with any type
+---
+```
+
+```yaml
+---
+id: bus:DLT-009
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:53:50.032Z
+    change_request: npm run build gap found on the room booking product; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: bus
+title: factory-events 0.7.0 -> 0.8.0 - assembly.verified step gains build
+target_ids:
+  - bus:SUR-001
+  - bus:CTR-006
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: bus:SUR-001
+    intended_version: "0.8.0"
+description: |
+  assembly-stage:DLT-005 adds a build step to the verification
+  sequence; the `step` enum of assembly.verified (bus:CTR-006) gains
+  the value `build`. Adding an enum value is a minor bump.
+tests_old_behavior:
+  - install, typecheck, test and sdd_ready still validate and an unknown step is still rejected
+tests_new_behavior:
+  - to:bus:CTR-006
+test_obligation:
+  predicate: |
+    assembly.verified{step: build} passes payload validation,
+    assembly.verified{step: lint} is rejected, and bus:SUR-001 is at
+    0.8.0 after finalize.
+  test_template: contract
+  boundary_classes:
+    - new step value
+    - unknown step value
+  failure_scenarios:
+    - the enum widened to any string
 ---
 ```
 

@@ -1421,6 +1421,66 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: design-stage:DLT-011
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:53:49.391Z
+    change_request: npm run build gap found on the room booking product; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: design-stage
+title: the tooling step pins types node so the build config compiles node imports
+target_ids:
+  - design-stage:BEH-003
+  - design-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  The room booking product (run room-booking-api-20261031-012036) passed
+  `npx tsc --noEmit` and was published, but `npm run build` (`tsc -p
+  tsconfig.build.json`, which extends tsconfig.json and includes only
+  src) failed with TS2591 "Cannot find name 'node:http'" and "Buffer":
+  the shipped TypeScript no longer adds every @types package
+  automatically, the typecheck config got the node types only through
+  the test files that import vitest, and the build config has no test
+  files. Change to design-stage:DLT-006: when the installed dev
+  dependencies include @types/node, the foreman also writes `types:
+  ["node"]` into the product tsconfig.json compilerOptions, next to
+  skipLibCheck and typeRoots, and logs it in the same line; any types
+  the architect listed are kept, with node added once.
+tests_old_behavior:
+  - skipLibCheck and typeRoots are still pinned
+  - a product without @types/node gets no types entry
+tests_new_behavior:
+  - to:design-stage:BEH-003
+  - to:design-stage:CTR-001
+test_obligation:
+  predicate: |
+    Given tooling with @types/node among the dev dependencies, the
+    written tsconfig.json has compilerOptions.types ["node"]; given an
+    architect tsconfig with types ["vitest/globals"], the result is
+    ["vitest/globals", "node"]; given no @types/node, no types key is
+    added; a product whose src imports node:http and whose
+    tsconfig.build.json extends the written tsconfig.json compiles with
+    tsc -p tsconfig.build.json.
+  test_template: integration
+  boundary_classes:
+    - node types installed
+    - architect types kept
+    - no node types
+  failure_scenarios:
+    - npm run build failing on node imports after a green typecheck
+    - an architect types entry dropped
+---
+```
+
 ---
 
 ## 16. Implementation bindings

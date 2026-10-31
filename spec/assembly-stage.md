@@ -121,7 +121,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: assembly-stage
 name: assembly-files
-version: "0.2.0"
+version: "0.3.0"
 boundary_type: public_storage
 members:
   - assembly-stage:CTR-001
@@ -1563,6 +1563,70 @@ test_obligation:
   failure_scenarios:
     - publish_failed after a green assembly over a role-written file
     - an operator's staged file inside the factory's commit
+---
+```
+
+```yaml
+---
+id: assembly-stage:DLT-005
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T01:53:49.708Z
+    change_request: npm run build gap found on the room booking product; approved by the agent under the operator's delegation for the night of 2026-10-31
+    scope: first-time-approval
+partition_id: assembly-stage
+title: assembly-files 0.2.0 -> 0.3.0 - the verification sequence runs the product's build script
+target_ids:
+  - assembly-stage:SUR-001
+  - assembly-stage:BEH-003
+  - assembly-stage:CTR-001
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact:
+  - id: assembly-stage:SUR-001
+    intended_version: "0.3.0"
+description: |
+  The verification sequence of assembly-stage:BEH-003 is install,
+  typecheck, test, sdd_ready; it never runs the product's own build,
+  which the hackathon acceptance (`npm run build` compiles, `npm test`
+  passes) runs first. The room booking product was published with a
+  green sequence and a failing `npm run build`. Change: when the
+  product's package.json defines scripts.build, a step `build` (`npm
+  run build`) runs after typecheck and before test, with the same
+  capture, red/green rule and stop-at-first-red as the other steps; a
+  red build is a mechanical failure handled exactly like a red
+  typecheck (the simple-fixer trigger for the assembly typecheck of
+  factory:BEH-012, then triage). Without scripts.build the step is not
+  run and not reported. The step enum of the assembly report
+  (CTR-001) gains `build`; build output stays untracked and is not
+  published.
+tests_old_behavior:
+  - a product without scripts.build verifies with the four steps as before
+tests_new_behavior:
+  - to:assembly-stage:BEH-003
+  - to:assembly-stage:CTR-001
+test_obligation:
+  predicate: |
+    Given a product whose package.json defines scripts.build, the round
+    runs npm ci, npx tsc --noEmit, npm run build, vitest and sdd ready
+    in that order and emits assembly.verified{step: build}; given npm
+    run build exiting 2, the round stops after build with a red
+    assembly.verified{step: build}, runs the simple-fixer as for a red
+    typecheck, and never runs vitest; given no scripts.build, no build
+    step runs.
+  test_template: integration
+  boundary_classes:
+    - build script present and green
+    - build script red
+    - no build script
+  failure_scenarios:
+    - publication of a product whose npm run build fails
+    - a build step run for a product without a build script
 ---
 ```
 
