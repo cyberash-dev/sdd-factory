@@ -176,6 +176,6 @@ describe("assembly.publish", () => {
 
     const { context } = await publish(f, { runner });
 
-    expect(context.published).toEqual([{ type: "run.failed", producer: "assembler", payload: { stage: "publish", reason: "publish_failed", detail: "git commit -m factory: todo-cli todo-cli-20261029-120000 exited 128: fatal: unable to write" } }]);
+    expect(context.published).toEqual([{ type: "run.failed", producer: "assembler", payload: { stage: "publish", reason: "publish_failed", detail: "git commit -m factory: todo-cli todo-cli-20261029-120000 -- hidden/todo-cli exited 128: fatal: unable to write" } }]);
   });
 });

@@ -57,7 +57,7 @@ async function publishTree(slice: SliceContext, runner: CommandRunner, identity:
   await copyTraceTo(slice.paths.traceDir, join(slice.paths.outputDir, "trace"));
   const outputRelative = relative(slice.paths.repoRoot, slice.paths.outputDir);
   await teamGit.output(["add", "-A", "--", outputRelative]);
-  await teamGit.output(["commit", "-m", `factory: ${slice.slug} ${slice.runId}`]);
+  await teamGit.output(["commit", "-m", `factory: ${slice.slug} ${slice.runId}`, "--", outputRelative]);
   const commitSha = await teamGit.output(["rev-parse", "HEAD"]);
   const pushed = await pushIfConfigured(teamGit, slice);
   const published = { commit_sha: commitSha, output_dir: `${outputRelative}/`, pushed };

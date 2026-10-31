@@ -11,6 +11,7 @@ import { integerField, stringArrayField } from "../domain/payload.js";
 import { redactSecrets, secretValuesOf } from "../domain/redaction.js";
 import { WRITE_SET_CONFLICT } from "../domain/rework-reasons.js";
 import { parseReadyEnvelope, SddEnvelopeError, type ReadyEnvelope } from "../../shared/sdd/envelope.js";
+import { repairSurfaceMembers } from "../../shared/sdd/surface-members.js";
 import { refreshBaselineBlock } from "../domain/baseline-block.js";
 import { failingCoversOf } from "../domain/sdd-ready-routing.js";
 import { parseTokenEnvelope } from "../domain/sdd-token.js";
@@ -24,6 +25,9 @@ import { REPORT_FILE, updateLedger, writeProductReport, type LedgerIdentity } fr
 const INTEGRATION_BRANCH = "integration";
 const SDD_READY_REPORT_FILE = "sdd_ready.json";
 const SPEC_FILE = join("spec", "spec.md");
+const ROLE_WRITTEN_DIRS = ["design", "spec"] as const;
+const ROLE_WRITTEN_COMMIT = "assembly: role-written design and spec files";
+const MEMBERSHIP_REPAIR_COMMIT = "spec: surface membership repair";
 const TOKEN_ARGV: Argv = ["npx", "sdd", "token", "--format=json"];
 const FIXER_AUTHOR = "simple-fixer <simple-fixer@sdd-factory.local>";
 const FIXER_OWNER = "assembler";
@@ -66,6 +70,21 @@ function entryOf(run: VerifyRun, step: AssemblyStep, argv: Argv, result: Command
 
 function plainOutcome(run: VerifyRun, entry: VerificationEntry, result: CommandResult, fixTrigger: AssemblyTrigger | null): StepOutcome {
   return { entry, failingCovers: [], failingTests: [], sddReady: null, fixTrigger: entry.result === "red" ? fixTrigger : null, failureOutput: commandLog(result, run.secrets) };
+}
+
+/* assembly-stage:DLT-004: an architect repair or planner re-cut after the last lane started leaves design/ or spec/ uncommitted; other paths stay as they are. */
+async function commitRoleWrittenFiles(git: GitRunner): Promise<void> {
+  const pendingDirs: string[] = [];
+  for (const dir of ROLE_WRITTEN_DIRS) {
+    if ((await git.output(["status", "--porcelain", "--untracked-files=all", "--", dir])) !== "") {
+      pendingDirs.push(dir);
+    }
+  }
+  if (pendingDirs.length === 0) {
+    return;
+  }
+  await git.output(["add", "-A", "--", ...pendingDirs]);
+  await git.output(["commit", "-m", ROLE_WRITTEN_COMMIT, "--", ...pendingDirs]);
 }
 
 async function mergeTask(run: VerifyRun, taskId: string): Promise<MergeEntry> {
@@ -161,6 +180,20 @@ async function refreshBaseline(run: VerifyRun): Promise<void> {
   await run.git.output(["commit", "-m", "spec: baseline refresh"]);
 }
 
+/* assembly-stage:DLT-003: a spec approved before spec-stage:DLT-007 (or a resumed run) lacks the members `sdd ready` checks. */
+async function repairSurfaceMembership(run: VerifyRun): Promise<void> {
+  const specPath = join(run.slice.paths.productDir, SPEC_FILE);
+  const spec = await readTextOrNull(specPath);
+  const repair = spec === null ? null : repairSurfaceMembers(spec);
+  if (repair === null || repair.added.length === 0) {
+    return;
+  }
+  await writeTextAtomic(specPath, repair.text);
+  await run.git.output(["add", "--", SPEC_FILE]);
+  await run.git.output(["commit", "-m", MEMBERSHIP_REPAIR_COMMIT, "--", SPEC_FILE]);
+  run.slice.log(`assembly round ${run.round}: ${repair.surfaceId} members += ${repair.added.join(", ")}`);
+}
+
 function readyEnvelopeOf(text: string): ReadyEnvelope | null {
   try {
     return parseReadyEnvelope(text);
@@ -173,6 +206,7 @@ function readyEnvelopeOf(text: string): ReadyEnvelope | null {
 }
 
 async function runSddReady(run: VerifyRun): Promise<StepOutcome> {
+  await repairSurfaceMembership(run);
   await refreshBaseline(run);
   const argv = stepArgv("sdd_ready", run.evidenceDir);
   const result = await execute(run, argv);
@@ -322,6 +356,7 @@ export function verifyEffect(runner: CommandRunner): EffectHandler {
     await ensureDir(run.evidenceDir);
     await updateLedger(identity, (ledger) => ({ ...ledger, rounds: round, task_order: taskOrder }));
     await run.git.output(["checkout", INTEGRATION_BRANCH]);
+    await commitRoleWrittenFiles(run.git);
     for (const taskId of taskOrder) {
       const merge = await mergeTask(run, taskId);
       await updateLedger(identity, (ledger) => ({ ...ledger, merges: [...ledger.merges, merge] }));

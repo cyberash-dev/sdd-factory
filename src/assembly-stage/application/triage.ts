@@ -148,7 +148,7 @@ export function triageEffect(runner: CommandRunner): EffectHandler {
           instruction: slice.prompts.render(instructionTemplate, variables),
           message: slice.prompts.render(TRIAGE_MESSAGE, variables),
           model,
-          tools: [readFileTool(slice.paths.productDir, trace), listDirTool(slice.paths.productDir, trace), writeFileTool(slice.paths.runDir, trace)],
+          tools: [readFileTool(slice.paths.productDir, trace), listDirTool(slice.paths.productDir, trace), writeFileTool(dirname(handoffPath), trace)],
           timeoutMs: slice.config.timeouts.apiRoleMs,
           maxOutputTokens: MAX_OUTPUT_TOKENS,
           toolTracePath: join(dirname(handoffPath), `tools-run${attempt}.jsonl`),
