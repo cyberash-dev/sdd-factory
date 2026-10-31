@@ -3013,6 +3013,154 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: build-stage:DLT-015
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T18:30:26.669Z
+    change_request: "operator decision 2026-10-31 19:40: test-writer reworks edit frozen tests; arbitration losses at the cap go to the simple-fixer"
+    scope: first-time-approval
+partition_id: build-stage
+title: a finding-routed test-writer rework edits the frozen tests instead of re-authoring them
+target_ids:
+  - build-stage:BEH-004
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  BEH-004 resets the worktree to baseSha on every test-writer rework, so
+  the test-writer finds no tests and writes the whole set again. In run
+  box-office-20261031-170345 task T-007 was sent back four times for one
+  wrong assertion each; every rewrite of about 260 tests brought a new
+  defect (409 vs 201 on the waitlist, 201 on POST /sessions, a fixture
+  that cannot reach the checked state) and the test-writer cap failed the
+  run. Change: when the rework reason is not a design restart
+  (architect_repair..., planner_recut) and T has a testsSha from a passed
+  red check, the worktree is reset with `git reset --hard <testsSha>` and
+  untracked files are removed, so the frozen tests are present and every
+  implementation change is gone; the test-writer's first message names
+  the finding, states that its frozen tests are in place, and asks it to
+  change only what the finding requires. The red check judges covers,
+  test files and the write-set over every file that differs from baseSha
+  (the frozen tests plus this attempt's edits) and commits the result as
+  the new testsSha. A design restart, or a task without testsSha, resets
+  to baseSha as before. Attempt counting is unchanged.
+tests_old_behavior:
+  - a design restart still resets the worktree to baseSha
+  - a rework of a task whose red check never passed still resets to baseSha
+tests_new_behavior:
+  - to:build-stage:BEH-004
+test_obligation:
+  predicate: |
+    Given T with baseSha B and testsSha S whose implementer changed a
+    source file, task.rework{target: test-writer, reason:
+    test_contract_conflict} leaves the worktree at S with the test files
+    of S present and the source change gone, and the test-writer prompt
+    names the finding and the frozen tests; the same rework with reason
+    architect_repair leaves the worktree at B; a red check after the
+    test-writer edited one of two test files finds the covers of both
+    files and passes.
+  test_template: integration
+  boundary_classes:
+    - finding-routed rework with testsSha
+    - design restart
+    - rework without testsSha
+    - red check after a one-file edit
+  failure_scenarios:
+    - the test-writer re-authors the whole set for one finding
+    - covers of untouched frozen test files reported missing
+---
+```
+
+```yaml
+---
+id: build-stage:DLT-016
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T18:30:26.988Z
+    change_request: "operator decision 2026-10-31 19:40: test-writer reworks edit frozen tests; arbitration losses at the cap go to the simple-fixer"
+    scope: first-time-approval
+partition_id: build-stage
+title: an arbitration ruling against a frozen test at the test-writer cap goes to the simple-fixer instead of failing the task
+target_ids:
+  - build-stage:BEH-004
+  - build-stage:BEH-008
+  - factory:BEH-012
+kind: replace
+compatibility_action: ignore
+baseline_version: factory:BL-001@v0.1.0
+surface_impact: []
+description: |
+  In arbitration mode (BEH-008) the reviewer can rule that a frozen test
+  contradicts the records and route the task to the test-writer. When the
+  test-writer rework cap is reached, BEH-004 fails the task with
+  cap_exhausted and the run ends; in run box-office-20261031-170345 this
+  ended the run at 19:19 with 260 of 262 tests passing and the two red
+  ones ruled wrong. The operator rule is that a blocker never ends a run
+  while a bounded way forward exists. Change: when task.rework{target:
+  test-writer, reason: test_contract_conflict} would exceed the
+  test-writer cap and simpleFixes(test-writer, T) < caps.simpleFixes, the
+  foreman resets the worktree to T's testsSha as in DLT-015 and runs the
+  simple-fixer with a new trigger arbitration_tests (owner test-writer,
+  unit T, directory the worktree of T, allowed paths the files matching
+  T.writes under tests/**, not format only). Its prompt carries the
+  arbitration report (findingPath) verbatim instead of a failing command's
+  output and tells it to change only the assertions and fixtures the
+  report names so that they agree with the cited records. The outcome is
+  fixed when at least one allowed file changed and nothing outside the
+  allowed paths did; otherwise every change is reverted and the outcome is
+  unfixed. On fixed the foreman emits task.tests_written for T with the
+  test files and covers of T's last test-writer handoff, as if the
+  test-writer had finished, and the red check, implementer, green check
+  and review follow as usual; the fixer run is not a test-writer attempt.
+  On unfixed, or with the fixer budget spent, task.failed{reason:
+  cap_exhausted, detail: test-writer} is emitted as before. Any other
+  rework reason at the cap fails the task as before; in review mode
+  DLT-013 applies.
+tests_old_behavior:
+  - a test-writer rework at the cap with a reason other than test_contract_conflict still fails the task
+  - with the simple-fixer budget spent the arbitration rework at the cap still fails the task
+tests_new_behavior:
+  - to:build-stage:BEH-004
+  - to:build-stage:BEH-008
+  - to:factory:BEH-012
+test_obligation:
+  predicate: |
+    Given T at the test-writer cap with testsSha S, task.rework{target:
+    test-writer, reason: test_contract_conflict, findingPath: P} emits no
+    task.failed and starts the simple-fixer with trigger arbitration_tests
+    whose prompt contains the text of P; a fixer run that edits one test
+    file of T leads to task.tests_written with the previous test files and
+    covers and leaves T.attempts.testWriter unchanged; a fixer run that
+    edits a file outside tests/** or edits nothing is reverted and emits
+    task.failed cap_exhausted test-writer; with simpleFixes(test-writer,
+    T) at caps.simpleFixes the rework emits task.failed cap_exhausted
+    test-writer; reason tests_rejected at the cap emits task.failed
+    cap_exhausted test-writer.
+  test_template: integration
+  boundary_classes:
+    - arbitration rework at the cap, fixer edits a test
+    - fixer edits outside the allowed paths
+    - fixer edits nothing
+    - fixer budget spent
+    - other reason at the cap
+  failure_scenarios:
+    - a task with two wrong tests ends the run
+    - the fixer edits source files
+    - a fixer run counted as a test-writer attempt
+---
+```
+
 ---
 
 ## 16. Implementation bindings

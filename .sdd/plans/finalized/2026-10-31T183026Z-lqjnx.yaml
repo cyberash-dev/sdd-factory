@@ -1,0 +1,17 @@
+plan_id: 2026-10-31T183026Z-lqjnx
+created_at: 2026-10-31T18:30:26.670Z
+pending_attestations:
+  - id: build-stage:DLT-015
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T18:30:26.669Z
+    change_request: "operator decision 2026-10-31 19:40: test-writer reworks edit frozen tests; arbitration losses at the cap go to the simple-fixer"
+    scope: first-time-approval
+    target_status: approved
+  - id: build-stage:DLT-016
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-10-31T18:30:26.988Z
+    change_request: "operator decision 2026-10-31 19:40: test-writer reworks edit frozen tests; arbitration losses at the cap go to the simple-fixer"
+    scope: first-time-approval
+    target_status: approved
