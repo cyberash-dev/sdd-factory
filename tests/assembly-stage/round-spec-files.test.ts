@@ -8,7 +8,8 @@ import { baselineSpec, collectingContext, commandLine, failed, fakeCommandRunner
 
 const SURFACE_LISTING_CONTRACT = "```yaml\n---\nid: todo-cli:SUR-001\ntype: Surface\nlifecycle: {status: approved}\npartition_id: todo-cli\nmembers: [todo-cli:CTR-001]\nversion: \"0.1.0\"\n---\n```\n";
 const CONTRACT = "```yaml\n---\nid: todo-cli:CTR-001\ntype: Contract\nlifecycle: {status: approved}\npartition_id: todo-cli\nsurface_ref: todo-cli:SUR-001\n---\n```\n";
-const BEHAVIOR_ON_SURFACE = "```yaml\n---\nid: todo-cli:BEH-001\ntype: Behavior\nlifecycle: {status: approved}\npartition_id: todo-cli\nsurface_ref: todo-cli:SUR-001\n---\n```\n";
+const BEHAVIOR_ON_SURFACE = "```yaml\n---\nid: todo-cli:BEH-001\ntype: Behavior\nlifecycle: {status: approved}\npartition_id: todo-cli\nsurface_ref: todo-cli:SUR-001\npolicy_refs: {not_applicable: local cli}\napplicability: {invariant_to_all_axes: true}\nconcurrency_model: {not_applicable: single process}\ndata_scope: {not_applicable: no persistent state}\n---\n```\n";
+const BINDING_ON_SURFACE = "```yaml\n---\nid: todo-cli:IB-001\ntype: ImplementationBinding\nlifecycle: {status: approved}\npartition_id: todo-cli\nbinding: dist/cli.js\nsurface_ref: todo-cli:SUR-001\nnotes: CLI entry bound to dist/cli.js\n---\n```\n";
 
 async function productRepo(specText: string): Promise<{ readonly root: string; readonly productDir: string; readonly baseSha: string }> {
   const root = await tempDir("assembly-round-spec");
@@ -45,9 +46,9 @@ function greenSequence(onReady: () => Promise<void>): CommandScript {
   };
 }
 
-async function verifyRound(root: string, script: CommandScript, implSha: string): Promise<void> {
+async function verifyRound(root: string, script: CommandScript, implSha: string, log: string[] = []): Promise<void> {
   const context = collectingContext(runState({ status: "assembling", assemblyRounds: 1, tasks: { "T-001": taskState({ implSha }) } }));
-  await verifyEffect(fakeCommandRunner(script))({ kind: "assembly.verify", round: 1, taskOrder: ["T-001"] }, context, sliceContext({ root }));
+  await verifyEffect(fakeCommandRunner(script))({ kind: "assembly.verify", round: 1, taskOrder: ["T-001"] }, context, sliceContext({ root, log }));
 }
 
 async function publishAfterRound(root: string): Promise<readonly PendingEvent[]> {
@@ -71,6 +72,29 @@ describe("assembly round surface membership", () => {
     }), fixture.baseSha);
 
     expect(committedSpecAtReady.includes("members:\n  - todo-cli:CTR-001\n  - todo-cli:BEH-001\nversion:")).toBe(true);
+  });
+
+  // @covers assembly-stage:DLT-003
+  // @covers spec-stage:DLT-008
+  it("removes the surface_ref of a binding without boundary fields and commits it before sdd ready runs", async () => {
+    const fixture = await productRepo(baselineSpec(SLUG, "0".repeat(40), "0".repeat(64)) + SURFACE_LISTING_CONTRACT + CONTRACT + BINDING_ON_SURFACE);
+    let committedSpecAtReady = "";
+
+    await verifyRound(fixture.root, greenSequence(async () => {
+      committedSpecAtReady = await git(fixture.productDir, "show", "HEAD:spec/spec.md");
+    }), fixture.baseSha);
+
+    expect(committedSpecAtReady).toContain("partition_id: todo-cli\nbinding: dist/cli.js\nnotes: CLI entry bound to dist/cli.js\n---");
+  });
+
+  // @covers spec-stage:DLT-008
+  it("logs the ids whose surface_ref the round removed and no empty members line", async () => {
+    const fixture = await productRepo(baselineSpec(SLUG, "0".repeat(40), "0".repeat(64)) + SURFACE_LISTING_CONTRACT + CONTRACT + BINDING_ON_SURFACE);
+    const log: string[] = [];
+
+    await verifyRound(fixture.root, greenSequence(async () => undefined), fixture.baseSha, log);
+
+    expect(log.filter((line) => line.includes("surface_ref") || line.includes("members +="))).toEqual(["assembly round 1: surface_ref removed from todo-cli:IB-001"]);
   });
 
   // @covers assembly-stage:DLT-003

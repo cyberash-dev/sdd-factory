@@ -210,13 +210,18 @@ async function repairSurfaceMembership(run: VerifyRun): Promise<void> {
   const specPath = join(run.slice.paths.productDir, SPEC_FILE);
   const spec = await readTextOrNull(specPath);
   const repair = spec === null ? null : repairSurfaceMembers(spec);
-  if (repair === null || repair.added.length === 0) {
+  if (repair === null || (repair.added.length === 0 && repair.detached.length === 0)) {
     return;
   }
   await writeTextAtomic(specPath, repair.text);
   await run.git.output(["add", "--", SPEC_FILE]);
   await run.git.output(["commit", "-m", MEMBERSHIP_REPAIR_COMMIT, "--", SPEC_FILE]);
-  run.slice.log(`assembly round ${run.round}: ${repair.surfaceId} members += ${repair.added.join(", ")}`);
+  if (repair.added.length > 0) {
+    run.slice.log(`assembly round ${run.round}: ${repair.surfaceId} members += ${repair.added.join(", ")}`);
+  }
+  if (repair.detached.length > 0) {
+    run.slice.log(`assembly round ${run.round}: surface_ref removed from ${repair.detached.join(", ")}`);
+  }
 }
 
 function readyEnvelopeOf(text: string): ReadyEnvelope | null {

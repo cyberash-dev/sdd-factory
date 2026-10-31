@@ -113,9 +113,31 @@ describe("surface membership repair", () => {
     expect([repaired?.added, repaired?.text.includes("members:\n  - todo-cli:CTR-002\n  - todo-cli:CTR-001\n  - todo-cli:CTR-003\nversion: \"0.1.0\""), specIntegrityProblems(repaired?.text ?? "")]).toEqual([["todo-cli:CTR-003"], true, []]);
   });
 
+  // @covers spec-stage:DLT-008
+  it("appends a record whose surface_ref names the surface when it carries the four boundary fields", () => {
+    const behavior = record("todo-cli:BEH-001", "Behavior", "title: add\nsurface_ref: todo-cli:SUR-001\npolicy_refs: {not_applicable: local cli}\napplicability: {invariant_to_all_axes: true}\nconcurrency_model: {not_applicable: single process}\ndata_scope: {not_applicable: no persistent state}");
+
+    const repaired = repairSurfaceMembers(SURFACE + CONTRACTS + behavior);
+
+    expect([repaired?.added, repaired?.detached, repaired?.text.includes("members:\n  - todo-cli:CTR-001\n  - todo-cli:CTR-002\n  - todo-cli:BEH-001\n")]).toEqual([["todo-cli:BEH-001"], [], true]);
+  });
+
+  // @covers spec-stage:DLT-008
+  it.each([
+    ["no boundary fields", ""],
+    ["three of the four boundary fields", "\npolicy_refs: {not_applicable: local cli}\napplicability: {invariant_to_all_axes: true}\nconcurrency_model: {not_applicable: single process}"],
+  ])("removes the surface_ref line of a record with %s and leaves it out of members", (_fields, boundaryFields) => {
+    const binding = (surfaceRef: string): string => record("todo-cli:IB-001", "ImplementationBinding", `binding: dist/cli.js\n${surfaceRef}boundary_classes: [cli entry]\nnotes: CLI entry${boundaryFields}`);
+    const spec = SURFACE + CONTRACTS + binding("surface_ref: todo-cli:SUR-001\n");
+
+    const repaired = repairSurfaceMembers(spec);
+
+    expect(repaired).toEqual({ surfaceId: "todo-cli:SUR-001", added: [], detached: ["todo-cli:IB-001"], text: SURFACE + CONTRACTS + binding("") });
+  });
+
   // @covers spec-stage:DLT-004
   it("reports nothing to add when every contract is already a member", () => {
-    expect(repairSurfaceMembers(SURFACE + CONTRACTS)).toEqual({ surfaceId: "todo-cli:SUR-001", added: [], text: SURFACE + CONTRACTS });
+    expect(repairSurfaceMembers(SURFACE + CONTRACTS)).toEqual({ surfaceId: "todo-cli:SUR-001", added: [], detached: [], text: SURFACE + CONTRACTS });
   });
 
   // @covers spec-stage:DLT-004
